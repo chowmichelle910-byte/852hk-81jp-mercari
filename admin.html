@@ -1150,7 +1150,11 @@ function buildMsg(r, arrTag, receiptUrl){
       local = 13;
     }
     const total = (parseFloat(postage) + local).toFixed(1);
-    return `客人你好, ${arrTag}嘅貨品已運往香港途中~${urlLine}請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
+    return `客人你好, ${arrTag}嘅貨品已運往香港途中~
+    
+    ${urlLine}
+    
+    請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
 及易寄取郵費HK$${local}, 共HK$${total}🙏🏻
 
 如果收件資料冇更改，我哋會用以下運單編號寄出：
@@ -1159,7 +1163,11 @@ ${trk}
 謝謝!`;
   }
   else if(method.toUpperCase().includes('SF')){
-    return `客人你好, ${arrTag}嘅貨品已運往香港途中~${urlLine}請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
+    return `客人你好, ${arrTag}嘅貨品已運往香港途中~
+    
+    ${urlLine}
+    
+    請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
 香港運費部分會由順豐收取
 
 如果收件資料冇更改，我哋會用以下運單編號寄出：
@@ -1168,14 +1176,22 @@ ${trk}
 謝謝!`;
   }
   else if(method.includes('平郵')){
-    return `客人你好, ${arrTag}嘅貨品已運往香港途中~${urlLine}請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
+    return `客人你好, ${arrTag}嘅貨品已運往香港途中~
+    
+    ${urlLine}
+    
+    請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
 🙏🏻
 香港平郵郵費部分會於寄出後提供寄出證明時收取
 
 謝謝!`;
   }
   else{
-    return `客人你好, ${arrTag}嘅貨品已運往香港途中~${urlLine}請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
+    return `客人你好, ${arrTag}嘅貨品已運往香港途中~
+    
+    ${urlLine}
+    
+    請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
 
 謝謝!`;
   }
