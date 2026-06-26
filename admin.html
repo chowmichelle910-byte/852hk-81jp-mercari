@@ -1151,9 +1151,7 @@ function buildMsg(r, arrTag, receiptUrl){
     }
     const total = (parseFloat(postage) + local).toFixed(1);
     return `客人你好, ${arrTag}嘅貨品已運往香港途中~
-    
     ${urlLine}
-    
     請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
 及易寄取郵費HK$${local}, 共HK$${total}🙏🏻
 
@@ -1164,9 +1162,7 @@ ${trk}
   }
   else if(method.toUpperCase().includes('SF')){
     return `客人你好, ${arrTag}嘅貨品已運往香港途中~
-    
     ${urlLine}
-    
     請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
 香港運費部分會由順豐收取
 
@@ -1177,9 +1173,7 @@ ${trk}
   }
   else if(method.includes('平郵')){
     return `客人你好, ${arrTag}嘅貨品已運往香港途中~
-    
     ${urlLine}
-    
     請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
 🙏🏻
 香港平郵郵費部分會於寄出後提供寄出證明時收取
@@ -1188,9 +1182,7 @@ ${trk}
   }
   else{
     return `客人你好, ${arrTag}嘅貨品已運往香港途中~
-    
     ${urlLine}
-    
     請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
 
 謝謝!`;
