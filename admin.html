@@ -970,10 +970,17 @@ function renderProfitGroup(g){
       <div class="kpi-box"><div class="kpi-lbl">購入日幣</div><div class="kpi-val" style="font-size:15px;">${r.buyJpy!=null?'¥'+Number(r.buyJpy).toLocaleString():'—'}</div></div>
       <div class="kpi-box"><div class="kpi-lbl">收到港幣</div><div class="kpi-val" style="font-size:15px;">${r.rcvHkd!=null?'HK$'+Number(r.rcvHkd).toFixed(1):'—'}</div></div>
       <div class="kpi-box green"><div class="kpi-lbl">賺取港幣</div><div class="kpi-val g">${r.earnHkd!=null?'HK$'+Number(r.earnHkd).toFixed(1):'—'}</div></div>
-      <div class="kpi-box" style="border-left-color:#7C3AED;">
+      <div class="kpi-box" style="border-left-color:${r.settled?'var(--success)':'#7C3AED'};">
         <div class="kpi-lbl">每人賺取</div>
-        <div class="kpi-val" style="font-size:15px;color:#7C3AED;">${r.perPerson!=null?r.perPerson:'—'}</div>
-        ${r.perPerson!=null?`<button class="clear-color-btn" style="margin-top:6px;" onclick="clearIColor('${esc(g)}','${esc(String(r.analysisRow))}')">🎨 清除底色</button>`:''}
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <div class="kpi-val" style="font-size:15px;color:${r.settled?'var(--success)':'#7C3AED'};">${r.perPerson!=null?r.perPerson:'—'}</div>
+          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:30px;background:${r.settled?'#DCFCE7':'#F3F0FF'};color:${r.settled?'var(--success)':'#7C3AED'};">
+            ${r.settled?'✅ 已結算':'⏳ 未結算'}
+          </span>
+        </div>
+        ${r.perPerson!=null?`<button class="clear-color-btn" style="margin-top:4px;" onclick="clearIColor('${esc(g)}','${esc(String(r.analysisRow))}')">
+          ${r.settled?'🔄 取消結算':'🎨 標記結算'}
+        </button>`:''}
       </div>
       <div class="kpi-box"><div class="kpi-lbl">寄出重量</div><div class="kpi-val" style="font-size:15px;">${r.weight!=null?r.weight:'—'}</div></div>
       <div class="kpi-box"><div class="kpi-lbl">客人郵費</div><div class="kpi-val" style="font-size:15px;">${r.custPostage!=null?'HK$'+Number(r.custPostage).toFixed(1):'—'}</div></div>
@@ -993,11 +1000,13 @@ async function saveActualPostage(analysisRow, value){
 }
 
 async function clearIColor(group, analysisRow){
-  if(!confirm(`確定清除「${group}」I欄底色？`))return;
   try{
     const d=await postMain({action:'clearIColumnColor',password:pw,analysisRow});
     if(d.error)throw new Error(d.error);
-    alert('✅ 底色已清除');
+    // 即時更新本地資料，唔需要重新載入
+    const r=profitAllRows.find(row=>row.group===group);
+    if(r){r.settled=d.settled;}
+    renderProfitGroup(curProfitGroup);
   }catch(e){alert('失敗：'+e.message);}
 }
 
