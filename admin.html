@@ -249,16 +249,6 @@ button{font-family:var(--font);}
 .rec-track-inp:focus{border-color:var(--gold);}
 .rec-save-btn{padding:8px 14px;background:var(--success);color:white;border:none;border-radius:var(--r-sm);font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;}
 
-/* Receipt image modal */
-.receipt-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:3000;align-items:center;justify-content:center;flex-direction:column;gap:12px;}
-.receipt-modal.open{display:flex;}
-.receipt-canvas-wrap{max-width:92vw;max-height:80vh;overflow-y:auto;border-radius:var(--r-md);background:white;}
-.receipt-canvas-wrap canvas{display:block;max-width:100%;}
-.receipt-modal-btns{display:flex;gap:10px;}
-.receipt-modal-btn{padding:11px 22px;border:none;border-radius:var(--r-sm);font-weight:700;font-size:14px;cursor:pointer;}
-.rm-save{background:var(--gold);color:var(--navy);}
-.rm-close{background:rgba(255,255,255,.2);color:white;}
-
 /* Status / empty / spin */
 .empty{text-align:center;padding:36px 20px;color:var(--slate);font-size:13px;}
 .spin{width:26px;height:26px;border:3px solid rgba(201,168,76,.25);border-top-color:var(--gold);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 9px;}
@@ -481,14 +471,7 @@ button{font-family:var(--font);}
 
 <button id="floatSave" class="fsave" onclick="saveBatch()">💾</button>
 
-<!-- Receipt Image Modal -->
-<div id="receiptModal" class="receipt-modal" onclick="closeReceiptModal(event)">
-  <div class="receipt-canvas-wrap" id="receiptCanvasWrap"></div>
-  <div class="receipt-modal-btns">
-    <button class="receipt-modal-btn rm-save" onclick="saveReceiptImg()">💾 儲存圖片</button>
-    <button class="receipt-modal-btn rm-close" onclick="document.getElementById('receiptModal').classList.remove('open')">✕ 關閉</button>
-  </div>
-</div>
+
 
 <script>
 // ── Config ──
@@ -1125,254 +1108,197 @@ async function saveTracking(rowNum){
   }
 }
 
-// ════════ RECEIPT IMAGE ════════
-let _receiptCanvas = null;
+// ════════ RECEIPT IMAGE → Supabase Storage ════════
 
 async function showReceipt(userName, group){
   if(!userName||!group){alert('請先選擇團次並載入客人資料');return;}
-  const modal=document.getElementById('receiptModal');
-  const wrap=document.getElementById('receiptCanvasWrap');
-  wrap.innerHTML='<div style="padding:30px;text-align:center;color:#666;font-size:14px;"><div class="spin" style="margin:0 auto 10px;"></div>生成收據圖片中…</div>';
-  modal.classList.add('open');
+
+  // 搵按鈕並顯示 loading
+  const btn = [...document.querySelectorAll('.rec-copy-btn')].find(b=>
+    b.textContent.includes('到貨圖') &&
+    b.closest('.rec-card')?.querySelector('.rec-username')?.textContent?.trim()===userName
+  );
+  const origText = btn?.textContent||'🖼️ 到貨圖';
+  if(btn){btn.disabled=true;btn.textContent='⏳ 生成中…';}
 
   try{
-    const d=await postMain({action:'getCustomerReceipt',password:pw,group,userName});
-    if(d.error)throw new Error(d.error);
+    // 1. 取資料
+    const d = await postMain({action:'getCustomerReceipt',password:pw,group,userName});
+    if(d.error) throw new Error(d.error);
 
-    // 需要預載所有商品圖片
-    const canvas=await drawReceiptCanvas(d, userName, group);
-    _receiptCanvas=canvas;
-    wrap.innerHTML='';
-    wrap.appendChild(canvas);
+    // 2. 取 Record 卡片資料
+    let recData = null;
+    document.querySelectorAll('.rec-card').forEach(card=>{
+      const uname=card.querySelector('.rec-username');
+      if(uname&&uname.textContent.trim()===userName){
+        const fields=card.querySelectorAll('.rv');
+        recData={
+          method   : fields[0]?.textContent||'',
+          postage  : fields[1]?.textContent||'',
+          weight   : fields[2]?.textContent||'',
+          receiver : fields[6]?.textContent||'',
+          phoneAddr: fields[7]?.textContent||''
+        };
+      }
+    });
+    const phone   = recData?.phoneAddr?.split('|')[0]?.trim()||'';
+    const address = recData?.phoneAddr?.split('|').slice(1).join('|').trim()||'';
+
+    // 3. 生成 HTML
+    const html = buildReceiptHtml(d.items||[], userName, group, recData, phone, address);
+
+    // 4. 上傳到 Supabase Storage
+    const filename = `receipt_${encodeURIComponent(userName)}_${encodeURIComponent(group)}_${Date.now()}.html`;
+    const uploadRes = await fetch(`${SB_URL}/storage/v1/object/receipts/${filename}`, {
+      method : 'POST',
+      headers: {
+        'apikey'        : SB_KEY,
+        'Authorization' : 'Bearer ' + SB_KEY,
+        'Content-Type'  : 'text/html;charset=utf-8',
+        'Cache-Control' : '3600',
+      },
+      body: html
+    });
+
+    if(!uploadRes.ok){
+      // 如果已存在就用 PUT 更新
+      const putRes = await fetch(`${SB_URL}/storage/v1/object/receipts/${filename}`, {
+        method : 'PUT',
+        headers: {
+          'apikey'        : SB_KEY,
+          'Authorization' : 'Bearer ' + SB_KEY,
+          'Content-Type'  : 'text/html;charset=utf-8',
+          'Cache-Control' : '3600',
+        },
+        body: html
+      });
+      if(!putRes.ok) throw new Error('上傳失敗：'+putRes.status);
+    }
+
+    // 5. 公開 URL
+    const publicUrl = `${SB_URL}/storage/v1/object/public/receipts/${filename}`;
+
+    // 6. 顯示 URL + 複製
+    showReceiptUrl(userName, publicUrl);
+
   }catch(e){
-    wrap.innerHTML=`<div style="padding:30px;color:red;font-size:13px;">❌ ${e.message}</div>`;
+    alert('生成失敗：'+e.message);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=origText;}
   }
 }
 
-function closeReceiptModal(e){
-  if(e.target===document.getElementById('receiptModal'))
-    document.getElementById('receiptModal').classList.remove('open');
-}
-
-function saveReceiptImg(){
-  if(!_receiptCanvas)return;
-  const link=document.createElement('a');
-  link.download='receipt.png';
-  link.href=_receiptCanvas.toDataURL('image/png');
-  link.click();
-}
-
-async function loadImg(src){
-  return new Promise((res,rej)=>{
-    if(!src){res(null);return;}
-    const img=new Image();
-    img.crossOrigin='anonymous';
-    img.onload=()=>res(img);
-    img.onerror=()=>res(null);
-    img.src=src;
-    setTimeout(()=>res(null),5000); // 5s timeout
-  });
-}
-
-async function drawReceiptCanvas(d, userName, group){
-  const items   = d.items || [];
-  const arrTag  = group + '到貨';
-  const W       = 750;
-  const PAD     = 30;
-  const imgSide = 90;
-  const lineH   = 22;
-  const secGap  = 16;
-
-  // 找 Record 卡片資料
-  let recData = null;
+function showReceiptUrl(userName, url){
+  // 喺對應嘅客人框入面顯示連結
   document.querySelectorAll('.rec-card').forEach(card=>{
     const uname=card.querySelector('.rec-username');
     if(uname&&uname.textContent.trim()===userName){
-      const fields=card.querySelectorAll('.rv');
-      recData={
-        method  : fields[0]?.textContent||'',
-        postage : fields[1]?.textContent||'',
-        weight  : fields[2]?.textContent||'',
-        receiver: fields[6]?.textContent||'',
-        phoneAddr: fields[7]?.textContent||''
-      };
+      // 移除舊的 url row（如有）
+      const old=card.querySelector('.receipt-url-row');
+      if(old)old.remove();
+
+      const row=document.createElement('div');
+      row.className='receipt-url-row';
+      row.style.cssText='display:flex;gap:7px;align-items:center;margin-top:8px;padding:8px 10px;background:#EFF6FF;border-radius:6px;';
+      row.innerHTML=`
+        <span style="font-size:11px;color:#1E40AF;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          <a href="${url}" target="_blank" style="color:#1E40AF;">🔗 ${url}</a>
+        </span>
+        <button onclick="copyReceiptUrl('${url}',this)" style="padding:5px 11px;background:#1E40AF;color:white;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">複製連結</button>`;
+      // 插入到 track row 前面
+      const trackRow=card.querySelector('.rec-track-row');
+      card.insertBefore(row, trackRow);
     }
   });
-  const phone   = recData?.phoneAddr?.split('|')[0]?.trim()||'';
-  const address = recData?.phoneAddr?.split('|').slice(1).join('|').trim()||'';
+}
 
-  // 預載圖片
-  const imgMap = {};
-  for(const it of items){
-    if(it.image) imgMap[it.image] = await loadImg(it.image);
-  }
+function copyReceiptUrl(url, btn){
+  navigator.clipboard.writeText(url).then(()=>{
+    const orig=btn.textContent; btn.textContent='✅ 已複製';
+    setTimeout(()=>btn.textContent=orig,2000);
+  });
+}
 
-  // 計算總高度
-  const infoRows = 7;
-  let totalH = 50 + 16; // header
-  totalH += infoRows * lineH + 16 + secGap; // info block
-  totalH += lineH + 10; // section title
-  for(const it of items){
-    const img = imgMap[it.image];
-    const nameLines = Math.ceil((it.itemName||'').length / 28) || 1;
-    const contentH = Math.max(nameLines * lineH, img ? imgSide : 0);
-    totalH += 24 + contentH + lineH*2 + 16 + secGap; // row1 + content + weight + url + pad
-  }
-  totalH += PAD;
+function buildReceiptHtml(items, userName, group, recData, phone, address){
+  const arrTag = group + '到貨';
+  const method   = recData?.method||'—';
+  const postage  = recData?.postage||'—';
+  const weight   = recData?.weight||'—';
+  const receiver = recData?.receiver||'—';
 
-  // 建立 canvas
-  const canvas = document.createElement('canvas');
-  canvas.width  = W;
-  canvas.height = totalH;
-  const ctx = canvas.getContext('2d');
+  const itemsHtml = items.map(it=>{
+    const notArrived = !it.arrivalDate;
+    const bg    = notArrived ? '#FFFBEB' : '#ffffff';
+    const border= notArrived ? '2px solid #F59E0B' : '1px solid #E2E8EF';
+    const dateColor = notArrived ? '#D97706' : '#059669';
+    const dateText  = it.arrivalDate || '未到貨';
+    const imgHtml   = it.image
+      ? `<img src="${esc(it.image)}" style="width:90px;height:90px;object-fit:cover;border-radius:6px;flex-shrink:0;">`
+      : `<div style="width:90px;height:90px;background:#F1F5F9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#CBD5E1;font-size:11px;flex-shrink:0;">無圖</div>`;
+    return `
+      <div style="background:${bg};border:${border};border-radius:10px;padding:14px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px;">
+          <span style="font-family:monospace;font-weight:700;font-size:13px;color:#0D1B2A;">#${esc(it.code||'—')}</span>
+          <span style="font-size:11px;color:#64748B;">購買：${esc(it.orderedDate||'—')}</span>
+          <span style="font-size:11px;font-weight:${notArrived?'700':'400'};color:${dateColor};">到貨：${dateText}</span>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;color:#1A2E45;line-height:1.6;word-break:break-all;margin-bottom:6px;">${esc(it.itemName||'—')}</div>
+            <div style="font-size:11px;color:#64748B;margin-bottom:4px;">重量：${it.weightKg?it.weightKg.toFixed(3)+'kg':'—'}</div>
+            <a href="${esc(it.link||'')}" style="font-size:10px;color:#3B82F6;word-break:break-all;line-height:1.4;" target="_blank">${esc(it.link||'')}</a>
+          </div>
+          ${imgHtml}
+        </div>
+      </div>`;
+  }).join('');
 
-  // Background
-  ctx.fillStyle = '#F4F6F9';
-  ctx.fillRect(0, 0, W, totalH);
+  return `<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>852hk81jp 到貨收據 — ${esc(arrTag)}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans HK',system-ui,sans-serif;background:#F4F6F9;padding:16px;max-width:600px;margin:0 auto;}
+</style>
+</head>
+<body>
+<!-- Header -->
+<div style="background:#0D1B2A;border-radius:14px;padding:18px 20px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+  <div>
+    <div style="color:#C9A84C;font-weight:900;font-size:18px;">852hk81jp</div>
+    <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:2px;">到貨收據</div>
+  </div>
+  <div style="color:rgba(255,255,255,.7);font-size:13px;font-weight:700;">${esc(arrTag)}</div>
+</div>
 
-  // Helper: wrap text，返回實際繪製高度
-  function wrapText(text, x, y, maxW, lh, color='#1A2E45', font='13px sans-serif'){
-    ctx.font = font;
-    ctx.fillStyle = color;
-    const chars = Array.from(text);
-    let line = '', lines = [];
-    for(const ch of chars){
-      const test = line + ch;
-      if(ctx.measureText(test).width > maxW && line){ lines.push(line); line = ch; }
-      else { line = test; }
-    }
-    if(line) lines.push(line);
-    lines.forEach((l,i) => ctx.fillText(l, x, y + i*lh));
-    return lines.length * lh;
-  }
-
-  let y = 0;
-
-  // ── Header ──
-  ctx.fillStyle = '#0D1B2A';
-  ctx.fillRect(0, 0, W, 50);
-  ctx.fillStyle = '#C9A84C';
-  ctx.font = 'bold 17px sans-serif';
-  ctx.fillText('852hk81jp 到貨收據', PAD, 33);
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.font = '12px sans-serif';
-  const tagW = ctx.measureText(arrTag).width;
-  ctx.fillText(arrTag, W - PAD - tagW, 33);
-  y = 60;
-
-  // ── 客戶資訊 block ──
-  const infoBoxH = infoRows * lineH + 16;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.roundRect(PAD, y, W - PAD*2, infoBoxH, 10);
-  ctx.fill();
-  ctx.strokeStyle = '#E2E8EF';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  const infoData = [
+<!-- 客戶資訊 -->
+<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:14px;border:1px solid #E2E8EF;">
+  <div style="font-size:12px;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">客戶資訊</div>
+  ${[
     ['客戶名稱', userName],
-    ['郵寄方式', recData?.method||'—'],
-    ['重量',     recData?.weight||'—'],
-    ['國際運費', recData?.postage||'—'],
-    ['收件人',   recData?.receiver||'—'],
+    ['郵寄方式', method],
+    ['重量',     weight],
+    ['國際運費', postage],
+    ['收件人',   receiver],
     ['電話',     phone||'—'],
     ['地址',     address||'—'],
-  ];
-  let iy = y + 14;
-  for(const [lbl, val] of infoData){
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = '12px sans-serif';
-    ctx.fillText(lbl + '：', PAD+12, iy);
-    ctx.fillStyle = '#0D1B2A';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.fillText(val, PAD + 80, iy);
-    iy += lineH;
-  }
-  y += infoBoxH + secGap;
+  ].map(([l,v])=>`
+  <div style="display:flex;padding:6px 0;border-bottom:1px solid #F1F5F9;">
+    <span style="font-size:12px;color:#94A3B8;width:70px;flex-shrink:0;">${l}</span>
+    <span style="font-size:12px;font-weight:600;color:#0D1B2A;flex:1;word-break:break-all;">${esc(v)}</span>
+  </div>`).join('')}
+</div>
 
-  // ── 已訂購商品標題 ──
-  ctx.fillStyle = '#0D1B2A';
-  ctx.font = 'bold 14px sans-serif';
-  ctx.fillText('已訂購商品', PAD, y + 14);
-  y += lineH + 8;
+<!-- 已訂購商品 -->
+<div style="font-size:13px;font-weight:800;color:#0D1B2A;margin-bottom:10px;">已訂購商品</div>
+${itemsHtml}
 
-  // ── 每件商品 ──
-  for(const it of items){
-    const notArrived = !it.arrivalDate;
-    const img = imgMap[it.image];
-    const nameMaxW = img ? W - PAD*2 - imgSide - 20 : W - PAD*2 - 20;
-
-    // 估算商品名高度
-    ctx.font = 'bold 13px sans-serif';
-    const nameChars = Array.from(it.itemName||'—');
-    let nameLine='', nameLines=[];
-    for(const ch of nameChars){
-      const test=nameLine+ch;
-      if(ctx.measureText(test).width > nameMaxW && nameLine){ nameLines.push(nameLine); nameLine=ch; }
-      else { nameLine=test; }
-    }
-    if(nameLine) nameLines.push(nameLine);
-    const nameDrawH = nameLines.length * lineH;
-    const contentH = Math.max(nameDrawH, img ? imgSide : 0);
-    const cardH = 26 + contentH + lineH + lineH + 14;
-
-    // Card background
-    ctx.fillStyle = notArrived ? '#FFFBEB' : '#FFFFFF';
-    ctx.beginPath();
-    ctx.roundRect(PAD, y, W-PAD*2, cardH, 8);
-    ctx.fill();
-    ctx.strokeStyle = notArrived ? '#F59E0B' : '#E2E8EF';
-    ctx.lineWidth = notArrived ? 2 : 1;
-    ctx.stroke();
-
-    // Row1: 編號 + 購買日期 + 到貨日期
-    const r1y = y + 18;
-    ctx.fillStyle = '#0D1B2A';
-    ctx.font = 'bold 12px monospace';
-    ctx.fillText(`#${it.code}`, PAD+12, r1y);
-
-    ctx.fillStyle = '#64748B';
-    ctx.font = '11px sans-serif';
-    ctx.fillText(`購買：${it.orderedDate||'—'}`, PAD+70, r1y);
-
-    const arrText = it.arrivalDate || '未到貨';
-    ctx.fillStyle = notArrived ? '#D97706' : '#059669';
-    ctx.font = notArrived ? 'bold 11px sans-serif' : '11px sans-serif';
-    ctx.fillText(`到貨：${arrText}`, PAD+210, r1y);
-
-    // 商品名稱
-    const nameY = r1y + 8;
-    wrapText(it.itemName||'—', PAD+12, nameY, nameMaxW, lineH, '#1A2E45', 'bold 13px sans-serif');
-
-    // 商品圖片
-    if(img){
-      const imgX = W - PAD - imgSide - 12;
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(imgX, nameY - 4, imgSide, imgSide, 6);
-      ctx.clip();
-      ctx.drawImage(img, imgX, nameY - 4, imgSide, imgSide);
-      ctx.restore();
-    }
-
-    // 重量
-    const wtY = r1y + 8 + contentH + 6;
-    ctx.fillStyle = '#64748B';
-    ctx.font = '11px sans-serif';
-    ctx.fillText(`重量：${it.weightKg ? it.weightKg.toFixed(3)+'kg' : '—'}`, PAD+12, wtY);
-
-    // 網址
-    const urlY = wtY + lineH;
-    ctx.fillStyle = '#3B82F6';
-    ctx.font = '10px sans-serif';
-    const shortUrl = it.link ? it.link.substring(0,70)+(it.link.length>70?'…':'') : '';
-    ctx.fillText(shortUrl, PAD+12, urlY);
-
-    y += cardH + 10;
-  }
-
-  return canvas;
+<div style="text-align:center;padding:16px 0;color:#94A3B8;font-size:11px;">852hk81jp · 由系統自動生成</div>
+</body>
+</html>`;
 }
 
 async function runTool(action,label){
