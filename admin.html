@@ -1191,11 +1191,16 @@ function showReceiptUrl(userName, url){
       const row=document.createElement('div');
       row.className='receipt-url-row';
       row.style.cssText='display:flex;gap:7px;align-items:center;margin-top:8px;padding:8px 10px;background:#EFF6FF;border-radius:6px;';
-      row.innerHTML=`
-        <span style="font-size:11px;color:#1E40AF;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-          <a href="${url}" target="_blank" style="color:#1E40AF;">🔗 ${url}</a>
-        </span>
-        <button onclick="copyReceiptUrl('${url}',this)" style="padding:5px 11px;background:#1E40AF;color:white;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">複製連結</button>`;
+      const span = document.createElement('span');
+      span.style.cssText = 'font-size:11px;color:#1E40AF;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+      const a = document.createElement('a');
+      a.href = url; a.target = '_blank'; a.style.color = '#1E40AF'; a.textContent = '🔗 ' + url;
+      span.appendChild(a);
+      const cpBtn = document.createElement('button');
+      cpBtn.textContent = '複製連結';
+      cpBtn.style.cssText = 'padding:5px 11px;background:#1E40AF;color:white;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;';
+      cpBtn.onclick = () => copyReceiptUrl(url, cpBtn);
+      row.appendChild(span); row.appendChild(cpBtn);
       const trackRow=card.querySelector('.rec-track-row');
       card.insertBefore(row, trackRow);
 
@@ -1204,8 +1209,7 @@ function showReceiptUrl(userName, url){
       if(msgEl){
         let msg=msgEl.value;
         if(!msg.includes(url)){
-          // 如果訊息有"到貨資料: 
-"就補入，否則插入到第一行後
+          // 如果訊息有到貨資料行就補入URL，否則插入到第一行後
           if(msg.includes('到貨資料: \n')){
             msg=msg.replace('到貨資料: \n',`到貨資料: ${url}\n`);
           } else {
