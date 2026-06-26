@@ -1177,16 +1177,18 @@ async function loadImg(src){
 async function drawReceiptCanvas(d, userName, group){
   const items   = d.items || [];
   const arrTag  = group + '到貨';
+  const W       = 750;
+  const PAD     = 30;
+  const imgSide = 90;
+  const lineH   = 22;
+  const secGap  = 16;
 
-  // ── 找 Record 資料（郵寄方式/運費/收件人等）──
-  const recRow  = (document.querySelectorAll('.rec-username')||[]);
-  let recData   = null;
-  // 從頁面已有的 record card 讀取
+  // 找 Record 卡片資料
+  let recData = null;
   document.querySelectorAll('.rec-card').forEach(card=>{
     const uname=card.querySelector('.rec-username');
     if(uname&&uname.textContent.trim()===userName){
       const fields=card.querySelectorAll('.rv');
-      // order: 郵寄方式, 國際運費, 重量, 到貨數量, 整體編號, 貨品編號, 收件人, 電話/地址
       recData={
         method  : fields[0]?.textContent||'',
         postage : fields[1]?.textContent||'',
@@ -1199,78 +1201,76 @@ async function drawReceiptCanvas(d, userName, group){
   const phone   = recData?.phoneAddr?.split('|')[0]?.trim()||'';
   const address = recData?.phoneAddr?.split('|').slice(1).join('|').trim()||'';
 
-  // ── Canvas 尺寸 ──
-  const W       = 750;
-  const PAD     = 30;
-  const imgSide = 100;
-  const lineH   = 22;
-  const secGap  = 18;
-
   // 預載圖片
   const imgMap = {};
   for(const it of items){
     if(it.image) imgMap[it.image] = await loadImg(it.image);
   }
 
-  // ── 先計算高度 ──
-  let estH = PAD + 30 + lineH + 10; // header
-  // 客戶資訊 block
-  estH += 7 * lineH + secGap;
-  // 已訂購商品 title
-  estH += lineH + 10;
+  // 計算總高度
+  const infoRows = 7;
+  let totalH = 50 + 16; // header
+  totalH += infoRows * lineH + 16 + secGap; // info block
+  totalH += lineH + 10; // section title
   for(const it of items){
-    estH += 26 + lineH + lineH + lineH + secGap; // row1 + name + weight/url + gap
-    if(imgMap[it.image]) estH += imgSide + 8;
+    const img = imgMap[it.image];
+    const nameLines = Math.ceil((it.itemName||'').length / 28) || 1;
+    const contentH = Math.max(nameLines * lineH, img ? imgSide : 0);
+    totalH += 24 + contentH + lineH*2 + 16 + secGap; // row1 + content + weight + url + pad
   }
-  estH += PAD;
+  totalH += PAD;
 
-  const canvas  = document.createElement('canvas');
+  // 建立 canvas
+  const canvas = document.createElement('canvas');
   canvas.width  = W;
-  canvas.height = Math.max(estH, 400);
-  const ctx     = canvas.getContext('2d');
+  canvas.height = totalH;
+  const ctx = canvas.getContext('2d');
 
-  // ── Background ──
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0,0,W,canvas.height);
+  // Background
+  ctx.fillStyle = '#F4F6F9';
+  ctx.fillRect(0, 0, W, totalH);
 
-  // ── Helper ──
-  function wrapText(text, x, y, maxW, lh, color='#1A2E45'){
+  // Helper: wrap text，返回實際繪製高度
+  function wrapText(text, x, y, maxW, lh, color='#1A2E45', font='13px sans-serif'){
+    ctx.font = font;
     ctx.fillStyle = color;
-    const words = text.split('');
+    const chars = Array.from(text);
     let line = '', lines = [];
-    for(const ch of words){
+    for(const ch of chars){
       const test = line + ch;
-      if(ctx.measureText(test).width > maxW && line){
-        lines.push(line); line = ch;
-      } else { line = test; }
+      if(ctx.measureText(test).width > maxW && line){ lines.push(line); line = ch; }
+      else { line = test; }
     }
     if(line) lines.push(line);
-    lines.forEach((l,i)=>ctx.fillText(l, x, y + i*lh));
+    lines.forEach((l,i) => ctx.fillText(l, x, y + i*lh));
     return lines.length * lh;
   }
 
-  let y = PAD;
+  let y = 0;
 
   // ── Header ──
   ctx.fillStyle = '#0D1B2A';
-  ctx.fillRect(0,0,W,50);
+  ctx.fillRect(0, 0, W, 50);
   ctx.fillStyle = '#C9A84C';
-  ctx.font = 'bold 18px sans-serif';
-  ctx.fillText('852hk81jp 到貨收據', PAD, 32);
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = 'bold 17px sans-serif';
+  ctx.fillText('852hk81jp 到貨收據', PAD, 33);
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.font = '12px sans-serif';
-  ctx.fillText(arrTag, W-PAD-ctx.measureText(arrTag).width, 32);
-  y = 70;
+  const tagW = ctx.measureText(arrTag).width;
+  ctx.fillText(arrTag, W - PAD - tagW, 33);
+  y = 60;
 
-  // ── 客戶資訊 ──
-  ctx.fillStyle = '#F4F6F9';
+  // ── 客戶資訊 block ──
+  const infoBoxH = infoRows * lineH + 16;
+  ctx.fillStyle = '#FFFFFF';
   ctx.beginPath();
-  ctx.roundRect(PAD, y, W-PAD*2, 7*lineH+16, 8);
+  ctx.roundRect(PAD, y, W - PAD*2, infoBoxH, 10);
   ctx.fill();
+  ctx.strokeStyle = '#E2E8EF';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
-  const infoX = PAD+14;
-  y += 12;
-  const infoItems = [
+  const infoData = [
     ['客戶名稱', userName],
     ['郵寄方式', recData?.method||'—'],
     ['重量',     recData?.weight||'—'],
@@ -1279,98 +1279,100 @@ async function drawReceiptCanvas(d, userName, group){
     ['電話',     phone||'—'],
     ['地址',     address||'—'],
   ];
-  ctx.font = '13px sans-serif';
-  for(const [lbl, val] of infoItems){
+  let iy = y + 14;
+  for(const [lbl, val] of infoData){
     ctx.fillStyle = '#94A3B8';
-    ctx.fillText(lbl + '：', infoX, y+13);
+    ctx.font = '12px sans-serif';
+    ctx.fillText(lbl + '：', PAD+12, iy);
     ctx.fillStyle = '#0D1B2A';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText(val, infoX + 70, y+13);
-    ctx.font = '13px sans-serif';
-    y += lineH;
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText(val, PAD + 80, iy);
+    iy += lineH;
   }
-  y += secGap;
+  y += infoBoxH + secGap;
 
   // ── 已訂購商品標題 ──
   ctx.fillStyle = '#0D1B2A';
-  ctx.font = 'bold 15px sans-serif';
-  ctx.fillText('已訂購商品', PAD, y+14);
+  ctx.font = 'bold 14px sans-serif';
+  ctx.fillText('已訂購商品', PAD, y + 14);
   y += lineH + 8;
 
   // ── 每件商品 ──
   for(const it of items){
     const notArrived = !it.arrivalDate;
-    const cardH = 26 + lineH*2 + (imgMap[it.image]?imgSide+8:0) + lineH + 14;
+    const img = imgMap[it.image];
+    const nameMaxW = img ? W - PAD*2 - imgSide - 20 : W - PAD*2 - 20;
 
-    // 背景
-    ctx.fillStyle = notArrived ? '#FFFBEB' : '#F8FAFC';
+    // 估算商品名高度
+    ctx.font = 'bold 13px sans-serif';
+    const nameChars = Array.from(it.itemName||'—');
+    let nameLine='', nameLines=[];
+    for(const ch of nameChars){
+      const test=nameLine+ch;
+      if(ctx.measureText(test).width > nameMaxW && nameLine){ nameLines.push(nameLine); nameLine=ch; }
+      else { nameLine=test; }
+    }
+    if(nameLine) nameLines.push(nameLine);
+    const nameDrawH = nameLines.length * lineH;
+    const contentH = Math.max(nameDrawH, img ? imgSide : 0);
+    const cardH = 26 + contentH + lineH + lineH + 14;
+
+    // Card background
+    ctx.fillStyle = notArrived ? '#FFFBEB' : '#FFFFFF';
     ctx.beginPath();
     ctx.roundRect(PAD, y, W-PAD*2, cardH, 8);
     ctx.fill();
-    if(notArrived){
-      ctx.strokeStyle = '#F59E0B';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
+    ctx.strokeStyle = notArrived ? '#F59E0B' : '#E2E8EF';
+    ctx.lineWidth = notArrived ? 2 : 1;
+    ctx.stroke();
 
     // Row1: 編號 + 購買日期 + 到貨日期
-    const row1y = y + 18;
-    ctx.font = 'bold 12px monospace';
+    const r1y = y + 18;
     ctx.fillStyle = '#0D1B2A';
-    ctx.fillText(`#${it.code}`, PAD+12, row1y);
-    ctx.font = '11px sans-serif';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText(`#${it.code}`, PAD+12, r1y);
+
     ctx.fillStyle = '#64748B';
-    ctx.fillText(`購買：${it.orderedDate||'—'}`, PAD+60, row1y);
+    ctx.font = '11px sans-serif';
+    ctx.fillText(`購買：${it.orderedDate||'—'}`, PAD+70, r1y);
+
     const arrText = it.arrivalDate || '未到貨';
-    const arrColor = notArrived ? '#D97706' : '#059669';
-    ctx.fillStyle = arrColor;
+    ctx.fillStyle = notArrived ? '#D97706' : '#059669';
     ctx.font = notArrived ? 'bold 11px sans-serif' : '11px sans-serif';
-    ctx.fillText(`到貨：${arrText}`, PAD+190, row1y);
+    ctx.fillText(`到貨：${arrText}`, PAD+210, r1y);
 
-    // Row2: 商品名稱
-    const nameY = row1y + lineH;
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillStyle = '#1A2E45';
-    const nameH = wrapText(it.itemName||'—', PAD+12, nameY, W-PAD*2-130, lineH);
+    // 商品名稱
+    const nameY = r1y + 8;
+    wrapText(it.itemName||'—', PAD+12, nameY, nameMaxW, lineH, '#1A2E45', 'bold 13px sans-serif');
 
-    // 商品圖片（右側）
-    const imgObj = imgMap[it.image];
-    if(imgObj){
+    // 商品圖片
+    if(img){
       const imgX = W - PAD - imgSide - 12;
-      const imgY = nameY - 4;
       ctx.save();
       ctx.beginPath();
-      ctx.roundRect(imgX, imgY, imgSide, imgSide, 6);
+      ctx.roundRect(imgX, nameY - 4, imgSide, imgSide, 6);
       ctx.clip();
-      ctx.drawImage(imgObj, imgX, imgY, imgSide, imgSide);
+      ctx.drawImage(img, imgX, nameY - 4, imgSide, imgSide);
       ctx.restore();
     }
 
-    // Row3: 重量
-    const wtY = nameY + Math.max(nameH, imgObj?imgSide:0) + 4;
-    ctx.font = '11px sans-serif';
+    // 重量
+    const wtY = r1y + 8 + contentH + 6;
     ctx.fillStyle = '#64748B';
-    ctx.fillText(`重量：${it.weightKg?it.weightKg.toFixed(3)+'kg':'—'}`, PAD+12, wtY+12);
+    ctx.font = '11px sans-serif';
+    ctx.fillText(`重量：${it.weightKg ? it.weightKg.toFixed(3)+'kg' : '—'}`, PAD+12, wtY);
 
-    // Row4: 商品網址
+    // 網址
     const urlY = wtY + lineH;
     ctx.fillStyle = '#3B82F6';
     ctx.font = '10px sans-serif';
-    const shortUrl = it.link ? it.link.substring(0,60)+(it.link.length>60?'…':'') : '';
-    ctx.fillText(shortUrl, PAD+12, urlY+10);
+    const shortUrl = it.link ? it.link.substring(0,70)+(it.link.length>70?'…':'') : '';
+    ctx.fillText(shortUrl, PAD+12, urlY);
 
     y += cardH + 10;
   }
 
-  y += PAD;
-  canvas.height = y;
-
-  // Redraw with correct height
-  const canvas2 = document.createElement('canvas');
-  canvas2.width = W;
-  canvas2.height = y;
-  canvas2.getContext('2d').drawImage(canvas, 0, 0);
-  return canvas2;
+  return canvas;
 }
 
 async function runTool(action,label){
