@@ -869,6 +869,14 @@ function swPick(n){
     b.classList.toggle('active', b.textContent===n);
   });
 }
+// 取最細 code 作為整體編號
+function getMinCode(items){
+  if(!items||!items.length)return'-';
+  const valid=items.filter(i=>i.code&&!isNaN(Number(i.code)));
+  if(!valid.length)return items[0]?.code||'-';
+  return valid.reduce((min,i)=>Number(i.code)<Number(min.code)?i:min).code;
+}
+
 function renderPickGrp(n){
   const c=document.getElementById('pickContent'),g=pickData[n];c.innerHTML='';
   ['HK','TW'].forEach(rk=>{
@@ -878,7 +886,7 @@ function renderPickGrp(n){
     let h=`<div class="pick-region ${rk.toLowerCase()}"><div class="pick-title">${lbl}<span class="pick-wt">總重 ${wt.toFixed(3)} kg</span></div>`;
     Object.keys(info.customers).sort().forEach(cid=>{
       const items=info.customers[cid].sort((a,b)=>Number(a.code)-Number(b.code));
-      const mc=items[0]?.code||'-';
+      const mc=getMinCode(items);
       h+=`<div class="cust-card"><div class="mcode">${mc}</div><div class="cinfo"><div class="cname">${cid}</div><div class="cc">${items.map(it=>`<div class="ib">${it.img?`<img src="${it.img}" class="ithumb" loading="lazy">`:`<div class="ithumb" style="display:flex;align-items:center;justify-content:center;font-size:9px;color:#ccc;">無圖</div>`}<div class="cn">#${it.code}</div><div class="inlbl">${it.link?`<a href="${it.link}" target="_blank" style="color:inherit;text-decoration:none;">${esc(it.itemName||'商品')}</a>`:esc(it.itemName||'商品')}</div></div>`).join('')}</div></div></div>`;
     });
     h+='</div>';c.innerHTML+=h;
