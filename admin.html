@@ -387,10 +387,16 @@ button{font-family:var(--font);}
 
       <!-- 寄件處理 -->
       <div id="tp-ship" class="tool-subpanel">
-        <button class="tool-btn tb-orange" onclick="runTool('generatePostData','匯出易寄取＋順豐資料')">📥 匯出易寄取＋順豐資料</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+          <button class="tool-btn tb-orange" style="flex:1;" onclick="runTool('generatePostData','匯出易寄取＋順豐資料')">📥 匯出易寄取＋順豐資料</button>
+          <button class="tool-btn tb-purple" style="flex:1;" onclick="generateShipPage()">🔗 生成寄件清單頁面</button>
+        </div>
+        <div id="shipUrlRow" style="display:none;margin-bottom:8px;padding:9px 11px;background:#EFF6FF;border-radius:var(--r-sm);display:flex;gap:7px;align-items:center;">
+          <a id="shipPageUrl" href="#" target="_blank" style="font-size:11px;color:#1E40AF;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></a>
+          <button onclick="copyShipUrl()" style="padding:5px 12px;background:#1E40AF;color:#fff;border:none;border-radius:var(--r-sm);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">複製網址</button>
+        </div>
         <div id="shipToolSts" class="tstatus"></div>
         <div id="shipSummary" style="margin-top:10px;"></div>
-        <button class="tool-btn tb-navy" style="margin-top:10px;" onclick="sendShippingAction()">📤 確認寄出通知 Email</button>
       </div>
 
       <!-- 新團設定 -->
@@ -1252,15 +1258,88 @@ function renderShipSummary(d){
   el.innerHTML=html;
 }
 
-async function sendShippingAction(){
-  const group=document.getElementById('toolGrpSel').value;
-  if(!group||!confirm(`確定寄出「${group}」寄貨通知？`))return;
-  setSts('shipToolSts','⏳ 寄送中…','ld');
+async function generateShipPage(){
+  const group=curToolGrp;
+  if(!group){alert('請先選擇團次！');return;}
+  setSts('shipToolSts','⏳ 生成寄件清單頁面…','ld');
+  document.getElementById('shipUrlRow').style.display='none';
   try{
-    const d=await postMain({action:'sendShippingNotification',password:pw,group});
+    const d=await postMain({action:'getShippingNotificationPreview',password:pw,group});
     if(d.error)throw new Error(d.error);
-    setSts('shipToolSts','✅ '+d.result,'ok');
+    if(d.html!==undefined&&d.easy===undefined){setSts('shipToolSts','⚠️ GAS 需更新並重新部署','err');return;}
+    const html=buildShipPageHtml(d);
+    const safeGroup=group.replace(/[^a-zA-Z0-9_\-]/g,'_');
+    const filename=`shiplist_${safeGroup}_${Date.now()}.html`;
+    const bytes=new TextEncoder().encode(html);
+    const res=await fetch(`${SB_URL}/storage/v1/object/receipts/${filename}`,{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'text/html; charset=utf-8','x-upsert':'true','Content-Length':String(bytes.length)},
+      body:new Blob([bytes],{type:'text/html; charset=utf-8'})
+    });
+    if(!res.ok)throw new Error('上傳失敗 '+res.status+': '+await res.text());
+    const publicUrl=`${SB_URL}/storage/v1/object/public/receipts/${filename}`;
+    const VIEWER_BASE='https://852hk-81jp-mercari.vercel.app/viewer.html';
+    const viewerUrl=`${VIEWER_BASE}?src=${encodeURIComponent(publicUrl)}`;
+    const a=document.getElementById('shipPageUrl');
+    a.href=viewerUrl; a.textContent='🔗 '+viewerUrl;
+    document.getElementById('shipUrlRow').style.display='flex';
+    setSts('shipToolSts','✅ 頁面已生成','ok');
   }catch(e){setSts('shipToolSts','❌ 失敗：'+e.message,'err');}
+}
+
+function copyShipUrl(){
+  const url=document.getElementById('shipPageUrl').href;
+  navigator.clipboard.writeText(url).then(()=>{
+    const btn=event.target;const o=btn.textContent;btn.textContent='✅ 已複製';
+    setTimeout(()=>btn.textContent=o,2000);
+  });
+}
+
+function buildShipPageHtml(d){
+  const {easy=[],sf=[],plain=[],home=[],sfWeight=0,homeWeight=0,prevGroupOverallIds=[],currTag='',total=0}=d;
+  function row(it){
+    const qrUrl=it.tracking?`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(it.tracking)}&bgcolor=ffffff&color=0D1B2A&margin=6`:'';
+    return `<div style="background:#fff;border-radius:12px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center;">
+      <div style="font-size:20px;font-weight:900;color:#DC2626;margin-bottom:12px;">${esc(it.mark||'—')}</div>
+      ${qrUrl?`<img src="${qrUrl}" style="width:200px;height:200px;display:block;margin:0 auto 10px;border-radius:8px;">`:'<div style="color:#EF4444;font-size:13px;margin-bottom:10px;">⚠️ 未填運單號</div>'}
+      ${it.tracking?`<div style="font-size:13px;font-weight:700;color:#64748B;margin-bottom:6px;word-break:break-all;">${esc(it.tracking)}</div>`:''}
+      ${it.sub?`<div style="font-size:12px;color:#94A3B8;">${esc(it.sub)}</div>`:''}
+    </div>`;
+  }
+  function plainRowHtml(it){
+    return `<div style="background:#fff;border-radius:12px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+      <div style="font-size:20px;font-weight:900;color:#DC2626;margin-bottom:10px;">${esc(it.mark||'—')}</div>
+      <div style="font-size:13px;color:#475569;line-height:2;">
+        <div>收件者：${esc(it.recipient||'—')}</div>
+        <div>電話：${esc(it.phone||'—')}</div>
+        <div>地址：${esc(it.address||'—')}</div>
+      </div>
+    </div>`;
+  }
+  function section(emoji,title,color,rows){
+    if(!rows.length)return '';
+    return `<div style="margin-bottom:20px;">
+      <div style="font-size:14px;font-weight:800;color:#0D1B2A;border-left:4px solid ${color};padding-left:10px;margin-bottom:10px;">${emoji} ${title}</div>
+      ${rows}
+    </div>`;
+  }
+  return `<!DOCTYPE html>
+<html lang="zh-HK"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>852hk81jp — ${esc(currTag)} 寄件清單</title>
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Noto Sans HK',system-ui,sans-serif;background:#F4F6F9;padding:16px;max-width:480px;margin:0 auto;}</style>
+</head><body>
+<div style="background:#0D1B2A;border-radius:14px;padding:16px 20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+  <div style="color:#C9A84C;font-weight:900;font-size:16px;">852hk81jp</div>
+  <div style="color:rgba(255,255,255,.8);font-size:13px;font-weight:700;">${esc(currTag)} · 共${total}件</div>
+</div>
+${section('📬','易寄取 '+easy.length+' 件','#2563EB',easy.map(i=>row({mark:i.mark,tracking:i.tracking,sub:''})).join(''))}
+${section('📦','順豐 '+sf.length+' 件（共'+sfWeight+'g）','#059669',sf.map(i=>row({mark:i.mark,tracking:i.tracking,sub:i.itemNames||''})).join(''))}
+${section('📮','平郵 '+plain.length+' 件','#7C3AED',plain.map(i=>plainRowHtml(i)).join(''))}
+${section('🏠','拎翻屋企 '+home.length+' 件','#D97706',home.map(i=>row({mark:i.mark,tracking:'',sub:i.weight?i.weight+'g':''})).join(''))}
+${prevGroupOverallIds.length?`<div style="background:#FFF7ED;border-radius:10px;padding:12px;font-size:12px;color:#92400E;">上一團拎翻屋企編號：${prevGroupOverallIds.join(', ')}</div>`:''}
+<div style="text-align:center;padding:16px 0;color:#94A3B8;font-size:11px;">852hk81jp · 由系統自動生成</div>
+</body></html>`;
 }
 
 // ── 當前載入的 Record 團號 ──

@@ -88,10 +88,6 @@ function doPost(e) {
       try { return jsonResponse_({ success: true, result: generatePostData(group) }); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
-    case 'sendShippingNotification':
-      try { return jsonResponse_({ success: true, result: sendShippingNotification(group) }); }
-      catch(err) { return jsonResponse_({ error: err.message }); }
-
     // ── 出單工具：預覽類（頁面顯示，唔寄 Email）──
     case 'getGroupEmailPreview':
       try { return jsonResponse_(getGroupEmailPreview_(group)); }
@@ -1070,127 +1066,6 @@ function generatePostData(selectedGroup) {
   }else{
     return sfOrderCount>0||ecshipOutput.length>0?'失敗：有訂單但無法產生附件':'完成：沒有符合條件的訂單。';
   }
-}
-
-// ─────────────────────────────────────────────
-//  sendShippingNotification（寄貨通知 Email）
-//  ★ SF QR Code：直接用 tracking number 生成 QR
-// ─────────────────────────────────────────────
-function sendShippingNotification(groupTitle) {
-  const ss          = SpreadsheetApp.getActiveSpreadsheet();
-  const recordSheet = ss.getSheetByName("Record");
-  const ordersSheet = ss.getSheetByName("訂單");
-  if (!groupTitle) throw new Error("未接收到團編號！");
-
-  const HOME_KEYWORDS = ["等下團一齊寄", "Michelle自己"];
-  const lastRow       = recordSheet.getLastRow();
-  if (lastRow < 2) throw new Error("Record 表沒有資料。");
-
-  const data     = recordSheet.getRange(2, 1, lastRow - 1, 14).getValues();
-  const raw      = String(groupTitle).trim();
-  const currTag  = raw.includes("到貨") ? raw : raw + "到貨";
-  const filtered = data.filter(r => String(r[2]||'').trim() === currTag);
-  if (!filtered.length) throw new Error("找不到屬於 " + currTag + " 的資料！");
-
-  const ordersLastRow = ordersSheet.getLastRow();
-  const ordersRange   = ordersLastRow >= 2 ? ordersSheet.getRange(2,15,ordersLastRow-1,14).getValues() : [];
-
-  function findItemContentByCode(pid) {
-    const p=String(pid||'').trim();if(!p)return'';
-    for(let r=ordersRange.length-1;r>=0;r--){if(String(ordersRange[r][0]||'').trim()===p)return String(ordersRange[r][13]||'').trim();}
-    return'';
-  }
-  function getItemNames(str){
-    if(!str)return[];
-    const ids=String(str).split(/[,，\s]+/).filter(Boolean);
-    const names=[],seen=new Set();
-    ids.forEach(id=>{const n=findItemContentByCode(id);if(n&&!seen.has(n)){names.push(n);seen.add(n);}});
-    return names;
-  }
-  function isHomePickup(rowArray){const m=String(rowArray[8]||'').toLowerCase();return HOME_KEYWORDS.some(kw=>m.includes(kw.toLowerCase()));}
-
-  let prevGroupOverallIds=[];
-  try{
-    const m=raw.match(/第\s*(\d+)\s*團/);
-    if(m&&parseInt(m[1])>1){
-      const prevTag="第"+(parseInt(m[1])-1)+"團到貨";
-      data.filter(r=>String(r[2]||'').trim()===prevTag).forEach(rowArr=>{
-        if(isHomePickup(rowArr)){const oid=String(rowArr[5]||'').trim();if(oid)prevGroupOverallIds.push(oid);}
-      });
-    }
-  }catch(err){Logger.log("上一團錯誤:"+err);}
-
-  const plainMarks=[],easyMarks=[],sfMarks=[],homeMarks=[];
-  let sfWeight=0,homeWeight=0;
-  const plainMails=[],inlineImages={};
-  let qrIndex=1,easyQrHtml='',sfQrHtml='',messageHtml="<h4>個別寄件通知</h4>";
-
-  filtered.forEach(row=>{
-    const user=row[0],productId=row[4],overallId=row[5],weight=row[7],method=row[8],
-          recipient=row[9],phone=row[10],address=row[11],tracking=row[12];
-    if(!user||!method)return;
-    const mark=String(overallId||productId||'').trim();
-
-    if(String(method).includes("平郵")){
-      plainMarks.push(mark);
-      plainMails.push("編號: "+mark+"\n收件人: "+recipient+"\n地址: "+address+"\n");
-      messageHtml+=`<div style="margin-bottom:15px;"><b>${user}</b><br>收件人：${recipient}<br>地址：${address}<br>你好～${currTag}嘅貨件已寄出，香港平郵郵費為$${tracking||""}☺️🙇🏻‍♀️<br>謝謝🙏🏻</div>`;
-    }
-    else if(String(method).includes("易寄取")){
-      easyMarks.push(mark);
-      if(tracking){
-        try{
-          const qrUrl="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+encodeURIComponent(tracking);
-          const qrBlob=UrlFetchApp.fetch(qrUrl).getBlob().setName(mark+"_easyqr.png");
-          const cid="qr"+qrIndex++;inlineImages[cid]=qrBlob;
-          easyQrHtml+=`<div style="margin-bottom:20px;text-align:center;"><div style="font-size:14px;color:red;"><b>${mark}</b></div><img src="cid:${cid}" alt="QR Code"><div>${method} ${tracking}</div></div>`;
-        }catch(err){Logger.log("易寄取QR錯誤:"+err);}
-      }
-      messageHtml+=`<div style="margin-bottom:15px;"><b>${user}</b><br>你好～${currTag}嘅貨件已寄出，易寄取嘅運單編號為${tracking||""}☺️🙇🏻‍♀️<br>謝謝🙏🏻</div>`;
-    }
-    // ★ SF：直接用 tracking number 生成 QR（同易寄取一樣）
-    else if(String(method).toUpperCase().includes("SF")){
-      sfMarks.push(mark);sfWeight+=(Number(weight)||0);
-      const itemNames=getItemNames(productId);
-      const baseText=String(overallId||mark||'').trim();
-      const itemsText=itemNames.join(", ");
-      if(tracking){
-        try{
-          const qrUrl="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="+encodeURIComponent(tracking);
-          const sfBlob=UrlFetchApp.fetch(qrUrl).getBlob().setName(mark+"_SFqr.png");
-          const sfCid="qr"+qrIndex++;inlineImages[sfCid]=sfBlob;
-          sfQrHtml+=`<div style="margin-bottom:20px;text-align:center;"><div style="font-size:14px;color:red;"><b>${baseText}</b></div><div>${itemsText}</div><img src="cid:${sfCid}" alt="SF QR Code"><div>順豐 ${tracking}</div></div>`;
-        }catch(err){
-          Logger.log("順豐QR錯誤:"+err);
-          sfQrHtml+=`<div style="margin-bottom:10px;text-align:center;"><div style="font-size:14px;color:red;"><b>${baseText}</b></div><div>${itemsText}</div><div>順豐 ${tracking}（QR生成失敗）</div></div>`;
-        }
-      }else{
-        sfQrHtml+=`<div style="margin-bottom:10px;text-align:center;"><div style="font-size:14px;color:red;"><b>${baseText}</b></div><div>${itemsText}</div><div>順豐（未提供運單號）</div></div>`;
-      }
-      messageHtml+=`<div style="margin-bottom:15px;"><b>${user}</b><br>你好～${currTag}嘅貨件已寄出，順豐嘅運單編號為${tracking||""}☺️🙇🏻‍♀️<br>謝謝🙏🏻</div>`;
-    }
-    else{
-      homeMarks.push(mark);homeWeight+=(Number(weight)||0);
-      messageHtml+=`<div style="margin-bottom:15px;"><b>${user}</b><br>你好～${currTag}嘅貨件已準備好，請拎翻屋企☺️🙇🏻‍♀️<br>謝謝🙏🏻</div>`;
-    }
-  });
-
-  let summaryHtml="<p>";
-  if(plainMarks.length)summaryHtml+=`平郵 ${plainMarks.length} 件: ${plainMarks.join(", ")}<br>`;
-  if(easyMarks.length) summaryHtml+=`易寄取 ${easyMarks.length} 件: ${easyMarks.join(", ")}<br>`;
-  if(sfMarks.length)   summaryHtml+=`順豐 ${sfMarks.length} 件（共${Math.round(sfWeight)}g）: ${sfMarks.join(", ")}<br>`;
-  if(homeMarks.length) summaryHtml+=`拎翻屋企 ${homeMarks.length} 件（共${Math.round(homeWeight)}g）: ${homeMarks.join(", ")}<br>`;
-  summaryHtml+="</p>";
-  if(prevGroupOverallIds.length>0) summaryHtml+=`<p>上一團拎翻屋企嘅貨品編號為: ${prevGroupOverallIds.join(", ")}</p>`;
-
-  let qrCombinedHtml="";
-  if(easyQrHtml)qrCombinedHtml+="<h4>易寄取 QR Code</h4>"+easyQrHtml;
-  if(sfQrHtml)  qrCombinedHtml+="<h4>順豐 QR Code</h4>"+sfQrHtml;
-
-  const htmlBody=`<div><h3>${currTag}</h3><p>一共會收到 ${filtered.length} 件貨：</p>${summaryHtml}${plainMails.length?"<h4>平郵資料</h4><pre>"+plainMails.join("\n")+"</pre>":""}${qrCombinedHtml?"<h4>QR / 順豐資訊</h4>"+qrCombinedHtml:""}${messageHtml}</div>`;
-
-  MailApp.sendEmail({to:RECIPIENT_EMAIL,subject:String(currTag)+" 寄送通知",body:"請使用支持 HTML 的郵件檢視器查看完整內容。",htmlBody,inlineImages});
-  return "通知 Email 已寄出 ("+currTag+")";
 }
 
 // ─────────────────────────────────────────────
