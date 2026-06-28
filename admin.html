@@ -1435,7 +1435,6 @@ async function showReceipt(userName, group){
       if(uname&&uname.textContent.trim()===userName){
         const rv = f => card.querySelectorAll('.rv')[f]?.textContent||'';
         const rowNum = card.id?.replace('rcard-','');
-        const rowNum = card.id?.replace('rcard-','');
         recData={
           method   : rv(0),
           postage  : rv(1),
