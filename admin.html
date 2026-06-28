@@ -2287,8 +2287,12 @@ async function igUploadAndSaveToSheet(){
     tmp.innerHTML=preview.html||'';
     const content=tmp.innerText||tmp.textContent||'';
     igShowSts('igCreateSts','ld','⏳ 寫入 IG post sheet…');
-    const today=new Date().toLocaleDateString('zh-HK',{year:'numeric',month:'2-digit',day:'2-digit'});
-    const d=await postMain({action:'saveIgPost',password:pw,imageUrl,content,date:today});
+    const rawStart=igGetFieldValue('cutoff-start'); // e.g. "2025年7月1日から"
+    const mDate=rawStart.match(/(\d{4})年(\d+)月(\d+)日/);
+    const date=mDate
+      ? `${mDate[1]}/${String(mDate[2]).padStart(2,'0')}/${String(mDate[3]).padStart(2,'0')}`
+      : new Date().toLocaleDateString('zh-HK',{year:'numeric',month:'2-digit',day:'2-digit'});
+    const d=await postMain({action:'saveIgPost',password:pw,imageUrl,content,date});
     if(d.error)throw new Error(d.error);
     igShowSts('igCreateSts','ok','✅ 已上傳並存入 IG post sheet！圖片：'+imageUrl);
   }catch(e){
