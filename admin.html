@@ -455,6 +455,8 @@ button{font-family:var(--font);}
           <div class="ig-canvas-wrap">
             <canvas id="igCanvas" width="1080" height="1350" style="max-height:360px;"></canvas>
           </div>
+          <!-- Auto-fill -->
+          <button class="ig-btn" style="width:100%;margin-bottom:10px;background:var(--gold);color:var(--navy);font-weight:800;" onclick="igAutoFill()">⚡ 自動填入（從已選團次）</button>
           <!-- Fields -->
           <div class="ig-field-grid">
             <div class="ig-field" style="grid-column:1/-1;">
@@ -2136,6 +2138,27 @@ function igRenderCanvas(){
     if(ov.shadow){ctx.shadowColor='rgba(0,0,0,0.25)';ctx.shadowBlur=4;ctx.shadowOffsetX=1;ctx.shadowOffsetY=1;}
     ctx.fillText(text,ov.x||0,ov.y||100);ctx.restore();
   });
+}
+
+async function igAutoFill(){
+  const group = curToolGrp;
+  if(!group){ igShowSts('igCreateSts','err','⚠️ 請先在上方選擇團次'); return; }
+  igShowSts('igCreateSts','ld','⏳ 讀取團次資料…');
+  try{
+    const d = await postMain({action:'getGroupInfo', password:pw, group});
+    if(d.error) throw new Error(d.error);
+    const set = (id, val) => { const el=document.getElementById(id); if(el&&val){ el.value=val; } };
+    set('ig-group-num',   d.groupNum);
+    set('ig-rate-display',d.rate);
+    set('ig-cutoff-start',d.cutoffStart);
+    set('ig-cutoff-end',  d.cutoffEnd);
+    set('ig-ship-date',   d.shipDate);
+    set('ig-arrival-hk',  d.arrivalHk);
+    igRenderCanvas();
+    igShowSts('igCreateSts','ok','✅ 已自動填入！請確認日期是否正確，可手動微調');
+  }catch(e){
+    igShowSts('igCreateSts','err','❌ 失敗：'+e.message);
+  }
 }
 
 function igLoadDefaultOverlay(){

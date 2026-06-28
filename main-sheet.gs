@@ -93,6 +93,10 @@ function doPost(e) {
       try { return jsonResponse_(getGroupEmailPreview_(group)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
+    case 'getGroupInfo':
+      try { return jsonResponse_(getGroupInfo_(group)); }
+      catch(err) { return jsonResponse_({ error: err.message }); }
+
     case 'getShippingNotificationPreview':
       try { return jsonResponse_(getShippingNotificationPreview_(group)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
@@ -280,6 +284,52 @@ function getGroupEmailPreview_(groupId) {
 #Mercari代購 #日本限定 #代購推薦</div>`;
 
   return { html };
+}
+
+// ─────────────────────────────────────────────
+//  團次基本資料（供 IG 帖子自動填入）
+// ─────────────────────────────────────────────
+function getGroupInfo_(groupId) {
+  const ss            = SpreadsheetApp.getActiveSpreadsheet();
+  const dataSheet     = ss.getSheetByName('Data');
+  const currencySheet = ss.getSheetByName('Currency');
+  const normalize     = str => String(str).trim();
+
+  const groupData     = dataSheet.getRange('H2:J').getValues();
+  const currencyData  = currencySheet.getRange('A2:H').getValues();
+
+  const groupRow    = groupData.find(r => normalize(r[0]) === normalize(groupId));
+  const currencyRow = currencyData.find(r => normalize(r[0]) === normalize(groupId));
+
+  if (!groupRow)    return { error: '找不到團號日期資料，請確認 Data 表 H 欄' };
+  if (!currencyRow) return { error: '找不到匯率資料，請確認 Currency 表 A 欄' };
+
+  const [group, startDate, endDate] = groupRow;
+  const rate1 = currencyRow[4];
+
+  function fmt(date, offset) {
+    const d = new Date(date);
+    if (offset) d.setDate(d.getDate() + offset);
+    return (d.getMonth()+1) + '/' + d.getDate();
+  }
+  function fmtMonth(date, offset) {
+    const d = new Date(date);
+    if (offset) d.setDate(d.getDate() + offset);
+    const m = d.getMonth()+1;
+    const day = d.getDate();
+    // rough label: early/mid/late month
+    const part = day <= 10 ? '初' : day <= 20 ? '中' : '底';
+    return m + '月' + part;
+  }
+
+  return {
+    groupNum:     normalize(group),
+    cutoffStart:  fmt(startDate),
+    cutoffEnd:    fmt(endDate),
+    shipDate:     fmtMonth(endDate, 1),
+    arrivalHk:    fmtMonth(endDate, 10),
+    rate:         rate1 ? String(rate1) : '',
+  };
 }
 
 // ─────────────────────────────────────────────
