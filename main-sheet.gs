@@ -330,68 +330,45 @@ function getShippingNotificationPreview_(groupTitle) {
     }
   } catch(err) {}
 
-  const plainMarks=[], easyMarks=[], sfMarks=[], homeMarks=[];
+  const easy=[], sf=[], plain=[], home=[];
   let sfWeight=0, homeWeight=0;
-  const plainMails=[];
-
-  let html = `<div style="font-family:sans-serif;font-size:13px;line-height:1.8;">
-<h3 style="margin:0 0 8px;color:#0D1B2A;">${currTag} 寄送通知</h3>
-<p style="margin:0 0 12px;color:#666;">一共 ${filtered.length} 件貨</p>`;
 
   filtered.forEach(row => {
-    const user      = row[0];
+    const user      = String(row[0]||'').trim();
     const productId = row[4];
     const overallId = row[5];
-    const weight    = row[7];
-    const method    = row[8];
-    const recipient = row[9];
-    const phone     = row[10];
-    const address   = row[11];
-    const tracking  = row[12];
+    const weight    = Number(row[7])||0;
+    const method    = String(row[8]||'').trim();
+    const recipient = String(row[9]||'').trim();
+    const phone     = String(row[10]||'').trim();
+    const address   = String(row[11]||'').trim();
+    const tracking  = String(row[12]||'').trim();
     if (!user || !method) return;
-    const mark      = String(overallId || productId || '').trim();
-    const ids       = String(productId || '').split(/[,，\s]+/).filter(Boolean);
+    const mark = String(overallId || productId || '').trim();
+    const ids  = String(productId || '').split(/[,，\s]+/).filter(Boolean);
     const itemNames = [...new Set(ids.map(id => findItemName(id)).filter(Boolean))].join(', ');
 
-    let color = '#C9A84C';
-    let methodLabel = method;
-    if (String(method).includes('易寄取'))   { easyMarks.push(mark); color = '#2563EB'; }
-    else if (String(method).toUpperCase().includes('SF')) { sfMarks.push(mark); sfWeight += Number(weight)||0; color = '#059669'; }
-    else if (String(method).includes('平郵')) { plainMarks.push(mark); color = '#7C3AED'; plainMails.push(`編號: ${mark} | 收件人: ${recipient} | 地址: ${address}`); }
-    else { homeMarks.push(mark); homeWeight += Number(weight)||0; color = '#D97706'; }
-
-    html += `<div style="margin-bottom:12px;padding:10px 12px;background:#f9f9f9;border-radius:8px;border-left:3px solid ${color};">
-<b style="color:#0D1B2A;">${user}</b> <span style="font-size:11px;color:#888;font-family:monospace;">(${mark})</span><br>`;
-
-    if (String(method).includes('平郵')) {
-      html += `方式：平郵 ｜ 收件人：${recipient}<br>地址：${address}<br>郵費：$${tracking||''}`;
-    } else if (String(method).includes('易寄取')) {
-      html += `方式：${method}<br>運單號：<b>${tracking||'（未提供）'}</b>`;
-    } else if (String(method).toUpperCase().includes('SF')) {
-      html += `方式：順豐 ｜ 運單號：<b>${tracking||'（未提供）'}</b><br>貨品：${itemNames||'—'}`;
+    if (method.includes('易寄取')) {
+      easy.push({ user, mark, method, tracking });
+    } else if (method.toUpperCase().includes('SF')) {
+      sfWeight += weight;
+      sf.push({ user, mark, method, tracking, weight, itemNames });
+    } else if (method.includes('平郵')) {
+      plain.push({ user, mark, tracking, recipient, phone, address });
     } else {
-      html += `方式：${method}（拎翻屋企）`;
+      homeWeight += weight;
+      home.push({ user, mark, method, weight });
     }
-    html += `</div>`;
   });
 
-  // Summary
-  html += `<div style="margin-top:14px;padding:10px 12px;background:#EFF6FF;border-radius:8px;font-size:12px;color:#1E3A8A;">`;
-  if (plainMarks.length)  html += `📮 平郵 ${plainMarks.length} 件：${plainMarks.join(', ')}<br>`;
-  if (easyMarks.length)   html += `📬 易寄取 ${easyMarks.length} 件：${easyMarks.join(', ')}<br>`;
-  if (sfMarks.length)     html += `📦 順豐 ${sfMarks.length} 件（共${Math.round(sfWeight)}g）：${sfMarks.join(', ')}<br>`;
-  if (homeMarks.length)   html += `🏠 拎翻屋企 ${homeMarks.length} 件（共${Math.round(homeWeight)}g）：${homeMarks.join(', ')}<br>`;
-  if (prevGroupOverallIds.length > 0) html += `<br>上一團拎翻屋企貨品編號：${prevGroupOverallIds.join(', ')}`;
-  html += `</div>`;
-
-  if (plainMails.length) {
-    html += `<div style="margin-top:10px;padding:10px;background:#F5F3FF;border-radius:8px;font-size:11px;font-family:monospace;">`;
-    plainMails.forEach(l => { html += l + '<br>'; });
-    html += `</div>`;
-  }
-
-  html += '</div>';
-  return { html };
+  return {
+    total: filtered.length,
+    currTag,
+    easy, sf, plain, home,
+    sfWeight: Math.round(sfWeight),
+    homeWeight: Math.round(homeWeight),
+    prevGroupOverallIds
+  };
 }
 
 // ─────────────────────────────────────────────

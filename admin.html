@@ -388,15 +388,9 @@ button{font-family:var(--font);}
       <!-- 寄件處理 -->
       <div id="tp-ship" class="tool-subpanel">
         <button class="tool-btn tb-orange" onclick="runTool('generatePostData','匯出易寄取＋順豐資料')">📥 匯出易寄取＋順豐資料</button>
-        <button class="tool-btn tb-navy" onclick="previewShippingNotification()">📢 預覽通知客人寄貨資料</button>
         <div id="shipToolSts" class="tstatus"></div>
-        <div id="shipPreview" class="tool-preview">
-          <div id="shipPreviewHtml" class="tool-preview-html"></div>
-          <div class="tool-preview-actions">
-            <button class="preview-copy-btn" onclick="copyPreview('shipPreviewHtml')">📋 複製內容</button>
-            <button class="preview-send-btn" onclick="sendShippingAction()">📤 確認寄出</button>
-          </div>
-        </div>
+        <div id="shipSummary" style="margin-top:10px;"></div>
+        <button class="tool-btn tb-navy" style="margin-top:10px;" onclick="sendShippingAction()">📤 確認寄出通知 Email</button>
       </div>
 
       <!-- 新團設定 -->
@@ -767,6 +761,7 @@ function selectToolGrp(g){
   const activeTab=document.querySelector('.tool-subtab.active');
   if(activeTab&&activeTab.id==='ts-arrival') loadRecordCards(g);
   if(activeTab&&activeTab.id==='ts-notice') previewGroupEmail();
+  if(activeTab&&activeTab.id==='ts-ship') previewShippingNotification();
 }
 
 // ── 新團設定 ──
@@ -811,6 +806,7 @@ function switchToolTab(t){
   document.getElementById('tp-'+t).classList.add('active');
   if(t==='notice'&&curToolGrp) previewGroupEmail();
   if(t==='arrival'&&curToolGrp) loadRecordCards(curToolGrp);
+  if(t==='ship'&&curToolGrp) previewShippingNotification();
   if(t==='newgroup') loadNewGroupDefaults();
 }
 
@@ -1156,15 +1152,70 @@ async function sendGroupEmailAction(){
 // Preview shipping notification (show in page)
 async function previewShippingNotification(){
   const group=curToolGrp;
-  if(!group){alert('請先選擇團次！');return;}
-  setSts('shipToolSts','⏳ 載入通知內容中…','ld');
+  if(!group){document.getElementById('shipSummary').innerHTML='';return;}
+  setSts('shipToolSts','⏳ 載入中…','ld');
   try{
     const d=await postMain({action:'getShippingNotificationPreview',password:pw,group});
     if(d.error)throw new Error(d.error);
-    document.getElementById('shipPreviewHtml').innerHTML=d.html||d.text||'（無內容）';
-    document.getElementById('shipPreview').classList.add('active');
-    setSts('shipToolSts','✅ 預覽已載入，確認後按「確認寄出」','ok');
+    renderShipSummary(d);
+    setSts('shipToolSts','','');
   }catch(e){setSts('shipToolSts','❌ 失敗：'+e.message,'err');}
+}
+
+function renderShipSummary(d){
+  const el=document.getElementById('shipSummary');
+  if(!el)return;
+  const {easy=[],sf=[],plain=[],home=[],sfWeight=0,homeWeight=0,prevGroupOverallIds=[],currTag='',total=0}=d;
+
+  function shipCopyBtn(text,label){
+    const id='scb-'+Math.random().toString(36).slice(2);
+    return `<button id="${id}" style="padding:5px 11px;background:var(--navy);color:var(--gold);border:none;border-radius:var(--r-sm);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;"
+      onclick="(function(btn){navigator.clipboard.writeText(${JSON.stringify(text)}).then(()=>{const o=btn.textContent;btn.textContent='✅ 已複製';setTimeout(()=>btn.textContent=o,2000);});})(document.getElementById('${id}'))">📋 複製</button>`;
+  }
+
+  function section(emoji,title,color,items,copyText,extra){
+    if(!items.length)return '';
+    const rows=items.map(it=>`
+      <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--navy);min-width:46px;flex-shrink:0;">${esc(it.mark||'—')}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;color:var(--navy);">${esc(it.user)}</div>
+          ${it.sub?`<div style="font-size:11px;color:var(--slate);margin-top:2px;">${esc(it.sub)}</div>`:''}
+        </div>
+      </div>`).join('');
+    return `<div style="background:var(--white);border-radius:var(--r-md);margin-bottom:10px;overflow:hidden;box-shadow:var(--sh-sm);border-left:4px solid ${color};">
+      <div style="padding:10px 13px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);">
+        <div style="font-size:13px;font-weight:800;color:var(--navy);">${emoji} ${title}</div>
+        ${shipCopyBtn(copyText,'複製')}
+      </div>
+      <div style="padding:0 13px;">${rows}</div>
+      ${extra?`<div style="padding:8px 13px;font-size:11px;color:var(--slate);border-top:1px solid var(--border);">${extra}</div>`:''}
+    </div>`;
+  }
+
+  const easyText=`📬 易寄取 ${easy.length} 件：`+easy.map(i=>i.mark).join(', ');
+  const sfText=`📦 順豐 ${sf.length} 件（共${sfWeight}g）：`+sf.map(i=>i.mark).join(', ');
+  const plainText=plain.map(i=>`編號: ${i.mark} | 收件人: ${i.recipient} | 電話: ${i.phone} | 地址: ${i.address}`).join('\n');
+  const homeText=`🏠 拎翻屋企 ${home.length} 件：`+home.map(i=>i.mark).join(', ');
+
+  let html=`<div style="font-size:11px;color:var(--slate);margin-bottom:10px;">${esc(currTag)} · 共 ${total} 件</div>`;
+  html+=section('📬','易寄取 '+easy.length+' 件','#2563EB',
+    easy.map(i=>({mark:i.mark,user:i.user,sub:i.tracking?'運單：'+i.tracking:''})),
+    easyText,'');
+  html+=section('📦','順豐 '+sf.length+' 件（共'+sfWeight+'g）','#059669',
+    sf.map(i=>({mark:i.mark,user:i.user,sub:(i.tracking?'運單：'+i.tracking:'')+(i.itemNames?' · '+i.itemNames:'')})),
+    sfText,'');
+  html+=section('📮','平郵 '+plain.length+' 件','#7C3AED',
+    plain.map(i=>({mark:i.mark,user:i.user,sub:(i.recipient||'')+(i.address?' · '+i.address:'')})),
+    plainText,'');
+  html+=section('🏠','拎翻屋企 '+home.length+' 件','#D97706',
+    home.map(i=>({mark:i.mark,user:i.user,sub:i.weight?i.weight+'g':''})),
+    homeText,'');
+  if(prevGroupOverallIds.length){
+    html+=`<div style="background:#FFF7ED;border-radius:var(--r-md);padding:10px 13px;font-size:12px;color:#92400E;">上一團拎翻屋企編號：${prevGroupOverallIds.join(', ')}</div>`;
+  }
+
+  el.innerHTML=html;
 }
 
 async function sendShippingAction(){
