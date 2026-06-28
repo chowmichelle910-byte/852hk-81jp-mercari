@@ -1200,18 +1200,29 @@ ${trk}
   }
 }
 
-function copyMsg(rowNum){
+async function copyMsg(rowNum){
   const trkEl = document.getElementById('trk-'+rowNum);
   const msgEl = document.getElementById('msg-'+rowNum);
   const card  = document.getElementById('rcard-'+rowNum);
   if(!msgEl)return;
 
+  const copyBtn = [...(card?.querySelectorAll('.rec-copy-btn')||[])].find(b=>b.textContent.includes('複製訊息'));
+  const origText = copyBtn?.textContent||'📋 複製訊息';
+
+  // 未有到貨圖先自動產生
+  if(!card?.querySelector('.receipt-url-row')){
+    const userName = card?.querySelector('.rec-username')?.textContent?.trim();
+    if(userName && currentRecordGroup){
+      if(copyBtn){copyBtn.disabled=true;copyBtn.textContent='⏳ 生成圖中…';}
+      try{ await showReceipt(userName, currentRecordGroup); }catch(e){}
+      if(copyBtn){copyBtn.disabled=false;copyBtn.textContent=origText;}
+    }
+  }
+
   const trk = trkEl ? trkEl.value.trim() : '';
   let msg = msgEl.value;
-  if(trk){
-    msg = msg.replace('（未提供）', trk);
-  }
-  // 如果有收據 URL，確保已加入（若生成後才點複製）
+  if(trk) msg = msg.replace('（未提供）', trk);
+
   const urlRow = card?.querySelector('.receipt-url-row a');
   if(urlRow && !msg.includes(urlRow.href)){
     const url = urlRow.href;
@@ -1220,16 +1231,12 @@ function copyMsg(rowNum){
   }
 
   navigator.clipboard.writeText(msg).then(()=>{
-    const btn=card.querySelector('.rec-copy-btn');
-    const orig=btn.textContent; btn.textContent='✅ 已複製！';
-    setTimeout(()=>btn.textContent=orig, 2000);
+    if(copyBtn){const o=copyBtn.textContent;copyBtn.textContent='✅ 已複製！';setTimeout(()=>copyBtn.textContent=o,2000);}
   }).catch(()=>{
     const ta=document.createElement('textarea');ta.value=msg;
     document.body.appendChild(ta);ta.select();document.execCommand('copy');
     document.body.removeChild(ta);
-    const btn=card.querySelector('.rec-copy-btn');
-    const orig=btn.textContent; btn.textContent='✅ 已複製！';
-    setTimeout(()=>btn.textContent=orig, 2000);
+    if(copyBtn){const o=copyBtn.textContent;copyBtn.textContent='✅ 已複製！';setTimeout(()=>copyBtn.textContent=o,2000);}
   });
 }
 
