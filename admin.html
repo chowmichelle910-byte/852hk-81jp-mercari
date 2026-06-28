@@ -1300,16 +1300,16 @@ function buildShipPageHtml(d){
   function row(it){
     const qrUrl=it.tracking?`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(it.tracking)}&bgcolor=ffffff&color=0D1B2A&margin=6`:'';
     return `<div style="background:#fff;border-radius:12px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center;">
-      <div style="font-size:20px;font-weight:900;color:#DC2626;margin-bottom:12px;">${esc(it.mark||'—')}</div>
-      ${qrUrl?`<img src="${qrUrl}" style="width:200px;height:200px;display:block;margin:0 auto 10px;border-radius:8px;">`:'<div style="color:#EF4444;font-size:13px;margin-bottom:10px;">⚠️ 未填運單號</div>'}
-      ${it.tracking?`<div style="font-size:13px;font-weight:700;color:#64748B;margin-bottom:6px;word-break:break-all;">${esc(it.tracking)}</div>`:''}
-      ${it.sub?`<div style="font-size:12px;color:#94A3B8;">${esc(it.sub)}</div>`:''}
+      <div style="font-size:30px;font-weight:900;color:#DC2626;margin-bottom:12px;">${esc(it.mark||'—')}</div>
+      ${qrUrl?`<img src="${qrUrl}" style="width:200px;height:200px;display:block;margin:0 auto 10px;border-radius:8px;">`:'<div style="color:#EF4444;font-size:23px;margin-bottom:10px;">⚠️ 未填運單號</div>'}
+      ${it.tracking?`<div style="font-size:23px;font-weight:700;color:#64748B;margin-bottom:6px;word-break:break-all;">${esc(it.tracking)}</div>`:''}
+      ${it.sub?`<div style="font-size:22px;color:#94A3B8;">${esc(it.sub)}</div>`:''}
     </div>`;
   }
   function plainRowHtml(it){
     return `<div style="background:#fff;border-radius:12px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);">
-      <div style="font-size:20px;font-weight:900;color:#DC2626;margin-bottom:10px;">${esc(it.mark||'—')}</div>
-      <div style="font-size:13px;color:#475569;line-height:2;">
+      <div style="font-size:30px;font-weight:900;color:#DC2626;margin-bottom:10px;">${esc(it.mark||'—')}</div>
+      <div style="font-size:23px;color:#475569;line-height:2;">
         <div>收件者：${esc(it.recipient||'—')}</div>
         <div>電話：${esc(it.phone||'—')}</div>
         <div>地址：${esc(it.address||'—')}</div>
@@ -1319,7 +1319,7 @@ function buildShipPageHtml(d){
   function section(emoji,title,color,rows){
     if(!rows.length)return '';
     return `<div style="margin-bottom:20px;">
-      <div style="font-size:14px;font-weight:800;color:#0D1B2A;border-left:4px solid ${color};padding-left:10px;margin-bottom:10px;">${emoji} ${title}</div>
+      <div style="font-size:24px;font-weight:800;color:#0D1B2A;border-left:4px solid ${color};padding-left:10px;margin-bottom:10px;">${emoji} ${title}</div>
       ${rows}
     </div>`;
   }
@@ -1327,18 +1327,18 @@ function buildShipPageHtml(d){
 <html lang="zh-HK"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>852hk81jp — ${esc(currTag)} 寄件清單</title>
-<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Noto Sans HK',system-ui,sans-serif;background:#F4F6F9;padding:16px;max-width:480px;margin:0 auto;}</style>
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Noto Sans HK',system-ui,sans-serif;background:#F4F6F9;padding:16px;max-width:520px;margin:0 auto;}</style>
 </head><body>
 <div style="background:#0D1B2A;border-radius:14px;padding:16px 20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
-  <div style="color:#C9A84C;font-weight:900;font-size:16px;">852hk81jp</div>
-  <div style="color:rgba(255,255,255,.8);font-size:13px;font-weight:700;">${esc(currTag)} · 共${total}件</div>
+  <div style="color:#C9A84C;font-weight:900;font-size:26px;">852hk81jp</div>
+  <div style="color:rgba(255,255,255,.8);font-size:23px;font-weight:700;">${esc(currTag)} · 共${total}件</div>
 </div>
 ${section('📬','易寄取 '+easy.length+' 件','#2563EB',easy.map(i=>row({mark:i.mark,tracking:i.tracking,sub:''})).join(''))}
 ${section('📦','順豐 '+sf.length+' 件（共'+sfWeight+'g）','#059669',sf.map(i=>row({mark:i.mark,tracking:i.tracking,sub:i.itemNames||''})).join(''))}
 ${section('📮','平郵 '+plain.length+' 件','#7C3AED',plain.map(i=>plainRowHtml(i)).join(''))}
 ${section('🏠','拎翻屋企 '+home.length+' 件','#D97706',home.map(i=>row({mark:i.mark,tracking:'',sub:i.weight?i.weight+'g':''})).join(''))}
-${prevGroupOverallIds.length?`<div style="background:#FFF7ED;border-radius:10px;padding:12px;font-size:12px;color:#92400E;">上一團拎翻屋企編號：${prevGroupOverallIds.join(', ')}</div>`:''}
-<div style="text-align:center;padding:16px 0;color:#94A3B8;font-size:11px;">852hk81jp · 由系統自動生成</div>
+${prevGroupOverallIds.length?`<div style="background:#FFF7ED;border-radius:10px;padding:12px;font-size:22px;color:#92400E;">上一團拎翻屋企編號：${prevGroupOverallIds.join(', ')}</div>`:''}
+<div style="text-align:center;padding:16px 0;color:#94A3B8;font-size:21px;">852hk81jp · 由系統自動生成</div>
 </body></html>`;
 }
 
@@ -1398,6 +1398,7 @@ function renderRecordCard(r, group){
       <div class="rec-field full"><label>地址</label><input class="rv-inp" id="rad-${r.rowNum}" value="${esc(r.address||'')}" placeholder="收件地址"></div>
     </div>
     <button class="rec-delivery-save" onclick="saveRecordDelivery(${r.rowNum})">💾 儲存收件資料</button>
+    <button class="rec-delivery-save" style="background:var(--gold);color:var(--navy);margin-top:4px;" onclick="holdToNextGroup(${r.rowNum},'${esc(arrTag)}')">⏩ 保留至下一團</button>
     <div class="rec-track-row">
       <input class="rec-track-inp" id="trk-${r.rowNum}" placeholder="輸入 Tracking No." value="${trackVal}">
       <button class="rec-save-btn" onclick="saveTracking(${r.rowNum})">💾 儲存</button>
@@ -2032,6 +2033,29 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&l
 function escAttr(s){return esc(s).replace(/\n/g,' ');}
 
 // ════════ RECORD DELIVERY EDIT ════════
+async function holdToNextGroup(rowNum, currentTag){
+  const m = String(currentTag).match(/第\s*(\d+)\s*團/);
+  if(!m){ alert('無法識別團號，請確認格式為「第X團到貨」'); return; }
+  const nextNum = parseInt(m[1]) + 1;
+  const nextTag = '第' + nextNum + '團到貨';
+  if(!confirm(`確定將此貨品從「${currentTag}」保留至「${nextTag}」？`)) return;
+  const card = document.getElementById('rcard-'+rowNum);
+  const btns = card ? card.querySelectorAll('button') : [];
+  btns.forEach(b=>b.disabled=true);
+  try{
+    const d = await postMain({action:'holdToNextGroup', password:pw, recordRow:rowNum, nextTag});
+    if(d.error) throw new Error(d.error);
+    if(card){ card.style.opacity='0.4'; card.style.pointerEvents='none'; }
+    const note = document.createElement('div');
+    note.style.cssText='background:#FEF9C3;border-radius:6px;padding:6px 10px;font-size:11px;color:#92400E;margin-top:4px;text-align:center;';
+    note.textContent = '✅ 已保留至 ' + nextTag + '，重新載入本團資料後此卡片會消失';
+    if(card) card.appendChild(note);
+  }catch(e){
+    alert('操作失敗：'+e.message);
+    btns.forEach(b=>b.disabled=false);
+  }
+}
+
 async function saveRecordDelivery(rowNum){
   const btn=document.querySelector(`#rcard-${rowNum} .rec-delivery-save`);
   const orig=btn?btn.textContent:'';

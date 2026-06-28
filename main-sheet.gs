@@ -160,6 +160,10 @@ function doPost(e) {
       try { return jsonResponse_(saveRecordDelivery_(e.parameter.recordRow, e.parameter.receiver, e.parameter.phone, e.parameter.address)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
+    case 'holdToNextGroup':
+      try { return jsonResponse_(holdToNextGroup_(e.parameter.recordRow, e.parameter.nextTag)); }
+      catch(err) { return jsonResponse_({ error: err.message }); }
+
     case 'saveIgPost':
       try { return jsonResponse_(saveIgPost_(e.parameter.imageUrl, e.parameter.content, e.parameter.date)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
@@ -818,6 +822,20 @@ function saveRecordDelivery_(recordRow, receiver, phone, address) {
   recordSheet.getRange(row, 12).setValue(address  || ''); // L
   SpreadsheetApp.flush();
   return { success: true };
+}
+
+// ─────────────────────────────────────────────
+//  保留至下一團：更新 Record C欄（到貨標籤）
+// ─────────────────────────────────────────────
+function holdToNextGroup_(recordRow, nextTag) {
+  const ss          = SpreadsheetApp.getActiveSpreadsheet();
+  const recordSheet = ss.getSheetByName('Record');
+  const row         = parseInt(recordRow);
+  if (isNaN(row) || row < 2) return { error: '無效行號' };
+  if (!nextTag) return { error: '未提供下一團標籤' };
+  recordSheet.getRange(row, 3).setValue(nextTag); // C = 到貨標籤
+  SpreadsheetApp.flush();
+  return { success: true, nextTag };
 }
 
 // ─────────────────────────────────────────────
