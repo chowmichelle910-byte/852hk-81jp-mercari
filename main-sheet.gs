@@ -164,6 +164,14 @@ function doPost(e) {
       try { return jsonResponse_(saveTrackingNo_(e.parameter.recordRow, e.parameter.tracking)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
+    case 'saveRecordDelivery':
+      try { return jsonResponse_(saveRecordDelivery_(e.parameter.recordRow, e.parameter.receiver, e.parameter.phone, e.parameter.address)); }
+      catch(err) { return jsonResponse_({ error: err.message }); }
+
+    case 'saveIgPost':
+      try { return jsonResponse_(saveIgPost_(e.parameter.imageUrl, e.parameter.content, e.parameter.date)); }
+      catch(err) { return jsonResponse_({ error: err.message }); }
+
     // ── 查詢 ID ──
     case 'findUserByIdFromPublic':
       try { return jsonResponse_(findUserByIdFromPublic_(e.parameter.custId)); }
@@ -824,6 +832,34 @@ function saveTrackingNo_(recordRow, tracking) {
   const row         = parseInt(recordRow);
   if (isNaN(row) || row < 2) return { error: '無效行號' };
   recordSheet.getRange(row, 13).setValue(tracking || '');
+  SpreadsheetApp.flush();
+  return { success: true };
+}
+
+// ─────────────────────────────────────────────
+//  儲存 Record 收件資料（J=收件人, K=電話, L=地址）
+// ─────────────────────────────────────────────
+function saveRecordDelivery_(recordRow, receiver, phone, address) {
+  const ss          = SpreadsheetApp.getActiveSpreadsheet();
+  const recordSheet = ss.getSheetByName('Record');
+  const row         = parseInt(recordRow);
+  if (isNaN(row) || row < 2) return { error: '無效行號' };
+  recordSheet.getRange(row, 10).setValue(receiver || ''); // J
+  recordSheet.getRange(row, 11).setValue(phone    || ''); // K
+  recordSheet.getRange(row, 12).setValue(address  || ''); // L
+  SpreadsheetApp.flush();
+  return { success: true };
+}
+
+// ─────────────────────────────────────────────
+//  儲存 IG 帖子圖片到「IG post - mercari」Sheet
+//  A=Picture(URL), B=Content, C=Status, D=Date
+// ─────────────────────────────────────────────
+function saveIgPost_(imageUrl, content, date) {
+  const ss        = SpreadsheetApp.getActiveSpreadsheet();
+  const igSheet   = ss.getSheetByName('IG post - mercari');
+  if (!igSheet) return { error: '找不到「IG post - mercari」分頁' };
+  igSheet.appendRow([imageUrl || '', content || '', 'pending', date || '']);
   SpreadsheetApp.flush();
   return { success: true };
 }

@@ -246,7 +246,37 @@ button{font-family:var(--font);}
 .rec-field label{font-size:9px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:2px;}
 .rec-field .rv{font-size:12px;font-weight:600;color:var(--navy);font-family:var(--mono);}
 .rec-field.full{grid-column:1/-1;}
+.rec-field .rv-inp{width:100%;font-size:12px;font-family:var(--mono);border:none;background:transparent;outline:none;color:var(--navy);font-weight:600;padding:0;}
+.rec-field .rv-inp:focus{border-bottom:1.5px solid var(--gold);}
+.rec-delivery-save{margin-top:8px;padding:7px 14px;background:var(--success);color:#fff;border:none;border-radius:var(--r-sm);font-size:11px;font-weight:700;cursor:pointer;width:100%;}
 .rec-track-row{display:flex;gap:7px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+
+/* IG Post tool */
+.ig-field-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.ig-field{display:flex;flex-direction:column;gap:3px;}
+.ig-field label{font-size:9px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.04em;}
+.ig-field input{padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:13px;font-family:var(--mono);outline:none;}
+.ig-field input:focus{border-color:var(--gold);}
+.ig-canvas-wrap{background:#f0f0f0;border-radius:var(--r-md);overflow:hidden;margin-bottom:10px;text-align:center;}
+.ig-canvas-wrap canvas{max-width:100%;height:auto;display:block;margin:0 auto;}
+.ig-btn{padding:10px 16px;border:none;border-radius:var(--r-sm);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);}
+.ig-btn-navy{background:var(--navy);color:var(--gold);}
+.ig-btn-purple{background:#7C3AED;color:#fff;}
+.ig-btn-green{background:var(--success);color:#fff;}
+.ig-btn-gray{background:var(--mist);color:var(--slate);border:1.5px solid var(--border);}
+.ig-btns{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;}
+.ig-ov-row{display:flex;gap:5px;align-items:center;margin-bottom:5px;flex-wrap:wrap;}
+.ig-ov-lbl{font-size:11px;font-weight:700;color:var(--navy);width:60px;flex-shrink:0;}
+.ig-ov-row input[type=number]{padding:4px 6px;border:1.5px solid var(--border);border-radius:4px;font-size:11px;outline:none;}
+.ig-ov-row input[type=color]{width:30px;height:28px;border:none;cursor:pointer;border-radius:4px;}
+.ig-ov-del{padding:3px 8px;background:#FEE2E2;color:#DC2626;border:none;border-radius:4px;cursor:pointer;font-size:11px;}
+.ig-status-bar{padding:8px 12px;border-radius:var(--r-sm);font-size:12px;margin:6px 0;display:none;}
+.ig-status-bar.ig-ok{background:#D1FAE5;color:#065F46;display:block;}
+.ig-status-bar.ig-err{background:#FEE2E2;color:#991B1B;display:block;}
+.ig-status-bar.ig-ld{background:#EFF6FF;color:#1E40AF;display:block;}
+.ig-collapsible-head{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:8px 0;border-top:1px solid var(--border);margin-top:8px;font-size:11px;font-weight:700;color:var(--slate);}
+.ig-collapsible-body{display:none;}
+.ig-collapsible-body.open{display:block;}
 .rec-track-inp{flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-family:var(--mono);outline:none;}
 .rec-track-inp:focus{border-color:var(--gold);}
 .rec-save-btn{padding:8px 14px;background:var(--success);color:white;border:none;border-radius:var(--r-sm);font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;}
@@ -333,6 +363,7 @@ button{font-family:var(--font);}
         <button class="tool-subtab" id="ts-arrival" onclick="switchToolTab('arrival')">📦 到貨資料</button>
         <button class="tool-subtab" id="ts-ship" onclick="switchToolTab('ship')">🚚 寄件處理</button>
         <button class="tool-subtab" id="ts-newgroup" onclick="switchToolTab('newgroup')">🆕 新團設定</button>
+        <button class="tool-subtab" id="ts-ig" onclick="switchToolTab('ig')">🖼️ IG 帖子</button>
       </div>
 
       <!-- 開團通知 -->
@@ -405,6 +436,71 @@ button{font-family:var(--font);}
           </div>
           <button class="charge-submit" onclick="saveNewGroup()">💾 儲存新團資料到 Currency 分頁</button>
           <div id="ngSts" class="tstatus" style="margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <!-- IG 帖子製作 -->
+      <div id="tp-ig" class="tool-subpanel">
+        <div class="card gold-left" style="margin-bottom:10px;">
+          <h4>🖼️ IG 帖子製作</h4>
+          <!-- Template upload -->
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+            <label style="font-size:12px;font-weight:700;color:var(--slate);flex-shrink:0;">上傳圖片範本：</label>
+            <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px dashed var(--border);border-radius:var(--r-sm);cursor:pointer;font-size:12px;color:var(--slate);">
+              📂 選擇檔案
+              <input type="file" id="igTemplateFile" accept="image/*" style="display:none;" onchange="igLoadTemplate(this)">
+            </label>
+            <button class="ig-btn ig-btn-gray" onclick="igRenderCanvas()">🔄 重整</button>
+          </div>
+          <!-- Canvas preview -->
+          <div class="ig-canvas-wrap">
+            <canvas id="igCanvas" width="1080" height="1350" style="max-height:360px;"></canvas>
+          </div>
+          <!-- Fields -->
+          <div class="ig-field-grid">
+            <div class="ig-field" style="grid-column:1/-1;">
+              <label>團號</label>
+              <input type="text" id="ig-group-num" placeholder="第49團" oninput="igRenderCanvas()">
+            </div>
+            <div class="ig-field">
+              <label>匯率顯示</label>
+              <input type="text" id="ig-rate-display" placeholder="0.054" oninput="igRenderCanvas()">
+            </div>
+            <div class="ig-field">
+              <label>收單開始</label>
+              <input type="text" id="ig-cutoff-start" placeholder="1/7" oninput="igRenderCanvas()">
+            </div>
+            <div class="ig-field">
+              <label>收單結束</label>
+              <input type="text" id="ig-cutoff-end" placeholder="15/7" oninput="igRenderCanvas()">
+            </div>
+            <div class="ig-field">
+              <label>寄出約</label>
+              <input type="text" id="ig-ship-date" placeholder="7月底" oninput="igRenderCanvas()">
+            </div>
+            <div class="ig-field" style="grid-column:1/-1;">
+              <label>到港約</label>
+              <input type="text" id="ig-arrival-hk" placeholder="8月中" oninput="igRenderCanvas()">
+            </div>
+          </div>
+          <!-- Actions -->
+          <div class="ig-btns">
+            <button class="ig-btn ig-btn-navy" onclick="igDownloadImage()">⬇️ 下載圖片</button>
+            <button class="ig-btn ig-btn-green" onclick="igUploadAndSaveToSheet()">☁️ 上傳並存入 Sheet</button>
+          </div>
+          <div id="igCreateSts" class="ig-status-bar"></div>
+          <!-- Overlay position config (collapsible) -->
+          <div class="ig-collapsible-head" onclick="this.nextElementSibling.classList.toggle('open')">
+            ⚙️ 文字位置設定 <span>▼</span>
+          </div>
+          <div class="ig-collapsible-body">
+            <div id="igOverlayList" style="margin:8px 0;"></div>
+            <div style="display:flex;gap:7px;flex-wrap:wrap;">
+              <button class="ig-btn ig-btn-gray" onclick="igSaveOverlayConfig()">💾 儲存位置</button>
+              <button class="ig-btn ig-btn-gray" onclick="igLoadDefaultOverlay()">↩️ 還原預設</button>
+              <button class="ig-btn ig-btn-gray" onclick="igAddOverlay()">＋ 新增行</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1134,9 +1230,11 @@ function renderRecordCard(r, group){
       <div class="rec-field"><label>到貨數量</label><div class="rv">${r.qty||'—'}</div></div>
       <div class="rec-field"><label>整體貨品編號</label><div class="rv">${esc(r.mark)||'—'}</div></div>
       <div class="rec-field"><label>貨品編號</label><div class="rv">${esc(r.codes)||'—'}</div></div>
-      <div class="rec-field full"><label>收件人</label><div class="rv">${esc(r.receiver)||'—'}</div></div>
-      <div class="rec-field full"><label>電話 / 地址</label><div class="rv">${esc(r.phone)||'—'} | ${esc(r.address)||'—'}</div></div>
+      <div class="rec-field full"><label>收件人</label><input class="rv-inp" id="rcv-${r.rowNum}" value="${esc(r.receiver||'')}" placeholder="收件人姓名"></div>
+      <div class="rec-field full"><label>電話</label><input class="rv-inp" id="rph-${r.rowNum}" value="${esc(r.phone||'')}" placeholder="電話號碼"></div>
+      <div class="rec-field full"><label>地址</label><input class="rv-inp" id="rad-${r.rowNum}" value="${esc(r.address||'')}" placeholder="收件地址"></div>
     </div>
+    <button class="rec-delivery-save" onclick="saveRecordDelivery(${r.rowNum})">💾 儲存收件資料</button>
     <div class="rec-track-row">
       <input class="rec-track-inp" id="trk-${r.rowNum}" placeholder="輸入 Tracking No." value="${trackVal}">
       <button class="rec-save-btn" onclick="saveTracking(${r.rowNum})">💾 儲存</button>
@@ -1765,6 +1863,153 @@ function gn(s){const m=String(s||'').match(/\d+/);return m?parseInt(m[0]):-1;}
 async function compUp(file){return new Promise((res,rej)=>{const img=new Image(),rd=new FileReader();rd.onload=e=>img.src=e.target.result;img.onload=()=>{const c=document.createElement('canvas'),max=1000;let w=img.width,h=img.height;if(w>h&&w>max){h*=max/w;w=max;}else if(h>max){w*=max/h;h=max;}c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);c.toBlob(blob=>{const fd=new FormData();fd.append('file',blob);fd.append('upload_preset',UPLOAD_PRESET);fd.append('folder',CLOUD_FOLDER);fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,{method:'POST',body:fd}).then(r=>r.json()).then(d=>res(d.secure_url)).catch(rej);},'image/jpeg',0.7);};rd.readAsDataURL(file);});}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 function escAttr(s){return esc(s).replace(/\n/g,' ');}
+
+// ════════ RECORD DELIVERY EDIT ════════
+async function saveRecordDelivery(rowNum){
+  const btn=document.querySelector(`#rcard-${rowNum} .rec-delivery-save`);
+  const orig=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='儲存中…';}
+  const receiver=(document.getElementById('rcv-'+rowNum)||{}).value||'';
+  const phone=(document.getElementById('rph-'+rowNum)||{}).value||'';
+  const address=(document.getElementById('rad-'+rowNum)||{}).value||'';
+  try{
+    const d=await postMain({action:'saveRecordDelivery',password:pw,recordRow:rowNum,receiver,phone,address});
+    if(d.error)throw new Error(d.error);
+    if(btn){btn.textContent='✅ 已儲存';setTimeout(()=>{btn.disabled=false;btn.textContent=orig;},2000);}
+  }catch(e){
+    alert('儲存失敗：'+e.message);
+    if(btn){btn.disabled=false;btn.textContent=orig;}
+  }
+}
+
+// ════════ IG POST TOOL ════════
+let igTemplateImg=null, igOverlays=[], igConfig={};
+
+(function igBoot(){
+  try{const s=localStorage.getItem('igConfig');if(s)igConfig=JSON.parse(s);}catch(_){}
+  try{const o=localStorage.getItem('igOverlays');if(o)igOverlays=JSON.parse(o);else igLoadDefaultOverlay();}catch(_){igLoadDefaultOverlay();}
+  try{
+    const src=localStorage.getItem('igTemplateSrc');
+    if(src){const img=new Image();img.onload=()=>{igTemplateImg=img;igRenderCanvas();};img.src=src;}
+  }catch(_){}
+})();
+
+function igLoadTemplate(input){
+  const file=input.files[0];if(!file)return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{igTemplateImg=img;try{localStorage.setItem('igTemplateSrc',e.target.result);}catch(_){}igRenderCanvas();};
+    img.src=e.target.result;
+  };
+  rd.readAsDataURL(file);
+}
+
+function igGetFieldValue(key){const el=document.getElementById('ig-'+key);return el?el.value.trim():'';}
+
+function igRenderCanvas(){
+  const canvas=document.getElementById('igCanvas');if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  canvas.width=1080;canvas.height=1350;
+  if(igTemplateImg){ctx.drawImage(igTemplateImg,0,0,1080,1350);}
+  else{ctx.fillStyle='#fce4ec';ctx.fillRect(0,0,1080,1350);ctx.fillStyle='#e91e8c';ctx.font='bold 44px "Noto Sans HK",sans-serif';ctx.textAlign='center';ctx.fillText('852hk · 81jp',540,600);ctx.fillStyle='#999';ctx.font='26px "Noto Sans HK",sans-serif';ctx.fillText('請載入圖片範本',540,660);}
+  const fieldMap={'group-num':igGetFieldValue('group-num'),'cutoff-start':igGetFieldValue('cutoff-start'),'cutoff-end':igGetFieldValue('cutoff-end'),'ship-date':igGetFieldValue('ship-date'),'arrival-hk':igGetFieldValue('arrival-hk'),'rate-display':igGetFieldValue('rate-display')};
+  igOverlays.forEach(ov=>{
+    const text=fieldMap[ov.key]!==undefined?fieldMap[ov.key]:ov.text;
+    if(!text)return;
+    ctx.save();
+    ctx.font=`${ov.bold?'bold ':''} ${ov.size||36}px "Noto Sans HK",sans-serif`;
+    ctx.fillStyle=ov.color||'#333';ctx.textAlign=ov.align||'left';
+    if(ov.shadow){ctx.shadowColor='rgba(0,0,0,0.25)';ctx.shadowBlur=4;ctx.shadowOffsetX=1;ctx.shadowOffsetY=1;}
+    ctx.fillText(text,ov.x||0,ov.y||100);ctx.restore();
+  });
+}
+
+function igLoadDefaultOverlay(){
+  igOverlays=[
+    {key:'group-num',   label:'團號',     text:'',x:720,y:118, size:52,color:'#e91e8c',bold:true, align:'left',  shadow:false},
+    {key:'cutoff-start',label:'收單開始', text:'',x:330,y:558, size:40,color:'#222222',bold:false,align:'left',  shadow:false},
+    {key:'cutoff-end',  label:'收單結束', text:'',x:330,y:618, size:40,color:'#222222',bold:false,align:'left',  shadow:false},
+    {key:'ship-date',   label:'寄出約',   text:'',x:148,y:808, size:38,color:'#ffffff',bold:true, align:'left',  shadow:false},
+    {key:'arrival-hk',  label:'到港約',   text:'',x:148,y:878, size:38,color:'#ffffff',bold:true, align:'left',  shadow:false},
+    {key:'rate-display',label:'匯率',     text:'',x:540,y:1230,size:90,color:'#e91e8c',bold:true, align:'center',shadow:false},
+  ];
+  igRenderOverlayList();
+  localStorage.setItem('igOverlays',JSON.stringify(igOverlays));
+}
+
+function igRenderOverlayList(){
+  const wrap=document.getElementById('igOverlayList');if(!wrap)return;
+  wrap.innerHTML=igOverlays.map((ov,i)=>`
+    <div class="ig-ov-row">
+      <span class="ig-ov-lbl">${esc(ov.label)}</span>
+      <input type="number" value="${ov.x}" style="width:62px;" placeholder="X" oninput="igOverlays[${i}].x=+this.value">
+      <input type="number" value="${ov.y}" style="width:62px;" placeholder="Y" oninput="igOverlays[${i}].y=+this.value">
+      <input type="number" value="${ov.size||36}" style="width:52px;" placeholder="字號" oninput="igOverlays[${i}].size=+this.value">
+      <input type="color" value="${ov.color||'#ffffff'}" oninput="igOverlays[${i}].color=this.value">
+      <button class="ig-ov-del" onclick="igRemoveOverlay(${i})">✕</button>
+    </div>`).join('');
+}
+
+function igAddOverlay(){
+  igOverlays.push({key:'custom_'+Date.now(),label:'自訂文字',text:'',x:100,y:200,size:36,color:'#FFFFFF',bold:false,align:'left',shadow:true});
+  igRenderOverlayList();
+}
+
+function igRemoveOverlay(i){igOverlays.splice(i,1);igRenderOverlayList();}
+
+function igSaveOverlayConfig(){
+  localStorage.setItem('igOverlays',JSON.stringify(igOverlays));
+  igRenderCanvas();
+  igShowSts('igCreateSts','ok','✅ 位置設定已儲存');
+}
+
+function igDownloadImage(){
+  igRenderCanvas();
+  const a=document.createElement('a');
+  a.download=`ig_post_${new Date().toISOString().slice(0,10)}.jpg`;
+  a.href=document.getElementById('igCanvas').toDataURL('image/jpeg',0.95);
+  a.click();
+}
+
+async function igUploadCanvas(){
+  return new Promise((resolve,reject)=>{
+    igRenderCanvas();
+    document.getElementById('igCanvas').toBlob(blob=>{
+      const fd=new FormData();
+      fd.append('file',blob);
+      fd.append('upload_preset',UPLOAD_PRESET);
+      fd.append('folder','ig_posts');
+      fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,{method:'POST',body:fd})
+        .then(r=>r.json())
+        .then(d=>{if(d.secure_url)resolve(d.secure_url);else reject(new Error(d.error?.message||'上傳失敗'));})
+        .catch(reject);
+    },'image/jpeg',0.95);
+  });
+}
+
+async function igUploadAndSaveToSheet(){
+  igShowSts('igCreateSts','ld','⏳ 上傳圖片到 Cloudinary…');
+  try{
+    const imageUrl=await igUploadCanvas();
+    igShowSts('igCreateSts','ld','⏳ 寫入 IG post sheet…');
+    const groupNum=igGetFieldValue('group-num');
+    const rate=igGetFieldValue('rate-display');
+    const content=`${groupNum||'新團'} 匯率 ${rate||''}`.trim();
+    const today=new Date().toLocaleDateString('zh-HK',{year:'numeric',month:'2-digit',day:'2-digit'});
+    const d=await postMain({action:'saveIgPost',password:pw,imageUrl,content,date:today});
+    if(d.error)throw new Error(d.error);
+    igShowSts('igCreateSts','ok','✅ 已上傳並存入 IG post sheet！圖片：'+imageUrl);
+  }catch(e){
+    igShowSts('igCreateSts','err','❌ 失敗：'+e.message);
+  }
+}
+
+function igShowSts(elId,type,msg){
+  const el=document.getElementById(elId);if(!el)return;
+  el.className='ig-status-bar '+(type==='ok'?'ig-ok':type==='err'?'ig-err':'ig-ld');
+  el.textContent=msg;
+}
 </script>
 </body>
 </html>
