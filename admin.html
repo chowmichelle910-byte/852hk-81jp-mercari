@@ -2188,6 +2188,9 @@ function igLoadDefaultOverlay(){
   localStorage.setItem('igOverlays',JSON.stringify(igOverlays));
 }
 
+function _igSet(i, key, val){ igOverlays[i][key]=val; igRenderCanvas(); }
+function _igSetAndRefresh(i, key, val){ igOverlays[i][key]=val; igRenderOverlayList(); igRenderCanvas(); }
+
 function igRenderOverlayList(){
   const wrap=document.getElementById('igOverlayList');if(!wrap)return;
   const FONTS=['Noto Sans HK','serif','monospace','cursive','fantasy'];
@@ -2196,40 +2199,40 @@ function igRenderOverlayList(){
       <span class="ig-ov-lbl" style="width:100%;font-size:11px;font-weight:700;color:var(--navy);">${esc(ov.label)}</span>
       <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
         <label style="font-size:10px;color:var(--slate);">X</label>
-        <input type="number" value="${ov.x||0}" style="width:58px;" oninput="igOverlays[${i}].x=+this.value">
+        <input type="number" value="${ov.x||0}" style="width:58px;" oninput="_igSet(${i},'x',+this.value)">
         <label style="font-size:10px;color:var(--slate);">Y</label>
-        <input type="number" value="${ov.y||0}" style="width:58px;" oninput="igOverlays[${i}].y=+this.value">
+        <input type="number" value="${ov.y||0}" style="width:58px;" oninput="_igSet(${i},'y',+this.value)">
         <label style="font-size:10px;color:var(--slate);">字號</label>
-        <input type="number" value="${ov.size||36}" style="width:52px;" oninput="igOverlays[${i}].size=+this.value">
+        <input type="number" value="${ov.size||36}" style="width:52px;" oninput="_igSet(${i},'size',+this.value)">
         <label style="font-size:10px;color:var(--slate);">旋轉°</label>
-        <input type="number" value="${ov.rotate||0}" style="width:52px;" placeholder="0" oninput="igOverlays[${i}].rotate=+this.value">
-        <input type="color" value="${ov.color||'#ffffff'}" title="填色" oninput="igOverlays[${i}].color=this.value">
+        <input type="number" value="${ov.rotate||0}" style="width:52px;" oninput="_igSet(${i},'rotate',+this.value)">
+        <input type="color" value="${ov.color||'#ffffff'}" title="填色" oninput="_igSet(${i},'color',this.value)">
         <button class="ig-ov-del" onclick="igRemoveOverlay(${i})">✕</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px;">
-        <select style="font-size:10px;padding:2px 4px;" onchange="igOverlays[${i}].font=this.value">
+        <select style="font-size:10px;padding:2px 4px;" onchange="_igSet(${i},'font',this.value)">
           ${FONTS.map(f=>`<option value="${f}" ${(ov.font||'Noto Sans HK')===f?'selected':''}>${f}</option>`).join('')}
         </select>
         <label style="font-size:10px;display:flex;align-items:center;gap:3px;cursor:pointer;">
-          <input type="checkbox" ${ov.bold?'checked':''} onchange="igOverlays[${i}].bold=this.checked">粗體
+          <input type="checkbox" ${ov.bold?'checked':''} onchange="_igSet(${i},'bold',this.checked)">粗體
         </label>
         <label style="font-size:10px;display:flex;align-items:center;gap:3px;cursor:pointer;">
-          <input type="checkbox" ${ov.italic?'checked':''} onchange="igOverlays[${i}].italic=this.checked">斜體
+          <input type="checkbox" ${ov.italic?'checked':''} onchange="_igSet(${i},'italic',this.checked)">斜體
         </label>
         <label style="font-size:10px;display:flex;align-items:center;gap:3px;cursor:pointer;">
-          <input type="checkbox" ${ov.stroke?'checked':''} onchange="igOverlays[${i}].stroke=this.checked">邊框
+          <input type="checkbox" ${ov.stroke?'checked':''} onchange="_igSetAndRefresh(${i},'stroke',this.checked)">邊框
         </label>
-        ${ov.stroke?`<input type="color" value="${ov.strokeColor||'#000000'}" title="邊框色" oninput="igOverlays[${i}].strokeColor=this.value">
+        ${ov.stroke?`<input type="color" value="${ov.strokeColor||'#000000'}" title="邊框色" oninput="_igSet(${i},'strokeColor',this.value)">
         <label style="font-size:10px;color:var(--slate);">粗</label>
-        <input type="number" value="${ov.strokeWidth||4}" style="width:44px;" oninput="igOverlays[${i}].strokeWidth=+this.value">`:''}
+        <input type="number" value="${ov.strokeWidth||4}" style="width:44px;" oninput="_igSet(${i},'strokeWidth',+this.value)">`:''}
         <label style="font-size:10px;display:flex;align-items:center;gap:3px;cursor:pointer;">
-          <input type="checkbox" ${ov.shadow?'checked':''} onchange="igOverlays[${i}].shadow=this.checked">陰影
+          <input type="checkbox" ${ov.shadow?'checked':''} onchange="_igSet(${i},'shadow',this.checked)">陰影
         </label>
-        <select style="font-size:10px;padding:2px 4px;" onchange="igOverlays[${i}].align=this.value">
+        <select style="font-size:10px;padding:2px 4px;" onchange="_igSet(${i},'align',this.value)">
           ${['left','center','right'].map(a=>`<option value="${a}" ${(ov.align||'left')===a?'selected':''}>${a}</option>`).join('')}
         </select>
       </div>
-      ${ov.key.startsWith('custom_')?`<input type="text" value="${esc(ov.text||'')}" placeholder="自訂文字" style="width:100%;margin-top:4px;font-size:11px;" oninput="igOverlays[${i}].text=this.value">`:''}
+      ${ov.key.startsWith('custom_')?`<input type="text" value="${esc(ov.text||'')}" placeholder="自訂文字" style="width:100%;margin-top:4px;font-size:11px;" oninput="_igSet(${i},'text',this.value)">`:''}
     </div>`).join('');
 }
 
