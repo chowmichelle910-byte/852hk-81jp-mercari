@@ -2133,10 +2133,19 @@ function igRenderCanvas(){
     const text=fieldMap[ov.key]!==undefined?fieldMap[ov.key]:ov.text;
     if(!text)return;
     ctx.save();
-    ctx.font=`${ov.bold?'bold ':''} ${ov.size||36}px "Noto Sans HK",sans-serif`;
-    ctx.fillStyle=ov.color||'#333';ctx.textAlign=ov.align||'left';
+    const px=ov.x||0, py=ov.y||100;
+    // rotation
+    if(ov.rotate){ctx.translate(px,py);ctx.rotate((ov.rotate||0)*Math.PI/180);ctx.translate(-px,-py);}
+    // font: italic + bold + size + family
+    const fontStyle=`${ov.italic?'italic ':''} ${ov.bold?'bold ':''} ${ov.size||36}px "${ov.font||'Noto Sans HK'}",sans-serif`;
+    ctx.font=fontStyle;
+    ctx.fillStyle=ov.color||'#333';
+    ctx.textAlign=ov.align||'left';
     if(ov.shadow){ctx.shadowColor='rgba(0,0,0,0.25)';ctx.shadowBlur=4;ctx.shadowOffsetX=1;ctx.shadowOffsetY=1;}
-    ctx.fillText(text,ov.x||0,ov.y||100);ctx.restore();
+    // stroke (text border)
+    if(ov.stroke){ctx.strokeStyle=ov.strokeColor||'#000000';ctx.lineWidth=ov.strokeWidth||4;ctx.lineJoin='round';ctx.strokeText(text,px,py);}
+    ctx.fillText(text,px,py);
+    ctx.restore();
   });
 }
 
@@ -2162,13 +2171,14 @@ async function igAutoFill(){
 }
 
 function igLoadDefaultOverlay(){
+  const def=(extra)=>Object.assign({font:'Noto Sans HK',italic:false,stroke:false,strokeColor:'#000000',strokeWidth:4,rotate:0,shadow:false},extra);
   igOverlays=[
-    {key:'group-num',   label:'團號',     text:'',x:720,y:118, size:52,color:'#e91e8c',bold:true, align:'left',  shadow:false},
-    {key:'cutoff-start',label:'收單開始', text:'',x:330,y:558, size:40,color:'#222222',bold:false,align:'left',  shadow:false},
-    {key:'cutoff-end',  label:'收單結束', text:'',x:330,y:618, size:40,color:'#222222',bold:false,align:'left',  shadow:false},
-    {key:'ship-date',   label:'寄出約',   text:'',x:148,y:808, size:38,color:'#ffffff',bold:true, align:'left',  shadow:false},
-    {key:'arrival-hk',  label:'到港約',   text:'',x:148,y:878, size:38,color:'#ffffff',bold:true, align:'left',  shadow:false},
-    {key:'rate-display',label:'匯率',     text:'',x:540,y:1230,size:90,color:'#e91e8c',bold:true, align:'center',shadow:false},
+    def({key:'group-num',   label:'團號',    text:'',x:720,y:118, size:52,color:'#e91e8c',bold:true, align:'left'}),
+    def({key:'cutoff-start',label:'收單開始',text:'',x:330,y:558, size:40,color:'#222222',bold:false,align:'left'}),
+    def({key:'cutoff-end',  label:'收單結束',text:'',x:330,y:618, size:40,color:'#222222',bold:false,align:'left'}),
+    def({key:'ship-date',   label:'寄出約',  text:'',x:148,y:808, size:38,color:'#ffffff',bold:true, align:'left'}),
+    def({key:'arrival-hk',  label:'到港約',  text:'',x:148,y:878, size:38,color:'#ffffff',bold:true, align:'left'}),
+    def({key:'rate-display',label:'匯率',    text:'',x:540,y:1230,size:90,color:'#e91e8c',bold:true, align:'center'}),
   ];
   igRenderOverlayList();
   localStorage.setItem('igOverlays',JSON.stringify(igOverlays));
@@ -2176,19 +2186,51 @@ function igLoadDefaultOverlay(){
 
 function igRenderOverlayList(){
   const wrap=document.getElementById('igOverlayList');if(!wrap)return;
+  const FONTS=['Noto Sans HK','serif','monospace','cursive','fantasy'];
   wrap.innerHTML=igOverlays.map((ov,i)=>`
-    <div class="ig-ov-row">
-      <span class="ig-ov-lbl">${esc(ov.label)}</span>
-      <input type="number" value="${ov.x}" style="width:62px;" placeholder="X" oninput="igOverlays[${i}].x=+this.value">
-      <input type="number" value="${ov.y}" style="width:62px;" placeholder="Y" oninput="igOverlays[${i}].y=+this.value">
-      <input type="number" value="${ov.size||36}" style="width:52px;" placeholder="字號" oninput="igOverlays[${i}].size=+this.value">
-      <input type="color" value="${ov.color||'#ffffff'}" oninput="igOverlays[${i}].color=this.value">
-      <button class="ig-ov-del" onclick="igRemoveOverlay(${i})">✕</button>
+    <div class="ig-ov-row" style="flex-wrap:wrap;gap:4px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span class="ig-ov-lbl" style="width:100%;font-size:11px;font-weight:700;color:var(--navy);">${esc(ov.label)}</span>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+        <label style="font-size:10px;color:var(--slate);">X</label>
+        <input type="number" value="${ov.x||0}" style="width:58px;" oninput="igOverlays[${i}].x=+this.value">
+        <label style="font-size:10px;color:var(--slate);">Y</label>
+        <input type="number" value="${ov.y||0}" style="width:58px;" oninput="igOverlays[${i}].y=+this.value">
+        <label style="font-size:10px;color:var(--slate);">字號</label>
+        <input type="number" value="${ov.size||36}" style="width:52px;" oninput="igOverlays[${i}].size=+this.value">
+        <label style="font-size:10px;color:var(--slate);">旋轉°</label>
+        <input type="number" value="${ov.rotate||0}" style="width:52px;" placeholder="0" oninput="igOverlays[${i}].rotate=+this.value">
+        <input type="color" value="${ov.color||'#ffffff'}" title="填色" oninput="igOverlays[${i}].color=this.value">
+        <button class="ig-ov-del" onclick="igRemoveOverlay(${i})">✕</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px;">
+        <select style="font-size:10px;padding:2px 4px;" onchange="igOverlays[${i}].font=this.value">
+          ${FONTS.map(f=>`<option value="${f}" ${(ov.font||'Noto Sans HK')===f?'selected':''}>${f}</option>`).join('')}
+        </select>
+        <label style="font-size:10px;display:flex;align-items:center;gap:3px;cursor:pointer;">
+          <input type="checkbox" ${ov.bold?'checked':''} onchange="igOverlays[${i}].bold=this.checked">粗體
+        </label>
+        <label style="font-size:10px;display:flex;align-items:center;gap:3px;cursor:pointer;">
+          <input type="checkbox" ${ov.italic?'checked':''} onchange="igOverlays[${i}].italic=this.checked">斜體
+        </label>
+        <label style="font-size:10px;display:flex;align-items:center;gap:3px;cursor:pointer;">
+          <input type="checkbox" ${ov.stroke?'checked':''} onchange="igOverlays[${i}].stroke=this.checked">邊框
+        </label>
+        ${ov.stroke?`<input type="color" value="${ov.strokeColor||'#000000'}" title="邊框色" oninput="igOverlays[${i}].strokeColor=this.value">
+        <label style="font-size:10px;color:var(--slate);">粗</label>
+        <input type="number" value="${ov.strokeWidth||4}" style="width:44px;" oninput="igOverlays[${i}].strokeWidth=+this.value">`:''}
+        <label style="font-size:10px;display:flex;align-items:center;gap:3px;cursor:pointer;">
+          <input type="checkbox" ${ov.shadow?'checked':''} onchange="igOverlays[${i}].shadow=this.checked">陰影
+        </label>
+        <select style="font-size:10px;padding:2px 4px;" onchange="igOverlays[${i}].align=this.value">
+          ${['left','center','right'].map(a=>`<option value="${a}" ${(ov.align||'left')===a?'selected':''}>${a}</option>`).join('')}
+        </select>
+      </div>
+      ${ov.key.startsWith('custom_')?`<input type="text" value="${esc(ov.text||'')}" placeholder="自訂文字" style="width:100%;margin-top:4px;font-size:11px;" oninput="igOverlays[${i}].text=this.value">`:''}
     </div>`).join('');
 }
 
 function igAddOverlay(){
-  igOverlays.push({key:'custom_'+Date.now(),label:'自訂文字',text:'',x:100,y:200,size:36,color:'#FFFFFF',bold:false,align:'left',shadow:true});
+  igOverlays.push({key:'custom_'+Date.now(),label:'自訂文字',text:'',x:100,y:200,size:36,color:'#FFFFFF',font:'Noto Sans HK',bold:false,italic:false,stroke:false,strokeColor:'#000000',strokeWidth:4,rotate:0,align:'left',shadow:false});
   igRenderOverlayList();
 }
 

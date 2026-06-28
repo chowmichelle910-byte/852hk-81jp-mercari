@@ -305,30 +305,30 @@ function getGroupInfo_(groupId) {
   if (!currencyRow) return { error: '找不到匯率資料，請確認 Currency 表 A 欄' };
 
   const [group, startDate, endDate] = groupRow;
-  const rate1 = currencyRow[4];
+  const rate1 = currencyRow[4]; // ¥1~10,000
+  const rate2 = currencyRow[6]; // ¥10,001~50,000
+  const rate3 = currencyRow[7]; // ¥50,001+
 
-  function fmt(date, offset) {
+  function jpDate(date) {
+    const d = new Date(date);
+    return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日';
+  }
+  function slashDate(date, offset) {
     const d = new Date(date);
     if (offset) d.setDate(d.getDate() + offset);
     return (d.getMonth()+1) + '/' + d.getDate();
   }
-  function fmtMonth(date, offset) {
-    const d = new Date(date);
-    if (offset) d.setDate(d.getDate() + offset);
-    const m = d.getMonth()+1;
-    const day = d.getDate();
-    // rough label: early/mid/late month
-    const part = day <= 10 ? '初' : day <= 20 ? '中' : '底';
-    return m + '月' + part;
-  }
+
+  // 匯率：¥50001+ ～ ¥1~10000（高到低）
+  const rateDisplay = [rate3, rate2, rate1].filter(Boolean).map(String).join('～');
 
   return {
-    groupNum:     normalize(group),
-    cutoffStart:  fmt(startDate),
-    cutoffEnd:    fmt(endDate),
-    shipDate:     fmtMonth(endDate, 1),
-    arrivalHk:    fmtMonth(endDate, 10),
-    rate:         rate1 ? String(rate1) : '',
+    groupNum:    normalize(group),
+    cutoffStart: jpDate(startDate) + 'から',
+    cutoffEnd:   jpDate(endDate)   + 'まで',
+    shipDate:    slashDate(startDate, 1), // 收單開始+1日
+    arrivalHk:   slashDate(startDate, 8), // 寄出+7日
+    rate:        rateDisplay,
   };
 }
 
