@@ -447,12 +447,13 @@ button{font-family:var(--font);}
         <div id="chargeSts" class="tstatus" style="margin-top:8px;"></div>
       </div>
 
-      <!-- Buyer summary (from Buyer sheet) -->
+      <!-- Buyer summary (from 訂單 sheet) -->
       <div class="fin-section">
         <div class="fin-section-head">每位客人明細<span id="buyerGroupLbl"></span></div>
+        <div id="buyerGroupTabs" class="atabs" style="padding:10px 14px 0;margin-bottom:0;flex-wrap:wrap;gap:6px;"></div>
         <div style="overflow-x:auto;"><table class="ft" id="buyerTable">
-          <thead><tr><th>客人</th><th>購入金額</th><th>匯率</th></tr></thead>
-          <tbody id="buyerTbody"><tr><td colspan="3" class="empty">載入中…</td></tr></tbody>
+          <thead><tr><th>客人</th><th>購入日幣</th><th>匯率</th><th>港幣</th></tr></thead>
+          <tbody id="buyerTbody"><tr><td colspan="4" class="empty">載入中…</td></tr></tbody>
         </table></div>
       </div>
 
@@ -1521,16 +1522,57 @@ async function submitCharge(){
   }catch(e){setSts('chargeSts','❌ 失敗：'+e.message,'err');}
 }
 
+let curBuyerGroup = '';
+
+function buildBuyerGroupTabs(groups){
+  const tabs = document.getElementById('buyerGroupTabs');
+  if(!tabs) return;
+  tabs.innerHTML = groups.map(g =>
+    `<div class="atab${g===curBuyerGroup?' active':''}" style="font-size:11px;padding:5px 11px;" onclick="switchBuyerGroup('${esc(g)}')">${esc(g)}</div>`
+  ).join('');
+}
+
+async function switchBuyerGroup(g){
+  curBuyerGroup = g;
+  document.querySelectorAll('#buyerGroupTabs .atab').forEach(b=>b.classList.toggle('active',b.textContent===g));
+  await loadBuyerData(g);
+}
+
 async function loadBuyerTable(){
+  const groups = allGroups.length ? allGroups : [];
+  if(!curBuyerGroup && groups.length) curBuyerGroup = groups[0];
+  buildBuyerGroupTabs(groups);
+  if(curBuyerGroup) await loadBuyerData(curBuyerGroup);
+}
+
+async function loadBuyerData(group){
+  document.getElementById('buyerGroupLbl').textContent = group ? ' — '+group : '';
+  document.getElementById('buyerTbody').innerHTML = '<tr><td colspan="4" class="empty"><div class="spin"></div></td></tr>';
   try{
-    const d=await postMain({action:'getBuyerSummary',password:pw});
-    if(d.error)return;
-    document.getElementById('buyerGroupLbl').textContent=d.group||'';
-    const rows=Array.isArray(d.rows)?d.rows:[];
-    document.getElementById('buyerTbody').innerHTML=rows.length
-      ?rows.map(r=>`<tr><td class="cn2">${esc(r.name||'')}</td><td>${r.amount!=null?'HK$'+Number(r.amount).toFixed(1):'—'}</td><td class="rt">${r.rate||'—'}</td></tr>`).join('')
-      :'<tr><td colspan="3" class="empty">暫無數據</td></tr>';
-  }catch(e){document.getElementById('buyerTbody').innerHTML='<tr><td colspan="3" class="empty">❌ 載入失敗</td></tr>';}
+    const d = await postMain({action:'getCustomerGroupSummary', password:pw, group});
+    if(d.error){ document.getElementById('buyerTbody').innerHTML=`<tr><td colspan="4" class="empty">❌ ${esc(d.error)}</td></tr>`; return; }
+    const rows = Array.isArray(d.rows) ? d.rows : [];
+    if(!rows.length){ document.getElementById('buyerTbody').innerHTML='<tr><td colspan="4" class="empty">此團暫無訂單</td></tr>'; return; }
+    let totalJpy = 0;
+    const html = rows.map(r=>{
+      const jpy = r.totalJpy || 0;
+      const rate = r.rate || 0;
+      const hkd = rate > 0 ? (jpy * rate).toFixed(1) : '—';
+      totalJpy += jpy;
+      return `<tr>
+        <td class="cn2">${esc(r.name||'')}</td>
+        <td>¥${Number(jpy).toLocaleString()}</td>
+        <td class="rt">${rate||'—'}</td>
+        <td>${rate>0?'HK$'+hkd:'—'}</td>
+      </tr>`;
+    }).join('');
+    const totalRow = `<tr style="background:var(--mist);font-weight:700;">
+      <td class="cn2">合計 ${rows.length} 人</td>
+      <td>¥${Number(totalJpy).toLocaleString()}</td>
+      <td>—</td><td>—</td>
+    </tr>`;
+    document.getElementById('buyerTbody').innerHTML = html + totalRow;
+  }catch(e){ document.getElementById('buyerTbody').innerHTML=`<tr><td colspan="4" class="empty">❌ 載入失敗</td></tr>`; }
 }
 
 let profitAllRows=[], curProfitGroup='';
