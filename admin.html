@@ -1375,18 +1375,20 @@ async function showReceipt(userName, group){
     document.querySelectorAll('.rec-card').forEach(card=>{
       const uname=card.querySelector('.rec-username');
       if(uname&&uname.textContent.trim()===userName){
-        const fields=card.querySelectorAll('.rv');
+        const rv = f => card.querySelectorAll('.rv')[f]?.textContent||'';
+        const rowNum = card.id?.replace('rcard-','');
         recData={
-          method   : fields[0]?.textContent||'',
-          postage  : fields[1]?.textContent||'',
-          weight   : fields[2]?.textContent||'',
-          receiver : fields[6]?.textContent||'',
-          phoneAddr: fields[7]?.textContent||''
+          method   : rv(0),
+          postage  : rv(1),
+          weight   : rv(2),
+          receiver : rowNum ? (document.getElementById('rcv-'+rowNum)?.value||'') : rv(6),
+          phone    : rowNum ? (document.getElementById('rph-'+rowNum)?.value||'') : '',
+          address  : rowNum ? (document.getElementById('rad-'+rowNum)?.value||'') : '',
         };
       }
     });
-    const phone   = recData?.phoneAddr?.split('|')[0]?.trim()||'';
-    const address = recData?.phoneAddr?.split('|').slice(1).join('|').trim()||'';
+    const phone   = recData?.phone||'';
+    const address = recData?.address||'';
 
     // 3. 生成 HTML
     const html = buildReceiptHtml(d.items||[], userName, group, recData, phone, address);
