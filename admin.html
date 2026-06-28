@@ -337,10 +337,9 @@ button{font-family:var(--font);}
 
       <!-- 開團通知 -->
       <div id="tp-notice" class="tool-subpanel active">
-        <button class="tool-btn tb-navy" onclick="previewGroupEmail()">📧 預覽開團通知 Email</button>
         <div id="noticeSts" class="tstatus"></div>
-        <div id="noticePreview" class="tool-preview">
-          <div id="noticePreviewHtml" class="tool-preview-html"></div>
+        <div id="noticePreview" class="tool-preview active">
+          <div id="noticePreviewHtml" class="tool-preview-html" style="min-height:60px;color:#94A3B8;font-size:13px;">請先選擇團次…</div>
           <div class="tool-preview-actions">
             <button class="preview-copy-btn" onclick="copyPreview('noticePreviewHtml')">📋 複製內容</button>
             <button class="preview-send-btn" onclick="sendGroupEmailAction()">📤 確認寄出</button>
@@ -667,13 +666,12 @@ function buildToolGrpTabs(groups){
 
 function selectToolGrp(g){
   curToolGrp = g;
-  // Update active tab
   document.querySelectorAll('#toolGrpTabs .atab').forEach(b=>{
     b.classList.toggle('active', b.textContent===g);
   });
-  // Reload arrival cards if on arrival tab
   const activeTab=document.querySelector('.tool-subtab.active');
   if(activeTab&&activeTab.id==='ts-arrival') loadRecordCards(g);
+  if(activeTab&&activeTab.id==='ts-notice') previewGroupEmail();
 }
 
 // ── 新團設定 ──
@@ -716,6 +714,7 @@ function switchToolTab(t){
   document.querySelectorAll('.tool-subpanel').forEach(p=>p.classList.remove('active'));
   document.getElementById('ts-'+t).classList.add('active');
   document.getElementById('tp-'+t).classList.add('active');
+  if(t==='notice'&&curToolGrp) previewGroupEmail();
   if(t==='arrival'&&curToolGrp) loadRecordCards(curToolGrp);
   if(t==='newgroup') loadNewGroupDefaults();
 }
@@ -1544,9 +1543,40 @@ let curBuyerGroup = '';
 function buildBuyerGroupTabs(groups){
   const tabs = document.getElementById('buyerGroupTabs');
   if(!tabs) return;
-  tabs.innerHTML = groups.map(g =>
-    `<div class="atab${g===curBuyerGroup?' active':''}" style="font-size:11px;padding:5px 11px;" onclick="switchBuyerGroup('${esc(g)}')">${esc(g)}</div>`
-  ).join('');
+  tabs.innerHTML = '';
+  const show = groups.slice(0,3);
+  const more = groups.slice(3);
+  show.forEach(g=>{
+    const b=document.createElement('div');
+    b.className='atab'+(g===curBuyerGroup?' active':'');
+    b.style.cssText='font-size:11px;padding:5px 11px;';
+    b.textContent=g;
+    b.onclick=()=>switchBuyerGroup(g);
+    tabs.appendChild(b);
+  });
+  if(more.length){
+    const wrap=document.createElement('div');wrap.className='more-dropdown';
+    const btn=document.createElement('div');
+    btn.className='atab'+(more.includes(curBuyerGroup)?' active':'');
+    btn.style.cssText='font-size:11px;padding:5px 11px;';
+    btn.textContent='更多…';
+    const list=document.createElement('div');list.className='more-list';
+    more.forEach(g=>{
+      const item=document.createElement('div');
+      item.className='more-list-item'+(g===curBuyerGroup?' active':'');
+      item.textContent=g;
+      item.onclick=(e)=>{e.stopPropagation();switchBuyerGroup(g);list.classList.remove('open');buildBuyerGroupTabs(groups);};
+      list.appendChild(item);
+    });
+    btn.onclick=(e)=>{
+      e.stopPropagation();
+      const isOpen=list.classList.contains('open');
+      document.querySelectorAll('.more-list.open').forEach(l=>l.classList.remove('open'));
+      if(!isOpen){const rect=btn.getBoundingClientRect();list.style.top=(rect.bottom+6)+'px';list.style.left=rect.left+'px';list.classList.add('open');}
+    };
+    document.addEventListener('click',()=>list.classList.remove('open'));
+    wrap.appendChild(btn);wrap.appendChild(list);tabs.appendChild(wrap);
+  }
 }
 
 async function switchBuyerGroup(g){
