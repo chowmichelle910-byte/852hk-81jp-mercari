@@ -1428,6 +1428,7 @@ async function showReceipt(userName, group){
       if(uname&&uname.textContent.trim()===userName){
         const rv = f => card.querySelectorAll('.rv')[f]?.textContent||'';
         const rowNum = card.id?.replace('rcard-','');
+        const rowNum = card.id?.replace('rcard-','');
         recData={
           method   : rv(0),
           postage  : rv(1),
@@ -1435,6 +1436,7 @@ async function showReceipt(userName, group){
           receiver : rowNum ? (document.getElementById('rcv-'+rowNum)?.value||'') : rv(6),
           phone    : rowNum ? (document.getElementById('rph-'+rowNum)?.value||'') : '',
           address  : rowNum ? (document.getElementById('rad-'+rowNum)?.value||'') : '',
+          tracking : rowNum ? (document.getElementById('trk-'+rowNum)?.value||'') : '',
         };
       }
     });
@@ -1533,11 +1535,12 @@ function copyReceiptUrl(url, btn){
 }
 
 function buildReceiptHtml(items, userName, group, recData, phone, address){
-  const arrTag = group + '到貨';
+  const arrTag  = group + '到貨';
   const method   = recData?.method||'—';
   const postage  = recData?.postage||'—';
   const weight   = recData?.weight||'—';
   const receiver = recData?.receiver||'—';
+  const tracking = recData?.tracking||'';
 
   const itemsHtml = items.map(it=>{
     const notArrived = !it.arrivalDate;
@@ -1605,6 +1608,18 @@ body{font-family:'Noto Sans HK',system-ui,sans-serif;background:#F4F6F9;padding:
     <span style="font-size:12px;font-weight:600;color:#0D1B2A;flex:1;word-break:break-all;">${esc(v)}</span>
   </div>`).join('')}
 </div>
+
+<!-- 運單 QR code -->
+${tracking ? `
+<div style="background:#fff;border-radius:12px;padding:16px;margin-bottom:14px;border:1px solid #E2E8EF;display:flex;align-items:center;gap:16px;">
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(tracking)}&bgcolor=ffffff&color=0D1B2A&margin=4"
+       style="width:110px;height:110px;border-radius:8px;flex-shrink:0;" alt="QR">
+  <div>
+    <div style="font-size:10px;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">運單號碼</div>
+    <div style="font-family:monospace;font-size:15px;font-weight:700;color:#0D1B2A;word-break:break-all;">${esc(tracking)}</div>
+    <div style="font-size:11px;color:#94A3B8;margin-top:6px;">掃描 QR Code 查詢貨件狀態</div>
+  </div>
+</div>` : ''}
 
 <!-- 已訂購商品 -->
 <div style="font-size:13px;font-weight:800;color:#0D1B2A;margin-bottom:10px;">已訂購商品</div>
