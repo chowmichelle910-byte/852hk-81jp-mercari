@@ -451,55 +451,59 @@ button{font-family:var(--font);}
             </label>
             <button class="ig-btn ig-btn-gray" onclick="igRenderCanvas()">🔄 重整</button>
           </div>
-          <!-- Canvas preview -->
-          <div class="ig-canvas-wrap">
-            <canvas id="igCanvas" width="1080" height="1350" style="max-height:360px;"></canvas>
-          </div>
-          <!-- Auto-fill -->
-          <button class="ig-btn" style="width:100%;margin-bottom:10px;background:var(--gold);color:var(--navy);font-weight:800;" onclick="igAutoFill()">⚡ 自動填入（從已選團次）</button>
-          <!-- Fields -->
-          <div class="ig-field-grid">
-            <div class="ig-field" style="grid-column:1/-1;">
-              <label>團號</label>
-              <input type="text" id="ig-group-num" placeholder="第49團" oninput="igRenderCanvas()">
+          <!-- Main layout: canvas left, settings right -->
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <!-- Left: canvas preview (fixed width) -->
+            <div style="flex-shrink:0;width:200px;">
+              <div class="ig-canvas-wrap" style="margin-bottom:8px;">
+                <canvas id="igCanvas" width="1080" height="1350" style="width:200px;height:250px;object-fit:contain;display:block;border-radius:6px;"></canvas>
+              </div>
+              <button class="ig-btn ig-btn-gray" style="width:100%;margin-bottom:4px;" onclick="igRenderCanvas()">🔄 重整</button>
+              <button class="ig-btn ig-btn-navy" style="width:100%;margin-bottom:4px;" onclick="igDownloadImage()">⬇️ 下載</button>
+              <button class="ig-btn ig-btn-green" style="width:100%;" onclick="igUploadAndSaveToSheet()">☁️ 上傳存 Sheet</button>
             </div>
-            <div class="ig-field">
-              <label>匯率顯示</label>
-              <input type="text" id="ig-rate-display" placeholder="0.054" oninput="igRenderCanvas()">
-            </div>
-            <div class="ig-field">
-              <label>收單開始</label>
-              <input type="text" id="ig-cutoff-start" placeholder="1/7" oninput="igRenderCanvas()">
-            </div>
-            <div class="ig-field">
-              <label>收單結束</label>
-              <input type="text" id="ig-cutoff-end" placeholder="15/7" oninput="igRenderCanvas()">
-            </div>
-            <div class="ig-field">
-              <label>寄出約</label>
-              <input type="text" id="ig-ship-date" placeholder="7月底" oninput="igRenderCanvas()">
-            </div>
-            <div class="ig-field" style="grid-column:1/-1;">
-              <label>到港約</label>
-              <input type="text" id="ig-arrival-hk" placeholder="8月中" oninput="igRenderCanvas()">
-            </div>
-          </div>
-          <!-- Actions -->
-          <div class="ig-btns">
-            <button class="ig-btn ig-btn-navy" onclick="igDownloadImage()">⬇️ 下載圖片</button>
-            <button class="ig-btn ig-btn-green" onclick="igUploadAndSaveToSheet()">☁️ 上傳並存入 Sheet</button>
-          </div>
-          <div id="igCreateSts" class="ig-status-bar"></div>
-          <!-- Overlay position config (collapsible) -->
-          <div class="ig-collapsible-head" onclick="this.nextElementSibling.classList.toggle('open')">
-            ⚙️ 文字位置設定 <span>▼</span>
-          </div>
-          <div class="ig-collapsible-body">
-            <div id="igOverlayList" style="margin:8px 0;"></div>
-            <div style="display:flex;gap:7px;flex-wrap:wrap;">
-              <button class="ig-btn ig-btn-gray" onclick="igSaveOverlayConfig()">💾 儲存位置</button>
-              <button class="ig-btn ig-btn-gray" onclick="igLoadDefaultOverlay()">↩️ 還原預設</button>
-              <button class="ig-btn ig-btn-gray" onclick="igAddOverlay()">＋ 新增行</button>
+            <!-- Right: fields + overlay settings -->
+            <div style="flex:1;min-width:0;overflow-y:auto;max-height:520px;">
+              <!-- Auto-fill -->
+              <button class="ig-btn" style="width:100%;margin-bottom:8px;background:var(--gold);color:var(--navy);font-weight:800;" onclick="igAutoFill()">⚡ 自動填入（從已選團次）</button>
+              <!-- Fields -->
+              <div class="ig-field-grid" style="margin-bottom:8px;">
+                <div class="ig-field" style="grid-column:1/-1;">
+                  <label>團號</label>
+                  <input type="text" id="ig-group-num" placeholder="第49團" oninput="igRenderCanvas()">
+                </div>
+                <div class="ig-field">
+                  <label>匯率顯示</label>
+                  <input type="text" id="ig-rate-display" placeholder="0.052～0.054" oninput="igRenderCanvas()">
+                </div>
+                <div class="ig-field">
+                  <label>收單開始</label>
+                  <input type="text" id="ig-cutoff-start" placeholder="2025年7月1日から" oninput="igRenderCanvas()">
+                </div>
+                <div class="ig-field">
+                  <label>收單結束</label>
+                  <input type="text" id="ig-cutoff-end" placeholder="2025年7月15日まで" oninput="igRenderCanvas()">
+                </div>
+                <div class="ig-field">
+                  <label>寄出約</label>
+                  <input type="text" id="ig-ship-date" placeholder="7/16" oninput="igRenderCanvas()">
+                </div>
+                <div class="ig-field">
+                  <label>到港約</label>
+                  <input type="text" id="ig-arrival-hk" placeholder="7/23" oninput="igRenderCanvas()">
+                </div>
+              </div>
+              <div id="igCreateSts" class="ig-status-bar" style="margin-bottom:8px;"></div>
+              <!-- Overlay settings (always visible, no collapsible) -->
+              <div style="border-top:1px solid var(--border);padding-top:8px;">
+                <div style="font-size:11px;font-weight:800;color:var(--navy);margin-bottom:6px;">⚙️ 文字位置設定</div>
+                <div id="igOverlayList"></div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+                  <button class="ig-btn ig-btn-gray" onclick="igSaveOverlayConfig()">💾 儲存</button>
+                  <button class="ig-btn ig-btn-gray" onclick="igLoadDefaultOverlay()">↩️ 還原預設</button>
+                  <button class="ig-btn ig-btn-gray" onclick="igAddOverlay()">＋ 新增行</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
