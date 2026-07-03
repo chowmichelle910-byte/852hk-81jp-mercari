@@ -71,7 +71,7 @@ button{font-family:var(--font);}
 .atab{padding:7px 14px;border-radius:30px;background:var(--white);color:var(--slate);border:1.5px solid var(--border);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s;font-family:var(--font);}
 .atab.active{background:var(--gold);color:var(--navy);border-color:var(--gold);}
 .more-dropdown{position:relative;display:inline-block;}
-.more-list{display:none;position:fixed;background:var(--white);border:1.5px solid var(--border);border-radius:var(--r-md);z-index:999;min-width:140px;box-shadow:var(--sh-md);overflow:hidden;}
+.more-list{display:none;position:fixed;background:var(--white);border:1.5px solid var(--border);border-radius:var(--r-md);z-index:999;min-width:140px;max-height:60vh;overflow-y:auto;box-shadow:var(--sh-md);-webkit-overflow-scrolling:touch;}
 .more-list.open{display:block;}
 .more-list-item{padding:10px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--slate);transition:background .12s;white-space:nowrap;}
 .more-list-item:hover{background:var(--gold-light);color:var(--gold-dark);}
@@ -109,7 +109,7 @@ button{font-family:var(--font);}
 .locked-i{font-size:10px;color:var(--slate);flex:1;font-family:var(--mono);}
 .edit-lk{padding:3px 7px;font-size:10px;background:var(--white);border:1px solid var(--border);border-radius:3px;cursor:pointer;}
 .wrow{display:flex;align-items:center;gap:6px;margin-top:5px;}
-.w-inp{flex:1;padding:8px 9px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:16px!important;font-family:var(--font);outline:none;}
+.w-inp{width:90px;max-width:90px;padding:8px 9px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:16px!important;font-family:var(--font);outline:none;}
 .w-inp:focus{border-color:var(--gold);}
 .wu{font-weight:700;color:var(--slate);font-size:12px;}
 .imgwrap{width:86px;height:86px;background:var(--mist);border-radius:var(--r-sm);overflow:hidden;margin-bottom:6px;border:1px solid var(--border);position:relative;}
@@ -359,23 +359,10 @@ button{font-family:var(--font);}
 
       <!-- Sub tabs -->
       <div class="tool-subtabs">
-        <button class="tool-subtab active" id="ts-notice" onclick="switchToolTab('notice')">📧 開團通知</button>
-        <button class="tool-subtab" id="ts-arrival" onclick="switchToolTab('arrival')">📦 到貨資料</button>
+        <button class="tool-subtab active" id="ts-arrival" onclick="switchToolTab('arrival')">📦 到貨資料</button>
         <button class="tool-subtab" id="ts-ship" onclick="switchToolTab('ship')">🚚 寄件處理</button>
         <button class="tool-subtab" id="ts-newgroup" onclick="switchToolTab('newgroup')">🆕 新團設定</button>
         <button class="tool-subtab" id="ts-ig" onclick="switchToolTab('ig')">🖼️ IG 帖子</button>
-      </div>
-
-      <!-- 開團通知 -->
-      <div id="tp-notice" class="tool-subpanel active">
-        <div id="noticeSts" class="tstatus"></div>
-        <div id="noticePreview" class="tool-preview active">
-          <div id="noticePreviewHtml" class="tool-preview-html" style="min-height:60px;color:#94A3B8;font-size:13px;">請先選擇團次…</div>
-          <div class="tool-preview-actions">
-            <button class="preview-copy-btn" onclick="copyPreview('noticePreviewHtml')">📋 複製內容</button>
-            <button class="preview-send-btn" onclick="sendGroupEmailAction()">📤 確認寄出</button>
-          </div>
-        </div>
       </div>
 
       <!-- 到貨資料 -->
@@ -538,7 +525,7 @@ button{font-family:var(--font);}
             <label>港幣金額（HK$）</label>
             <input type="number" id="chargeHkd" placeholder="0" oninput="calcChargeRate()">
           </div>
-          <div class="charge-field">
+          <div class="charge-field" style="grid-column:1/-1;">
             <label>匯率（自動計算）</label>
             <div class="charge-rate-display" id="chargeRateDisplay">—</div>
           </div>
@@ -771,7 +758,6 @@ function selectToolGrp(g){
   });
   const activeTab=document.querySelector('.tool-subtab.active');
   if(activeTab&&activeTab.id==='ts-arrival') loadRecordCards(g);
-  if(activeTab&&activeTab.id==='ts-notice') previewGroupEmail();
   if(activeTab&&activeTab.id==='ts-ship') previewShippingNotification();
 }
 
@@ -1134,31 +1120,6 @@ function renderPickGrp(n){
 
 // ════════ TOOLS ════════
 function setSts(id,msg,type){const el=document.getElementById(id);if(!el)return;el.textContent=msg;el.className='tstatus ts-'+type;}
-
-// Preview group email (show in page)
-async function previewGroupEmail(){
-  const group=curToolGrp;
-  if(!group){alert('請先選擇團次！');return;}
-  setSts('noticeSts','⏳ 載入 Email 內容中…','ld');
-  try{
-    const d=await postMain({action:'getGroupEmailPreview',password:pw,group});
-    if(d.error)throw new Error(d.error);
-    document.getElementById('noticePreviewHtml').innerHTML=d.html||d.text||'（無內容）';
-    document.getElementById('noticePreview').classList.add('active');
-    setSts('noticeSts','✅ 預覽已載入，確認後按「確認寄出」','ok');
-  }catch(e){setSts('noticeSts','❌ 失敗：'+e.message,'err');}
-}
-
-async function sendGroupEmailAction(){
-  const group=curToolGrp;
-  if(!group||!confirm(`確定寄出「${group}」開團通知 Email？`))return;
-  setSts('noticeSts','⏳ 寄送中…','ld');
-  try{
-    const d=await postMain({action:'sendGroupEmail',password:pw,group});
-    if(d.error)throw new Error(d.error);
-    setSts('noticeSts','✅ 已寄出：'+d.result,'ok');
-  }catch(e){setSts('noticeSts','❌ 失敗：'+e.message,'err');}
-}
 
 // Preview shipping notification (show in page)
 async function previewShippingNotification(){
