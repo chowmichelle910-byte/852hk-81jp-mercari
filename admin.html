@@ -444,12 +444,11 @@ button{font-family:var(--font);}
           <h4>🖼️ IG 帖子製作</h4>
           <!-- Template upload -->
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-            <label style="font-size:12px;font-weight:700;color:var(--slate);flex-shrink:0;">上傳圖片範本：</label>
+            <label style="font-size:12px;font-weight:700;color:var(--slate);flex-shrink:0;">上傳底圖：</label>
             <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px dashed var(--border);border-radius:var(--r-sm);cursor:pointer;font-size:12px;color:var(--slate);">
-              📂 選擇檔案
-              <input type="file" id="igTemplateFile" accept="image/*" style="display:none;" onchange="igLoadTemplate(this)">
+              📂 選擇檔案（自動上傳儲存）
+              <input type="file" id="igTemplateFile" accept="image/*" style="display:none;" onchange="igLoadAndUploadTemplate(this)">
             </label>
-            <button class="ig-btn ig-btn-gray" onclick="igRenderCanvas()">🔄 重整</button>
           </div>
           <!-- Main layout: canvas left, settings right -->
           <div style="display:flex;gap:12px;align-items:flex-start;">
@@ -499,7 +498,7 @@ button{font-family:var(--font);}
                 <div style="font-size:11px;font-weight:800;color:var(--navy);margin-bottom:6px;">⚙️ 文字位置設定</div>
                 <div id="igOverlayList"></div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
-                  <button class="ig-btn ig-btn-gray" onclick="igSaveOverlayConfig()">💾 儲存</button>
+                  <button class="ig-btn ig-btn-gray" onclick="igSaveTemplateToSheet()">☁️ 儲存至雲端</button>
                   <button class="ig-btn ig-btn-gray" onclick="igLoadDefaultOverlay()">↩️ 還原預設</button>
                   <button class="ig-btn ig-btn-gray" onclick="igAddOverlay()">＋ 新增行</button>
                 </div>
@@ -2102,26 +2101,63 @@ async function saveRecordDelivery(rowNum){
 }
 
 // ════════ IG POST TOOL ════════
-let igTemplateImg=null, igOverlays=[], igConfig={};
+let igTemplateImg=null, igOverlays=[], igConfig={}, igTemplateUrl='';
 
 (function igBoot(){
   try{const s=localStorage.getItem('igConfig');if(s)igConfig=JSON.parse(s);}catch(_){}
-  try{const o=localStorage.getItem('igOverlays');if(o)igOverlays=JSON.parse(o);else igLoadDefaultOverlay();}catch(_){igLoadDefaultOverlay();}
-  try{
-    const src=localStorage.getItem('igTemplateSrc');
-    if(src){const img=new Image();img.onload=()=>{igTemplateImg=img;igRenderCanvas();};img.src=src;}
-  }catch(_){}
+  // 嘗試從 Sheet 載入範本（底圖URL + overlays）
+  igLoadTemplateFromSheet();
 })();
 
-function igLoadTemplate(input){
+async function igLoadTemplateFromSheet(){
+  try{
+    const d=await postMain({action:'loadIgTemplate',password:pw});
+    if(d.templateUrl){
+      igTemplateUrl=d.templateUrl;
+      const img=new Image();img.crossOrigin='anonymous';
+      img.onload=()=>{igTemplateImg=img;igRenderCanvas();};
+      img.src=d.templateUrl;
+    }
+    if(d.overlays){
+      try{const o=JSON.parse(d.overlays);if(Array.isArray(o)&&o.length){igOverlays=o;igRenderOverlayList();}}catch(_){}
+    }
+    if(!igOverlays.length)igLoadDefaultOverlay();
+  }catch(_){
+    // fallback localStorage
+    try{const o=localStorage.getItem('igOverlays');if(o)igOverlays=JSON.parse(o);else igLoadDefaultOverlay();}catch(_){igLoadDefaultOverlay();}
+    try{const src=localStorage.getItem('igTemplateSrc');if(src){const img=new Image();img.onload=()=>{igTemplateImg=img;igRenderCanvas();};img.src=src;}}catch(_){}
+  }
+}
+
+async function igLoadAndUploadTemplate(input){
   const file=input.files[0];if(!file)return;
-  const rd=new FileReader();
-  rd.onload=e=>{
-    const img=new Image();
-    img.onload=()=>{igTemplateImg=img;try{localStorage.setItem('igTemplateSrc',e.target.result);}catch(_){}igRenderCanvas();};
-    img.src=e.target.result;
-  };
-  rd.readAsDataURL(file);
+  igShowSts('igCreateSts','ld','⏳ 上傳底圖中…');
+  try{
+    const fd=new FormData();
+    fd.append('file',file);
+    fd.append('upload_preset',UPLOAD_PRESET);
+    fd.append('folder','ig_templates');
+    const r=await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,{method:'POST',body:fd});
+    const j=await r.json();
+    if(!j.secure_url)throw new Error('上傳失敗');
+    igTemplateUrl=j.secure_url;
+    const img=new Image();img.crossOrigin='anonymous';
+    img.onload=()=>{igTemplateImg=img;igRenderCanvas();};
+    img.src=igTemplateUrl;
+    // 同步儲存到 Sheet
+    await postMain({action:'saveIgTemplate',password:pw,templateUrl:igTemplateUrl,overlays:JSON.stringify(igOverlays)});
+    igShowSts('igCreateSts','ok','✅ 底圖已上傳並儲存至雲端');
+  }catch(e){igShowSts('igCreateSts','err','❌ 底圖上傳失敗：'+e.message);}
+}
+
+async function igSaveTemplateToSheet(){
+  igShowSts('igCreateSts','ld','⏳ 儲存中…');
+  try{
+    await postMain({action:'saveIgTemplate',password:pw,templateUrl:igTemplateUrl||'',overlays:JSON.stringify(igOverlays)});
+    localStorage.setItem('igOverlays',JSON.stringify(igOverlays));
+    igRenderCanvas();
+    igShowSts('igCreateSts','ok','✅ 範本設定已儲存至雲端（任何裝置可用）');
+  }catch(e){igShowSts('igCreateSts','err','❌ 儲存失敗：'+e.message);}
 }
 
 function igGetFieldValue(key){const el=document.getElementById('ig-'+key);return el?el.value.trim():'';}
@@ -2246,7 +2282,6 @@ function igRemoveOverlay(i){igOverlays.splice(i,1);igRenderOverlayList();}
 function igSaveOverlayConfig(){
   localStorage.setItem('igOverlays',JSON.stringify(igOverlays));
   igRenderCanvas();
-  igShowSts('igCreateSts','ok','✅ 位置設定已儲存');
 }
 
 function igDownloadImage(){

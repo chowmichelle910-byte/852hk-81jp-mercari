@@ -172,6 +172,14 @@ function doPost(e) {
       try { return jsonResponse_(saveIgPost_(e.parameter.imageUrl, e.parameter.content, e.parameter.date)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
+    case 'saveIgTemplate':
+      try { return jsonResponse_(saveIgTemplate_(e.parameter.templateUrl, e.parameter.overlays)); }
+      catch(err) { return jsonResponse_({ error: err.message }); }
+
+    case 'loadIgTemplate':
+      try { return jsonResponse_(loadIgTemplate_()); }
+      catch(err) { return jsonResponse_({ error: err.message }); }
+
     // ── 查詢 ID ──
     case 'findUserByIdFromPublic':
       try { return jsonResponse_(findUserByIdFromPublic_(e.parameter.custId)); }
@@ -892,6 +900,29 @@ function holdToNextGroup_(recordRow, nextTag) {
   recordSheet.getRange(row, 14).setValue(nextTag);
   SpreadsheetApp.flush();
   return { success: true, nextTag };
+}
+
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+//  IG 範本設定（底圖URL + 文字疊加）→「IG Template」Sheet A1=URL, B1=overlaysJSON
+// ─────────────────────────────────────────────
+function saveIgTemplate_(templateUrl, overlaysJson) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName('IG Template');
+  if (!sh) sh = ss.insertSheet('IG Template');
+  sh.getRange(1, 1).setValue(templateUrl || '');
+  sh.getRange(1, 2).setValue(overlaysJson || '[]');
+  SpreadsheetApp.flush();
+  return { success: true };
+}
+
+function loadIgTemplate_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName('IG Template');
+  if (!sh) return { templateUrl: '', overlays: '[]' };
+  const templateUrl = sh.getRange(1, 1).getValue() || '';
+  const overlays    = sh.getRange(1, 2).getValue() || '[]';
+  return { templateUrl, overlays };
 }
 
 // ─────────────────────────────────────────────
