@@ -2284,8 +2284,12 @@ async function igUploadAndSaveToSheet(){
     if(preview.error) throw new Error(preview.error);
     // strip HTML tags → plain text for IG caption
     const tmp=document.createElement('div');
-    tmp.innerHTML=preview.html||'';
-    const content=tmp.innerText||tmp.textContent||'';
+    tmp.innerHTML=(preview.html||'')
+      .replace(/<br\s*\/?>/gi,'\n')
+      .replace(/<\/p>/gi,'\n')
+      .replace(/<\/div>/gi,'\n')
+      .replace(/<[^>]+>/g,'');
+    const content=(tmp.textContent||'').replace(/\n{3,}/g,'\n\n').trim();
     igShowSts('igCreateSts','ld','⏳ 寫入 IG post sheet…');
     const rawStart=igGetFieldValue('cutoff-start'); // e.g. "2025年7月1日から"
     const mDate=rawStart.match(/(\d{4})年(\d+)月(\d+)日/);
