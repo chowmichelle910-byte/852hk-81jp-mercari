@@ -517,7 +517,7 @@ function getAnalysisData_() {
         weight       : r[7]  !== '' ? r[7]  : null,
         custPostage  : r[9]  !== '' ? r[9]  : null,
         actualPostage: r[10] !== '' ? r[10] : null,
-        settled      : hasColor  // true = 有底色 = 已結算
+        settled      : !hasColor  // 無底色 = 已結算，淡黃色 = 未結算
       };
     });
 
@@ -556,14 +556,14 @@ function clearIColumnColor_(analysisRow) {
   const hasColor = current && current !== '#ffffff' && current !== null && current !== '';
 
   if (hasColor) {
-    // 已有底色 → 清除（取消結算）
+    // 已有淡黃底色（未結算）→ 清除（標記已結算）
     cell.setBackground(null);
   } else {
-    // 無底色 → 加綠色（標記已結算）
-    cell.setBackground('#b7e1cd');
+    // 無底色（已結算）→ 加淡黃（標記未結算）
+    cell.setBackground('#fff2cc');
   }
   SpreadsheetApp.flush();
-  return { success: true, settled: !hasColor };
+  return { success: true, settled: hasColor }; // hasColor was true = was unsettled, now cleared = settled
 }
 
 // ─────────────────────────────────────────────
