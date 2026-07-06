@@ -84,6 +84,10 @@ function doPost(e) {
       try { return jsonResponse_({ success: true, result: generatePostData(group) }); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
+    case 'getGroupEmailPreview':
+      try { return jsonResponse_(getGroupEmailPreview_(group)); }
+      catch(err) { return jsonResponse_({ error: err.message }); }
+
     case 'getGroupInfo':
       try { return jsonResponse_(getGroupInfo_(group)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
@@ -242,6 +246,56 @@ function getNextShipDate_() {
 // ─────────────────────────────────────────────
 //  開團通知 Email 預覽（返回 HTML，唔寄）
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+//  開團通知 Email 預覽（返回 HTML，唔寄）
+// ─────────────────────────────────────────────
+function getGroupEmailPreview_(groupId) {
+  const ss            = SpreadsheetApp.getActiveSpreadsheet();
+  const dataSheet     = ss.getSheetByName('Data');
+  const currencySheet = ss.getSheetByName('Currency');
+  const groupData     = dataSheet.getRange('H2:J').getValues();
+  const currencyData  = currencySheet.getRange('A2:H').getValues();
+  const normalize     = str => String(str).trim();
+
+  const selectedGroupRow    = groupData.find(row => normalize(row[0]) === normalize(groupId));
+  const selectedCurrencyRow = currencyData.find(row => normalize(row[0]) === normalize(groupId));
+
+  if (!selectedGroupRow)    return { error: `找不到團號 ${groupId} 的日期資料` };
+  if (!selectedCurrencyRow) return { error: `找不到團號 ${groupId} 的匯率資料` };
+
+  const [group, startDate, endDate] = selectedGroupRow;
+  const rate1 = selectedCurrencyRow[4];
+  const rate2 = selectedCurrencyRow[6];
+  const rate3 = selectedCurrencyRow[7];
+
+  const format = date => Utilities.formatDate(new Date(date), 'Asia/Hong_Kong', 'M月d日（E）');
+  const fOffset = (date, offset) => {
+    const d = new Date(date); d.setDate(d.getDate() + offset); return format(d);
+  };
+
+  const html = `<div style="font-family:sans-serif;font-size:14px;line-height:1.9;">
+<b>【Mercari代購｜${group}開始啦！${format(endDate)}截】</b><br><br>
+୨୧┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈୨୧<br>
+<b>收單時間</b>｜${format(startDate)} 至 ${format(endDate)}<br>
+<b>日本寄出日</b>｜預計 ${fOffset(endDate,1)}<br>
+<b>香港到貨日</b>｜預計 ${fOffset(endDate,7)} 後<br>
+୨୧┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈୨୧<br><br>
+✓ 無其他手續費<br>
+✓ 收到款項即時代拍<br>
+✓ 到港後以順豐到付／郵局易寄取／平郵寄出<br><br>
+<b>本團匯率（以每團每位客人總金額計算）：</b><br>
+・¥1～10,000 → ${rate1}算<br>
+・¥10,001～50,000 → ${rate2}算<br>
+・¥50,001或以上 → ${rate3}算<br>
+<b>到港運費：</b>HK$4.5／50g（50g起跳，超過50g以實重計算）<br><br>
+👉🏻 歡迎dm/wts查詢 🔍<br>
+*<i>wts link可以喺profile搵到</i> 🥰<br>
+📱 +852 9337 5712<br><br>
+#Mercari代購 #日本限定 #代購推薦</div>`;
+
+  return { html };
+}
+
 // ─────────────────────────────────────────────
 //  團次基本資料（供 IG 帖子自動填入）
 // ─────────────────────────────────────────────
