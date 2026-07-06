@@ -2087,6 +2087,10 @@ async function igLoadTemplateFromSheet(){
     if(d.overlays){
       try{const o=JSON.parse(d.overlays);if(Array.isArray(o)&&o.length){igOverlays=o;igRenderOverlayList();}}catch(_){}
     }
+    // Sheet 沒有資料時，fallback localStorage
+    if(!igOverlays.length){
+      try{const o=localStorage.getItem('igOverlays');if(o){const parsed=JSON.parse(o);if(Array.isArray(parsed)&&parsed.length){igOverlays=parsed;igRenderOverlayList();}}}catch(_){}
+    }
     if(!igOverlays.length)igLoadDefaultOverlay();
   }catch(_){
     // fallback localStorage
