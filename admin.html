@@ -2299,17 +2299,19 @@ async function igUploadAndSaveToSheet(){
   igShowSts('igCreateSts','ld','⏳ 上傳圖片到 Cloudinary…');
   try{
     const imageUrl=await igUploadCanvas();
-    igShowSts('igCreateSts','ld','⏳ 讀取開團通知內容…');
-    const preview=await postMain({action:'getGroupEmailPreview',password:pw,group});
-    if(preview.error) throw new Error(preview.error);
-    // strip HTML tags → plain text for IG caption
-    const tmp=document.createElement('div');
-    tmp.innerHTML=(preview.html||'')
-      .replace(/<br\s*\/?>/gi,'\n')
-      .replace(/<\/p>/gi,'\n')
-      .replace(/<\/div>/gi,'\n')
-      .replace(/<[^>]+>/g,'');
-    const content=(tmp.textContent||'').replace(/\n{3,}/g,'\n\n').trim();
+    // 用 IG 欄位組合 caption
+    const cutoffStart=igGetFieldValue('cutoff-start');
+    const cutoffEnd=igGetFieldValue('cutoff-end');
+    const shipDate=igGetFieldValue('ship-date');
+    const arrivalHk=igGetFieldValue('arrival-hk');
+    const rateDisplay=igGetFieldValue('rate-display');
+    const content=[
+      cutoffStart?`收單開始：${cutoffStart}`:'',
+      cutoffEnd?`收單結束：${cutoffEnd}`:'',
+      shipDate?`寄出約：${shipDate}`:'',
+      arrivalHk?`到港約：${arrivalHk}`:'',
+      rateDisplay?`匯率：${rateDisplay}`:'',
+    ].filter(Boolean).join('\n');
     igShowSts('igCreateSts','ld','⏳ 寫入 IG post sheet…');
     const rawStart=igGetFieldValue('cutoff-start'); // e.g. "2025年7月1日から"
     const mDate=rawStart.match(/(\d{4})年(\d+)月(\d+)日/);
