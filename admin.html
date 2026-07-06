@@ -450,8 +450,13 @@ button{font-family:var(--font);}
             </div>
             <!-- Right: fields + overlay settings -->
             <div style="flex:1;min-width:0;overflow-y:auto;max-height:520px;">
-              <!-- Auto-fill -->
-              <button class="ig-btn" style="width:100%;margin-bottom:8px;background:var(--gold);color:var(--navy);font-weight:800;" onclick="igAutoFill()">⚡ 自動填入（從已選團次）</button>
+              <!-- IG 獨立團次選擇 -->
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+                <select id="igGroupSelect" style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:13px;font-family:var(--font);outline:none;background:var(--white);">
+                  <option value="">選擇團次…</option>
+                </select>
+                <button class="ig-btn" style="background:var(--gold);color:var(--navy);font-weight:800;white-space:nowrap;" onclick="igAutoFill()">⚡ 自動填入</button>
+              </div>
               <!-- Fields -->
               <div class="ig-field-grid" style="margin-bottom:8px;">
                 <div class="ig-field" style="grid-column:1/-1;">
@@ -801,10 +806,10 @@ function switchToolTab(t){
   document.querySelectorAll('.tool-subpanel').forEach(p=>p.classList.remove('active'));
   document.getElementById('ts-'+t).classList.add('active');
   document.getElementById('tp-'+t).classList.add('active');
-  if(t==='notice'&&curToolGrp) previewGroupEmail();
   if(t==='arrival'&&curToolGrp) loadRecordCards(curToolGrp);
   if(t==='ship'&&curToolGrp) previewShippingNotification();
   if(t==='newgroup') loadNewGroupDefaults();
+  if(t==='ig') igLoadGroups();
 }
 
 // ════════ ARRIVAL ════════
@@ -2150,9 +2155,23 @@ function igRenderCanvas(){
   });
 }
 
+async function igLoadGroups(){
+  try{
+    const d = await postMain({action:'getIgGroups', password:pw});
+    const sel = document.getElementById('igGroupSelect');
+    if(!sel || !d.groups) return;
+    const groups = d.groups;
+    sel.innerHTML = '<option value="">選擇團次…</option>' +
+      groups.map(g=>`<option value="${g}">${g}</option>`).join('');
+    // 預選最後一個
+    if(groups.length) sel.value = groups[groups.length - 1];
+  }catch(_){}
+}
+
 async function igAutoFill(){
-  const group = curToolGrp;
-  if(!group){ igShowSts('igCreateSts','err','⚠️ 請先在上方選擇團次'); return; }
+  const sel = document.getElementById('igGroupSelect');
+  const group = sel ? sel.value : '';
+  if(!group){ igShowSts('igCreateSts','err','⚠️ 請先選擇團次'); return; }
   igShowSts('igCreateSts','ld','⏳ 讀取團次資料…');
   try{
     const d = await postMain({action:'getGroupInfo', password:pw, group});
@@ -2270,7 +2289,8 @@ async function igUploadCanvas(){
 }
 
 async function igUploadAndSaveToSheet(){
-  const group=curToolGrp;
+  const sel=document.getElementById('igGroupSelect');
+  const group=sel?sel.value:'';
   if(!group){igShowSts('igCreateSts','err','⚠️ 請先選擇團次');return;}
   igShowSts('igCreateSts','ld','⏳ 上傳圖片到 Cloudinary…');
   try{

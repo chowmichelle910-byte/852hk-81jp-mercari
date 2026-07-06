@@ -135,6 +135,10 @@ function doPost(e) {
       try { return jsonResponse_(getNewGroupDefaults_()); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
+    case 'getIgGroups':
+      try { return jsonResponse_(getIgGroups_()); }
+      catch(err) { return jsonResponse_({ error: err.message }); }
+
     case 'saveNewGroup':
       try { return jsonResponse_(saveNewGroup_(e.parameter)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
@@ -595,6 +599,17 @@ function findUserByIdFromPublic_(custId) {
 //  新團設定：讀取 Currency 分頁最後一行，計算下一團預設值
 //  A=團號, B=Start, C=End, E=r1, F=r5k, G=r10k, H=r50k
 // ─────────────────────────────────────────────
+function getIgGroups_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName('Currency');
+  if (!sh) return { error: '找不到 Currency 工作表' };
+  const lastRow = sh.getLastRow();
+  if (lastRow < 10) return { groups: [] };
+  const vals = sh.getRange(10, 1, lastRow - 9, 1).getValues();
+  const groups = vals.map(r => String(r[0] || '').trim()).filter(Boolean);
+  return { groups };
+}
+
 function getNewGroupDefaults_() {
   const ss      = SpreadsheetApp.getActiveSpreadsheet();
   const curSheet = ss.getSheetByName('Currency');
