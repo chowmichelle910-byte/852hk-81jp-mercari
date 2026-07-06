@@ -2301,11 +2301,11 @@ async function igUploadAndSaveToSheet(){
     igShowSts('igCreateSts','ld','⏳ 取得開團內容…');
     const preview=await postMain({action:'getGroupEmailPreview',password:pw,group});
     if(preview.error) throw new Error(preview.error);
-    const tmp=document.createElement('div');
-    tmp.innerHTML=preview.html||'';
-    // preserve line breaks: replace <br> with newline before extracting text
-    tmp.querySelectorAll('br').forEach(br=>br.replaceWith('\n'));
-    const content=(tmp.innerText||tmp.textContent||'').replace(/\n{3,}/g,'\n\n').trim();
+    const content=(preview.html||'')
+      .replace(/<br\s*\/?>/gi,'\n')
+      .replace(/<[^>]+>/g,'')
+      .replace(/\n{3,}/g,'\n\n')
+      .trim();
     igShowSts('igCreateSts','ld','⏳ 寫入 IG post sheet…');
     const rawStart=igGetFieldValue('cutoff-start'); // e.g. "2025年7月1日から"
     const mDate=rawStart.match(/(\d{4})年(\d+)月(\d+)日/);
