@@ -667,6 +667,7 @@ async function callAdmin(){
   processItems(d);
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('adminUI').style.display='block';
+  igLoadTemplateFromSheet();
 }
 
 function processItems(d){
@@ -2071,8 +2072,6 @@ let igTemplateImg=null, igOverlays=[], igConfig={}, igTemplateUrl='';
 
 (function igBoot(){
   try{const s=localStorage.getItem('igConfig');if(s)igConfig=JSON.parse(s);}catch(_){}
-  // 嘗試從 Sheet 載入範本（底圖URL + overlays）
-  igLoadTemplateFromSheet();
 })();
 
 async function igLoadTemplateFromSheet(){
