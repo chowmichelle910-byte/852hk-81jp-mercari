@@ -654,7 +654,16 @@ function saveNewGroup_(params) {
   const { group, start, end, r1, r5k, r10k, r50k } = params;
   if (!group || !start || !end) return { error: '請提供團號、開始及結束日期' };
 
-  const nextRow = curSheet.getLastRow() + 1;
+  // 以 A 欄最後一列有資料的地方為基準，插入下一行
+  const lastRowWithA = curSheet.getLastRow();
+  const aCol = lastRowWithA >= 10
+    ? curSheet.getRange(10, 1, lastRowWithA - 9, 1).getValues()
+    : [];
+  let lastAIdx = -1;
+  for (let i = aCol.length - 1; i >= 0; i--) {
+    if (String(aCol[i][0] || '').trim()) { lastAIdx = i; break; }
+  }
+  const nextRow = lastAIdx >= 0 ? (10 + lastAIdx + 1) : 10;
 
   // A=團號, B=Start, C=End, E=r1, F=r5k, G=r10k, H=r50k
   curSheet.getRange(nextRow, 1).setValue(group);
