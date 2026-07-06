@@ -2094,7 +2094,7 @@ async function igLoadTemplateFromSheet(){
     if(!igOverlays.length)igLoadDefaultOverlay();
   }catch(_){
     // fallback localStorage
-    try{const o=localStorage.getItem('igOverlays');if(o)igOverlays=JSON.parse(o);else igLoadDefaultOverlay();}catch(_){igLoadDefaultOverlay();}
+    try{const o=localStorage.getItem('igOverlays');if(o){const parsed=JSON.parse(o);if(Array.isArray(parsed)&&parsed.length){igOverlays=parsed;igRenderOverlayList();igRenderCanvas();}}else igLoadDefaultOverlay();}catch(_){igLoadDefaultOverlay();}
     try{const src=localStorage.getItem('igTemplateSrc');if(src){const img=new Image();img.onload=()=>{igTemplateImg=img;igRenderCanvas();};img.src=src;}}catch(_){}
   }
 }
