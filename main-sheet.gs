@@ -1276,6 +1276,26 @@ function exportArrivalData(group) {
     d.qty           += 1;
   }
 
+  // ── 從 Record 建立收件資料 fallback（最新一筆） ──
+  const recordData = recordSheet.getLastRow() >= 2
+    ? recordSheet.getRange(2, 1, recordSheet.getLastRow() - 1, 13).getValues()
+    : [];
+  const recordDeliveryMap = new Map();
+  for (let i = recordData.length - 1; i >= 0; i--) {
+    const rRow = recordData[i];
+    const rName = String(rRow[0] || '').trim();
+    if (!rName) continue;
+    if (!recordDeliveryMap.has(rName)) {
+      const rMethod   = String(rRow[8]  || '').trim(); // I
+      const rReceiver = String(rRow[9]  || '').trim(); // J
+      const rPhone    = String(rRow[10] || '').trim(); // K
+      const rAddress  = String(rRow[11] || '').trim(); // L
+      if (rMethod || rReceiver || rPhone || rAddress) {
+        recordDeliveryMap.set(rName, { method: rMethod, receiver: rReceiver, phone: rPhone, address: rAddress });
+      }
+    }
+  }
+
   // ── 計算「整體貨品編號」──
   // 取所有 code 中數字最細的那個
   // 注意：code 超過 1000 會從頭計算（即 1001→1, 1002→2...）
@@ -1297,8 +1317,8 @@ function exportArrivalData(group) {
     const postage   = parseFloat((d.totalPostage < 4.5 ? 4.5 : d.totalPostage).toFixed(1));
     const weightG   = Math.round(d.totalWeightKg * 1000); // KG → g
 
-    // 從「收件資料」搵最新收件資訊
-    const delivery  = deliveryMap.get(userName) || {};
+    // 從「收件資料」搵最新收件資訊，如無則從 Record fallback
+    const delivery  = deliveryMap.get(userName) || recordDeliveryMap.get(userName) || {};
     const method    = delivery.method   || '';
     const receiver  = delivery.receiver || '';
     const phone     = delivery.phone    || '';
