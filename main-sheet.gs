@@ -1240,7 +1240,7 @@ function exportArrivalData(group) {
   // ── 讀取「收件資料」分頁 ──
   // A=0(用戶名稱前半), B=1(用戶名稱後半), C=2(第X團購買),
   // D=3(郵寄方式), E=4(收件人), F=5(電話), G=6(地址)
-  const deliveryData = deliverySheet.getLastRow() >= 2
+  const deliveryData = (deliverySheet && deliverySheet.getLastRow() >= 2)
     ? deliverySheet.getRange(2, 1, deliverySheet.getLastRow() - 1, 7).getValues()
     : [];
 
