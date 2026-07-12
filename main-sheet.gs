@@ -376,15 +376,24 @@ function getShippingNotificationPreview_(groupTitle) {
 
   const HOME_KEYWORDS = ["等下團一齊寄", "Michelle自己"];
   let prevGroupOverallIds = [];
+  // map: user -> prevMark for items held to this group
+  const prevHeldMarkByUser = new Map();
   try {
     const m = raw.match(/第\s*(\d+)\s*團/);
     if (m && parseInt(m[1]) > 1) {
       const prevTag = "第" + (parseInt(m[1]) - 1) + "團到貨";
       data.filter(r => String(r[2]||'').trim() === prevTag).forEach(rowArr => {
         const methodVal = String(rowArr[8]||'').toLowerCase();
+        const nextTagVal = String(rowArr[13]||'').trim();
         if (HOME_KEYWORDS.some(kw => methodVal.includes(kw.toLowerCase()))) {
           const oid = String(rowArr[5]||'').trim();
           if (oid) prevGroupOverallIds.push(oid);
+        }
+        // 保留至下一團 且 N欄有資料 → 記錄 user 的上一團整體貨品編號
+        if (methodVal.includes('保留至下一團') && nextTagVal) {
+          const user = String(rowArr[0]||'').trim();
+          const oid  = String(rowArr[5]||'').trim();
+          if (user && oid) prevHeldMarkByUser.set(user, oid);
         }
       });
     }
@@ -405,7 +414,9 @@ function getShippingNotificationPreview_(groupTitle) {
     const tracking  = String(row[12]||'').trim();
     const nextTag   = String(row[13]||'').trim();
     if (!user || !method) return;
-    const mark = String(overallId || productId || '').trim();
+    const currMark = String(overallId || productId || '').trim();
+    const prevMark = prevHeldMarkByUser.get(user) || '';
+    const mark = prevMark ? `${prevMark}(上一團貨品)+${currMark}` : currMark;
     const ids  = String(productId || '').split(/[,，\s]+/).filter(Boolean);
     const itemNames = [...new Set(ids.map(id => findItemName(id)).filter(Boolean))].join(', ');
 
