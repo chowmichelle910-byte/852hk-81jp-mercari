@@ -264,7 +264,12 @@ function showSidebar() {
 function doPost(e) {
   // Telegram webhook callback（JSON body）
   if (e.postData && e.postData.type === 'application/json') {
-    try { handleTelegramUpdate_(JSON.parse(e.postData.contents)); } catch(err) {}
+    Logger.log('TG webhook received: ' + e.postData.contents.substring(0, 200));
+    try {
+      handleTelegramUpdate_(JSON.parse(e.postData.contents));
+    } catch(err) {
+      Logger.log('TG error: ' + err.message + '\n' + err.stack);
+    }
     return ContentService.createTextOutput('OK');
   }
 
