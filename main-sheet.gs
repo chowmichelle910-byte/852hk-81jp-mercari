@@ -559,6 +559,27 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'getUnratedItems': {
+      try {
+        const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        if (lastRow < 2) return jsonResponse_({ items: [] });
+        const data  = sheet.getRange(2, 1, lastRow - 1, 29).getValues();
+        const items = [];
+        for (let i = 0; i < data.length; i++) {
+          if (String(data[i][28] || '').trim() !== '未評價') continue;
+          const link = String(data[i][5] || '').trim();
+          if (!link.includes('mercari.com/item/')) continue;
+          items.push({
+            rowNum  : i + 2,
+            tUrl    : link.replace('/item/', '/transaction/'),
+            code    : String(data[i][14] || '').trim()
+          });
+        }
+        return jsonResponse_({ items });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     default:
       return jsonResponse_({ error: '未知 action: ' + action });
   }

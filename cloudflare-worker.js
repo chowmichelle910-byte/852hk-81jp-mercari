@@ -65,6 +65,24 @@ async function handleUpdate(update) {
       }
     }
 
+    if (text === '/unrated' || text.startsWith('/unrated@')) {
+      const result = await gas({ action: 'getUnratedItems' });
+      const items  = result.items || [];
+      if (!items.length) {
+        await tg('sendMessage', { chat_id: chatId, text: '✅ 沒有待評價的商品' });
+        return;
+      }
+      const lines   = items.map((u, i) => `${i + 1}. <a href="${u.tUrl}">${u.tUrl}</a>`).join('\n');
+      const allRows = items.map(u => u.rowNum).join(',');
+      await tg('sendMessage', {
+        chat_id: chatId,
+        text: `⭐ <b>待評價（${items.length} 件）</b>\n\n${lines}`,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: ('rated:' + allRows).substring(0, 64) }]] }
+      });
+      return;
+    }
+
     if (text === '/pending' || text.startsWith('/pending@')) {
       const data = await gas({ action: 'getPendingOrders' });
       if (!data.orders || !data.orders.length) {
