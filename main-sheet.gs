@@ -1806,14 +1806,17 @@ function syncArrivalData() {
       const dateObj=arrivalDate instanceof Date?arrivalDate:new Date(arrivalDate);
       orderSheet.getRange(orderRow,16).setValue(dateObj);orderSheet.getRange(orderRow,16).setNumberFormat("yyyy/m/d");
       orderSheet.getRange(orderRow,17).setValue(netWeight);
-      const url=row[4];if(url&&url.includes("mercari.com/item/"))transactionUrls.push(`• ${url.replace("/item/","/transaction/")}`);
+      const url=row[4];if(url&&url.includes("mercari.com/item/")){const tUrl=url.replace("/item/","/transaction/");transactionUrls.push({text:`• ${tUrl}`,tg:`• <a href="${tUrl}">${tUrl}</a>`});}
       rowsToDelete.push(i+2);updatedRows++;
     }
   }
   rowsToDelete.sort((a,b)=>b-a).forEach(row=>arrivalSheet.deleteRow(row));
   assignGroupByArrivalDate();
   SpreadsheetApp.getUi().alert(`完成同步，更新 ${updatedRows} 筆資料！`);
-  if(transactionUrls.length>0)GmailApp.sendEmail(RECIPIENT_EMAIL,"Mercari代購--已到貨商品","以下商品已到貨：\n\nこの度はお取引ありがとうございました。\nまた機会がありましたらよろしくお願い致します。\n\n"+transactionUrls.join("\n\n"));
+  if(transactionUrls.length>0){
+    GmailApp.sendEmail(RECIPIENT_EMAIL,"Mercari代購--已到貨商品","以下商品已到貨：\n\nこの度はお取引ありがとうございました。\nまた機会がありましたらよろしくお願い致します。\n\n"+transactionUrls.map(u=>u.text).join("\n\n"));
+    tgSend_(`⭐ <b>新到貨，請評價（${transactionUrls.length} 件）</b>\n\n` + transactionUrls.map(u=>u.tg).join('\n'));
+  }
 }
 
 // ─────────────────────────────────────────────
