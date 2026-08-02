@@ -1873,10 +1873,8 @@ function syncArrivalData() {
   SpreadsheetApp.getUi().alert(`完成同步，更新 ${updatedRows} 筆資料！`);
   if(transactionUrls.length>0){
     const lines = transactionUrls.map((u,i)=>`${i+1}. <a href="${u.tUrl}">${u.tUrl}</a>`).join('\n');
-    const keyboard = transactionUrls.map(u=>[{
-      text: '⭐ 已評價',
-      callback_data: ('rated:'+u.orderRow).substring(0,64)
-    }]);
+    const allRows = transactionUrls.map(u=>u.orderRow).join(',');
+    const keyboard = [[{ text: '⭐ 已評價', callback_data: ('rated:'+allRows).substring(0,64) }]];
     tgSend_(`⭐ <b>新到貨，請評價（${transactionUrls.length} 件）</b>\n\n${lines}`, {inline_keyboard: keyboard});
   }
 }
