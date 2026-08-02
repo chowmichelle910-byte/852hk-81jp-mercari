@@ -501,6 +501,64 @@ function doPost(e) {
       try { return jsonResponse_(getCustomerGroupSummary_(e.parameter.group)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
+    // ── Cloudflare Worker / Telegram Bot ──
+    case 'getPendingOrders': {
+      try {
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        if (lastRow < 2) return jsonResponse_({ orders: [], positions: [] });
+        const data = sheet.getRange(2, 1, lastRow - 1, 15).getValues();
+        const posSet = new Set();
+        for (let i = data.length - 1; i >= 0; i--) {
+          const p = String(data[i][2] || '').trim();
+          if (p) posSet.add(p);
+        }
+        const orders = [];
+        for (let i = 0; i < data.length; i++) {
+          const pos = String(data[i][2] || '').trim();
+          const id  = String(data[i][3] || '').trim();
+          const hasContent = data[i].some(cell => String(cell || '').trim() !== '');
+          if (!pos && !id && hasContent) {
+            orders.push({
+              rowNum  : i + 2,
+              code    : String(data[i][14] || '').trim(),
+              itemUrl : String(data[i][5]  || '').trim()
+            });
+          }
+        }
+        return jsonResponse_({ orders, positions: [...posSet] });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
+    case 'getCustomersByPosition': {
+      try {
+        const pos     = String(e.parameter.pos || '').trim();
+        const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        const data    = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 4).getValues() : [];
+        const seen    = new Set();
+        const ids     = [];
+        for (let i = data.length - 1; i >= 0; i--) {
+          const p  = String(data[i][2] || '').trim();
+          const id = String(data[i][3] || '').trim();
+          if (p === pos && id && !seen.has(id)) { seen.add(id); ids.push(id); }
+        }
+        return jsonResponse_({ ids });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
+    case 'writePositionId': {
+      try {
+        const rowNum = parseInt(e.parameter.row);
+        const pos    = String(e.parameter.pos || '').trim();
+        const id     = String(e.parameter.id  || '').trim();
+        const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        sheet.getRange(rowNum, 3).setValue(pos);
+        sheet.getRange(rowNum, 4).setValue(id);
+        return jsonResponse_({ success: true });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     default:
       return jsonResponse_({ error: '未知 action: ' + action });
   }
