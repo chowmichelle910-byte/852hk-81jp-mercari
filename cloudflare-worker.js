@@ -19,10 +19,8 @@ async function tg(method, params) {
 
 // ─── GAS API ─────────────────────────────────────
 async function gas(params) {
-  const url = new URL(GAS_URL);
-  url.searchParams.set('password', GAS_PASS);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const res = await fetch(url.toString(), { redirect: 'follow' });
+  const body = new URLSearchParams({ password: GAS_PASS, ...params });
+  const res  = await fetch(GAS_URL, { method: 'POST', body, redirect: 'follow' });
   return res.json();
 }
 
