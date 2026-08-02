@@ -132,6 +132,28 @@ function checkNewOrdersAndNotify() {
   }
 }
 
+function tgShowCustPage_(msgId, rowNum, pos, code, itemUrl, ids, offset) {
+  const PAGE = 6;
+  const page = ids.slice(offset, offset + PAGE);
+  const custButtons = page.map(id => [{
+    text: id,
+    callback_data: ('id:' + rowNum + ':' + pos + ':' + id).substring(0, 64)
+  }]);
+  const nav = [];
+  if (offset + PAGE < ids.length) {
+    nav.push({ text: '➡️ 再多6個', callback_data: ('pg:' + rowNum + ':' + (offset + PAGE) + ':' + pos).substring(0, 64) });
+  }
+  nav.push({ text: '✏️ 自己輸入', callback_data: 'new_id:' + rowNum + ':' + pos });
+  custButtons.push(nav);
+
+  tgEdit_(msgId,
+    `${code ? code : '訂單'}\n` +
+    (itemUrl ? `🔗 ${itemUrl}\n` : '') +
+    `Position：<b>${pos}</b>\n\n係哪個客人購入？`,
+    { inline_keyboard: custButtons }
+  );
+}
+
 function handleTelegramUpdate_(update) {
   // 處理文字指令（如 /pending）
   const msg = update.message;
@@ -228,18 +250,31 @@ function handleTelegramUpdate_(update) {
     const itemUrl = String(rowData[5]  || '').trim();
 
     tgAnswer_(cb.id, '');
-    const custButtons = ids.slice(0, 6).map(id => [{
-      text: id,
-      callback_data: ('id:' + rowNum + ':' + pos + ':' + id).substring(0, 64)
-    }]);
-    custButtons.push([{ text: '✏️ 輸入新客人 ID', callback_data: 'new_id:' + rowNum + ':' + pos }]);
+    tgShowCustPage_(msgId, rowNum, pos, code, itemUrl, ids, 0);
 
-    tgEdit_(msgId,
-      `${code ? code : '訂單'}\n` +
-      (itemUrl ? `🔗 ${itemUrl}\n` : '') +
-      `Position：<b>${pos}</b>\n\n係哪個客人購入？`,
-      { inline_keyboard: custButtons }
-    );
+  } else if (action === 'pg') {
+    // 翻頁：pg:rowNum:offset:pos（pos 放最後防止 : 問題）
+    const rowNum = parseInt(parts[1]);
+    const offset = parseInt(parts[2]);
+    const pos    = parts.slice(3).join(':');
+
+    const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+    const lastRow = sheet.getLastRow();
+    const data    = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 15).getValues() : [];
+
+    const seen = new Set();
+    const ids  = [];
+    for (let i = data.length - 1; i >= 0; i--) {
+      const p  = String(data[i][2] || '').trim();
+      const id = String(data[i][3] || '').trim();
+      if (p === pos && id && !seen.has(id)) { seen.add(id); ids.push(id); }
+    }
+    const rowData = data[rowNum - 2] || [];
+    const code    = String(rowData[14] || '').trim();
+    const itemUrl = String(rowData[5]  || '').trim();
+
+    tgAnswer_(cb.id, '');
+    tgShowCustPage_(msgId, rowNum, pos, code, itemUrl, ids, offset);
 
   } else if (action === 'new_id') {
     // 用戶選擇手動輸入 → 儲存待輸入狀態，提示輸入
