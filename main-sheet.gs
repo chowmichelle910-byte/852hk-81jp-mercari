@@ -115,19 +115,15 @@ function checkNewOrdersAndNotify() {
     if (pos || id || !hasContent) continue;
     if (props.getProperty('tg_r' + rowNum)) continue;
 
-    // 搵商品 URL（掃描含 mercari.com 的欄）
-    let itemUrl = '';
-    for (const cell of data[i]) {
-      const v = String(cell || '').trim();
-      if (v.includes('mercari.com')) { itemUrl = v; break; }
-    }
+    const code    = String(data[i][14] || '').trim(); // O: Code
+    const itemUrl = String(data[i][5]  || '').trim(); // F: Link
 
     const posButtons = positions.length
       ? positions.map(p => [{ text: p, callback_data: ('pos:' + rowNum + ':' + p).substring(0, 64) }])
       : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: 'pos:' + rowNum + ':' + p }))];
 
     tgSend_(
-      `🆕 <b>新訂單！</b>  第 ${rowNum} 行\n` +
+      `🆕 <b>新訂單！</b>${code ? '  ' + code : ''}\n` +
       (itemUrl ? `🔗 ${itemUrl}\n` : '') +
       `\n係哪個 <b>Position</b>？`,
       { inline_keyboard: posButtons }
@@ -142,6 +138,23 @@ function handleTelegramUpdate_(update) {
   if (msg && msg.text) {
     const fromChatId = msg.chat && msg.chat.id ? String(msg.chat.id) : TG_CHAT_ID;
     const text = String(msg.text || '').trim();
+
+    // 處理手動輸入客人 ID（pending state）
+    if (!text.startsWith('/')) {
+      const props   = PropertiesService.getScriptProperties();
+      const pending = props.getProperty('tg_pending_id');
+      if (pending) {
+        const [rowNum, ...posParts] = pending.split(':');
+        const pos = posParts.join(':');
+        props.deleteProperty('tg_pending_id');
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        sheet.getRange(parseInt(rowNum), 3).setValue(pos);
+        sheet.getRange(parseInt(rowNum), 4).setValue(text);
+        tgSend_(`✅ <b>已填入</b>\nPosition：<b>${pos}</b>\n客人 ID：<b>${text}</b>`, null, fromChatId);
+        return;
+      }
+    }
+
     if (text === '/pending' || text.startsWith('/pending@')) {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
       const lastRow = sheet.getLastRow();
@@ -164,17 +177,14 @@ function handleTelegramUpdate_(update) {
         const hasContent = data[i].some(cell => String(cell || '').trim() !== '');
         if (!pos && !id && hasContent) {
           count++;
-          const rowNum = i + 2;
-          let itemUrl = '';
-          for (const cell of data[i]) {
-            const v = String(cell || '').trim();
-            if (v.includes('mercari.com')) { itemUrl = v; break; }
-          }
+          const rowNum  = i + 2;
+          const code    = String(data[i][14] || '').trim(); // O: Code
+          const itemUrl = String(data[i][5]  || '').trim(); // F: Link
           const posButtons = positions.length
             ? positions.map(p => [{ text: p, callback_data: ('pos:' + rowNum + ':' + p).substring(0, 64) }])
             : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: 'pos:' + rowNum + ':' + p }))];
           tgSend_(
-            `📋 <b>待填訂單</b>  第 ${rowNum} 行\n` +
+            `📋 <b>待填訂單</b>${code ? '  ' + code : ''}\n` +
             (itemUrl ? `🔗 ${itemUrl}\n` : '') +
             `\n係哪個 <b>Position</b>？`,
             { inline_keyboard: posButtons },
@@ -196,13 +206,13 @@ function handleTelegramUpdate_(update) {
   const action = parts[0];
 
   if (action === 'pos') {
-    // 第一步：選好 Position → 顯示歷史客人列表（最新排前）
+    // 第一步：選好 Position → 顯示歷史客人列表（最新6個）
     const rowNum = parseInt(parts[1]);
     const pos    = parts.slice(2).join(':');
 
     const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
     const lastRow = sheet.getLastRow();
-    const data    = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 4).getValues() : [];
+    const data    = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 15).getValues() : [];
 
     const seen = new Set();
     const ids  = [];
@@ -212,17 +222,33 @@ function handleTelegramUpdate_(update) {
       if (p === pos && id && !seen.has(id)) { seen.add(id); ids.push(id); }
     }
 
+    // 取同一行的 code 和 URL 供訊息顯示
+    const rowData = data.find((_, idx) => idx + 2 === rowNum) || [];
+    const code    = String(rowData[14] || '').trim();
+    const itemUrl = String(rowData[5]  || '').trim();
+
     tgAnswer_(cb.id, '');
-    const custButtons = ids.slice(0, 12).map(id => [{
+    const custButtons = ids.slice(0, 6).map(id => [{
       text: id,
       callback_data: ('id:' + rowNum + ':' + pos + ':' + id).substring(0, 64)
     }]);
-    custButtons.push([{ text: '✏️ 跳過，手動填入', callback_data: 'skip:' + rowNum }]);
+    custButtons.push([{ text: '✏️ 輸入新客人 ID', callback_data: 'new_id:' + rowNum + ':' + pos }]);
 
     tgEdit_(msgId,
-      `🆕 <b>新訂單</b>  第 ${rowNum} 行\nPosition：<b>${pos}</b>\n\n係哪個客人購入？`,
+      `${code ? code : '訂單'}\n` +
+      (itemUrl ? `🔗 ${itemUrl}\n` : '') +
+      `Position：<b>${pos}</b>\n\n係哪個客人購入？`,
       { inline_keyboard: custButtons }
     );
+
+  } else if (action === 'new_id') {
+    // 用戶選擇手動輸入 → 儲存待輸入狀態，提示輸入
+    const rowNum = parseInt(parts[1]);
+    const pos    = parts.slice(2).join(':');
+    const props  = PropertiesService.getScriptProperties();
+    props.setProperty('tg_pending_id', rowNum + ':' + pos);
+    tgAnswer_(cb.id, '');
+    tgEdit_(msgId, cb.message.text + '\n\n✏️ 請直接輸入客人 ID：');
 
   } else if (action === 'id') {
     // 第二步：選好客人 → 填入 Sheet
@@ -236,7 +262,7 @@ function handleTelegramUpdate_(update) {
 
     tgAnswer_(cb.id, '✅ 已填入！');
     tgEdit_(msgId,
-      `✅ <b>第 ${rowNum} 行已填入</b>\nPosition：<b>${pos}</b>\n客人 ID：<b>${selId}</b>`
+      `✅ <b>已填入</b>\nPosition：<b>${pos}</b>\n客人 ID：<b>${selId}</b>`
     );
 
   } else if (action === 'skip') {
