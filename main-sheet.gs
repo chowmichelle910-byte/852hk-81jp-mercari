@@ -11,14 +11,34 @@ const TG_TOKEN   = '8932041338:AAHRcNR1BNoLHU4sXdVSD2uZyQQ2PQN0ECI';
 const TG_CHAT_ID = '8392318130';
 const TG_API_URL = 'https://api.telegram.org/bot' + TG_TOKEN;
 
-// 執行一次：部署 GAS 後在編輯器手動執行此函數設定 Webhook
-function setTelegramWebhook() {
-  const url = ScriptApp.getService().getUrl();
-  const res = UrlFetchApp.fetch(TG_API_URL + '/setWebhook', {
+// 執行一次：清除 webhook，改用 polling 模式
+function deleteWebhookAndUsePoll() {
+  const res = UrlFetchApp.fetch(TG_API_URL + '/deleteWebhook', {
     method: 'post', contentType: 'application/json',
-    payload: JSON.stringify({ url: url }), muteHttpExceptions: true
+    payload: JSON.stringify({ drop_pending_updates: true }), muteHttpExceptions: true
   });
   Logger.log(res.getContentText());
+}
+
+// 時間驅動 Trigger（每分鐘）— 在 GAS Triggers 設定：
+//   函數: pollTelegramUpdates / 時間驅動 / 分鐘計時器 / 每 1 分鐘
+function pollTelegramUpdates() {
+  const props  = PropertiesService.getScriptProperties();
+  const offset = parseInt(props.getProperty('tg_offset') || '0');
+
+  const res  = UrlFetchApp.fetch(
+    TG_API_URL + '/getUpdates?timeout=0&limit=20&offset=' + offset,
+    { muteHttpExceptions: true }
+  );
+  const json = JSON.parse(res.getContentText());
+  if (!json.ok || !json.result.length) return;
+
+  let nextOffset = offset;
+  for (const update of json.result) {
+    nextOffset = Math.max(nextOffset, update.update_id + 1);
+    try { handleTelegramUpdate_(update); } catch(err) { Logger.log('poll err: ' + err.message); }
+  }
+  props.setProperty('tg_offset', String(nextOffset));
 }
 
 function tgSend_(text, replyMarkup, chatId) {
