@@ -21,13 +21,24 @@ function setTelegramWebhook() {
   Logger.log(res.getContentText());
 }
 
-function tgSend_(text, replyMarkup) {
-  const payload = { chat_id: TG_CHAT_ID, text: text, parse_mode: 'HTML' };
+function tgSend_(text, replyMarkup, chatId) {
+  const cid = chatId || TG_CHAT_ID;
+  const payload = { chat_id: cid, text: text, parse_mode: 'HTML' };
   if (replyMarkup) payload.reply_markup = replyMarkup;
-  UrlFetchApp.fetch(TG_API_URL + '/sendMessage', {
+  const res = UrlFetchApp.fetch(TG_API_URL + '/sendMessage', {
     method: 'post', contentType: 'application/json',
     payload: JSON.stringify(payload), muteHttpExceptions: true
   });
+  Logger.log('tgSend_ cid=' + cid + ' resp=' + res.getContentText());
+}
+
+// 診斷用：在 GAS 編輯器手動執行此函數測試能否發送訊息
+function testTgSend() {
+  const res = UrlFetchApp.fetch(TG_API_URL + '/sendMessage', {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify({ chat_id: TG_CHAT_ID, text: '🤖 測試訊息 OK' })
+  });
+  Logger.log(res.getContentText());
 }
 
 function tgEdit_(msgId, text, replyMarkup) {
@@ -101,11 +112,12 @@ function handleTelegramUpdate_(update) {
   // 處理文字指令（如 /pending）
   const msg = update.message;
   if (msg && msg.text) {
+    const fromChatId = msg.chat && msg.chat.id ? String(msg.chat.id) : TG_CHAT_ID;
     const text = String(msg.text || '').trim();
     if (text === '/pending' || text.startsWith('/pending@')) {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
       const lastRow = sheet.getLastRow();
-      if (lastRow < 2) { tgSend_('✅ 沒有待處理訂單'); return; }
+      if (lastRow < 2) { tgSend_('✅ 沒有待處理訂單', null, fromChatId); return; }
 
       const data = sheet.getRange(2, 1, lastRow - 1, 28).getValues();
       const pending = [];
@@ -124,9 +136,9 @@ function handleTelegramUpdate_(update) {
       }
 
       if (!pending.length) {
-        tgSend_('✅ 沒有待填 Position/ID 的訂單');
+        tgSend_('✅ 沒有待填 Position/ID 的訂單', null, fromChatId);
       } else {
-        tgSend_(`📋 <b>待填 Position/ID 的訂單（${pending.length} 筆）</b>\n\n` + pending.join('\n\n'));
+        tgSend_(`📋 <b>待填 Position/ID 的訂單（${pending.length} 筆）</b>\n\n` + pending.join('\n\n'), null, fromChatId);
       }
       return;
     }
