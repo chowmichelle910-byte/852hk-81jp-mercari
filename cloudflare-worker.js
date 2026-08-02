@@ -3,6 +3,7 @@ const TG_TOKEN   = '8932041338:AAHRcNR1BNoLHU4sXdVSD2uZyQQ2PQN0ECI';
 const TG_CHAT_ID = '8392318130';
 const TG_API     = `https://api.telegram.org/bot${TG_TOKEN}`;
 const GAS_URL    = 'https://script.google.com/macros/s/AKfycbwT9_K4m0UvBUrZRveZJ3clzfuUCLtR1TrEok7gYDdamRtqHjk1HkZrTmLPpHuLXTRckA/exec';
+const GAS_API2   = 'https://script.google.com/macros/s/AKfycby2I6Q2M67npEFW-Vqi14JS3L7rtuQ9DLD35KwhwCaGpyt3xBnRfNyeLcOGXfslA9sx/exec';
 const GAS_PASS   = '4916';
 const PAGE       = 6;
 
@@ -158,6 +159,37 @@ async function handleUpdate(update) {
       chat_id: chatId, message_id: msgId,
       text: (cb.message.text || '') + '\n\n⏭ 已跳過，請手動填入'
     });
+
+  } else if (action === 'rated') {
+    const orderRow = parts[1];
+    // Call other GAS to mark as evaluated
+    const url2 = new URL(GAS_API2);
+    url2.searchParams.set('password', GAS_PASS);
+    url2.searchParams.set('action', 'saveArrivalData');
+    url2.searchParams.set('row', orderRow);
+    url2.searchParams.set('status', '');
+    await fetch(url2.toString(), { redirect: 'follow' });
+
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已記錄！' });
+
+    // Remove the pressed button from keyboard
+    const currentKb = (cb.message.reply_markup && cb.message.reply_markup.inline_keyboard) || [];
+    const newKb = currentKb.filter(row => {
+      return !row.some(btn => btn.callback_data === data);
+    });
+    if (newKb.length === 0) {
+      // All rated — edit message text to show done
+      await tg('editMessageText', {
+        chat_id: chatId, message_id: msgId,
+        text: (cb.message.text || '') + '\n\n✅ 全部已評價！',
+        parse_mode: 'HTML'
+      });
+    } else {
+      await tg('editMessageReplyMarkup', {
+        chat_id: chatId, message_id: msgId,
+        reply_markup: { inline_keyboard: newKb }
+      });
+    }
   }
 }
 

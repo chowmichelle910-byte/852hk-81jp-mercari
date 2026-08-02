@@ -1864,7 +1864,7 @@ function syncArrivalData() {
       const dateObj=arrivalDate instanceof Date?arrivalDate:new Date(arrivalDate);
       orderSheet.getRange(orderRow,16).setValue(dateObj);orderSheet.getRange(orderRow,16).setNumberFormat("yyyy/m/d");
       orderSheet.getRange(orderRow,17).setValue(netWeight);
-      const url=row[4];if(url&&url.includes("mercari.com/item/")){const tUrl=url.replace("/item/","/transaction/");transactionUrls.push({text:`• ${tUrl}`,tg:`• <a href="${tUrl}">${tUrl}</a>`});}
+      const url=row[4];if(url&&url.includes("mercari.com/item/")){const tUrl=url.replace("/item/","/transaction/");transactionUrls.push({tUrl,orderRow});}
       rowsToDelete.push(i+2);updatedRows++;
     }
   }
@@ -1872,7 +1872,12 @@ function syncArrivalData() {
   assignGroupByArrivalDate();
   SpreadsheetApp.getUi().alert(`完成同步，更新 ${updatedRows} 筆資料！`);
   if(transactionUrls.length>0){
-    tgSend_(`⭐ <b>新到貨，請評價（${transactionUrls.length} 件）</b>\n\n` + transactionUrls.map(u=>u.tg).join('\n'));
+    const lines = transactionUrls.map((u,i)=>`${i+1}. <a href="${u.tUrl}">${u.tUrl}</a>`).join('\n');
+    const keyboard = transactionUrls.map(u=>[{
+      text: '⭐ 已評價',
+      callback_data: ('rated:'+u.orderRow).substring(0,64)
+    }]);
+    tgSend_(`⭐ <b>新到貨，請評價（${transactionUrls.length} 件）</b>\n\n${lines}`, {inline_keyboard: keyboard});
   }
 }
 
