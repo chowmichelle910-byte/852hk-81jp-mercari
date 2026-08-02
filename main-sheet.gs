@@ -98,6 +98,40 @@ function checkNewOrdersAndNotify() {
 }
 
 function handleTelegramUpdate_(update) {
+  // 處理文字指令（如 /pending）
+  const msg = update.message;
+  if (msg && msg.text) {
+    const text = String(msg.text || '').trim();
+    if (text === '/pending' || text.startsWith('/pending@')) {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+      const lastRow = sheet.getLastRow();
+      if (lastRow < 2) { tgSend_('✅ 沒有待處理訂單'); return; }
+
+      const data = sheet.getRange(2, 1, lastRow - 1, 28).getValues();
+      const pending = [];
+      for (let i = 0; i < data.length; i++) {
+        const pos = String(data[i][2] || '').trim();
+        const id  = String(data[i][3] || '').trim();
+        const hasContent = data[i].some(cell => String(cell || '').trim() !== '');
+        if (!pos && !id && hasContent) {
+          let itemUrl = '';
+          for (const cell of data[i]) {
+            const v = String(cell || '').trim();
+            if (v.includes('mercari.com')) { itemUrl = v; break; }
+          }
+          pending.push(`• 第 ${i + 2} 行${itemUrl ? '\n  🔗 ' + itemUrl : ''}`);
+        }
+      }
+
+      if (!pending.length) {
+        tgSend_('✅ 沒有待填 Position/ID 的訂單');
+      } else {
+        tgSend_(`📋 <b>待填 Position/ID 的訂單（${pending.length} 筆）</b>\n\n` + pending.join('\n\n'));
+      }
+      return;
+    }
+  }
+
   const cb = update.callback_query;
   if (!cb) return;
   const cbData = cb.data || '';
