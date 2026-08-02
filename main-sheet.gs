@@ -5,6 +5,157 @@
  */
 
 // ─────────────────────────────────────────────
+//  Telegram Bot 設定
+// ─────────────────────────────────────────────
+const TG_TOKEN   = '8932041338:AAHRcNR1BNoLHU4sXdVSD2uZyQQ2PQN0ECI';
+const TG_CHAT_ID = '8392318130';
+const TG_API_URL = 'https://api.telegram.org/bot' + TG_TOKEN;
+
+// 執行一次：部署 GAS 後在編輯器手動執行此函數設定 Webhook
+function setTelegramWebhook() {
+  const url = ScriptApp.getService().getUrl();
+  const res = UrlFetchApp.fetch(TG_API_URL + '/setWebhook', {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify({ url: url }), muteHttpExceptions: true
+  });
+  Logger.log(res.getContentText());
+}
+
+function tgSend_(text, replyMarkup) {
+  const payload = { chat_id: TG_CHAT_ID, text: text, parse_mode: 'HTML' };
+  if (replyMarkup) payload.reply_markup = replyMarkup;
+  UrlFetchApp.fetch(TG_API_URL + '/sendMessage', {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify(payload), muteHttpExceptions: true
+  });
+}
+
+function tgEdit_(msgId, text, replyMarkup) {
+  const payload = { chat_id: TG_CHAT_ID, message_id: msgId, text: text, parse_mode: 'HTML' };
+  if (replyMarkup) payload.reply_markup = replyMarkup;
+  UrlFetchApp.fetch(TG_API_URL + '/editMessageText', {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify(payload), muteHttpExceptions: true
+  });
+}
+
+function tgAnswer_(cbId, text) {
+  UrlFetchApp.fetch(TG_API_URL + '/answerCallbackQuery', {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify({ callback_query_id: cbId, text: text || '' }),
+    muteHttpExceptions: true
+  });
+}
+
+// onChange trigger 觸發 — Sheet 有新行加入時即時執行
+// 設定方法：GAS Triggers → From spreadsheet → On change → checkNewOrdersAndNotify
+function checkNewOrdersAndNotify() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('訂單');
+  const props = PropertiesService.getScriptProperties();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  const data = sheet.getRange(2, 1, lastRow - 1, 28).getValues();
+
+  // 收集現有 Position 種類（由最新排前）
+  const posSet = new Set();
+  for (let i = data.length - 1; i >= 0; i--) {
+    const p = String(data[i][2] || '').trim();
+    if (p) posSet.add(p);
+  }
+  const positions = [...posSet];
+
+  for (let i = 0; i < data.length; i++) {
+    const rowNum = i + 2;
+    const pos = String(data[i][2] || '').trim(); // C: Position
+    const id  = String(data[i][3] || '').trim(); // D: ID
+
+    // 新訂單：C 和 D 都空白，但行內有其他資料
+    const hasContent = data[i].some(cell => String(cell || '').trim() !== '');
+    if (pos || id || !hasContent) continue;
+    if (props.getProperty('tg_r' + rowNum)) continue;
+
+    // 搵商品 URL（掃描含 mercari.com 的欄）
+    let itemUrl = '';
+    for (const cell of data[i]) {
+      const v = String(cell || '').trim();
+      if (v.includes('mercari.com')) { itemUrl = v; break; }
+    }
+
+    const posButtons = positions.length
+      ? positions.map(p => [{ text: p, callback_data: ('pos:' + rowNum + ':' + p).substring(0, 64) }])
+      : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: 'pos:' + rowNum + ':' + p }))];
+
+    tgSend_(
+      `🆕 <b>新訂單！</b>  第 ${rowNum} 行\n` +
+      (itemUrl ? `🔗 ${itemUrl}\n` : '') +
+      `\n係哪個 <b>Position</b>？`,
+      { inline_keyboard: posButtons }
+    );
+    props.setProperty('tg_r' + rowNum, '1');
+  }
+}
+
+function handleTelegramUpdate_(update) {
+  const cb = update.callback_query;
+  if (!cb) return;
+  const cbData = cb.data || '';
+  const msgId  = cb.message.message_id;
+  const parts  = cbData.split(':');
+  const action = parts[0];
+
+  if (action === 'pos') {
+    // 第一步：選好 Position → 顯示歷史客人列表（最新排前）
+    const rowNum = parseInt(parts[1]);
+    const pos    = parts.slice(2).join(':');
+
+    const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+    const lastRow = sheet.getLastRow();
+    const data    = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 4).getValues() : [];
+
+    const seen = new Set();
+    const ids  = [];
+    for (let i = data.length - 1; i >= 0; i--) {
+      const p  = String(data[i][2] || '').trim();
+      const id = String(data[i][3] || '').trim();
+      if (p === pos && id && !seen.has(id)) { seen.add(id); ids.push(id); }
+    }
+
+    tgAnswer_(cb.id, '');
+    const custButtons = ids.slice(0, 12).map(id => [{
+      text: id,
+      callback_data: ('id:' + rowNum + ':' + pos + ':' + id).substring(0, 64)
+    }]);
+    custButtons.push([{ text: '✏️ 跳過，手動填入', callback_data: 'skip:' + rowNum }]);
+
+    tgEdit_(msgId,
+      `🆕 <b>新訂單</b>  第 ${rowNum} 行\nPosition：<b>${pos}</b>\n\n係哪個客人購入？`,
+      { inline_keyboard: custButtons }
+    );
+
+  } else if (action === 'id') {
+    // 第二步：選好客人 → 填入 Sheet
+    const rowNum = parseInt(parts[1]);
+    const pos    = parts[2];
+    const selId  = parts.slice(3).join(':');
+
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+    sheet.getRange(rowNum, 3).setValue(pos);
+    sheet.getRange(rowNum, 4).setValue(selId);
+
+    tgAnswer_(cb.id, '✅ 已填入！');
+    tgEdit_(msgId,
+      `✅ <b>第 ${rowNum} 行已填入</b>\nPosition：<b>${pos}</b>\n客人 ID：<b>${selId}</b>`
+    );
+
+  } else if (action === 'skip') {
+    tgAnswer_(cb.id, '已跳過');
+    tgEdit_(msgId, cb.message.text + '\n\n⏭ 已跳過，請手動填入');
+  }
+}
+
+// ─────────────────────────────────────────────
 //  全域配置
 // ─────────────────────────────────────────────
 const SF_TEMPLATE_SHEET_NAME       = "2023.08.24";
@@ -65,6 +216,12 @@ function showSidebar() {
 //  doPost — 完整 Web App 入口
 // ─────────────────────────────────────────────
 function doPost(e) {
+  // Telegram webhook callback（JSON body）
+  if (e.postData && e.postData.type === 'application/json') {
+    try { handleTelegramUpdate_(JSON.parse(e.postData.contents)); } catch(err) {}
+    return ContentService.createTextOutput('OK');
+  }
+
   const action   = String(e.parameter.action   || '').trim();
   const password = String(e.parameter.password || '').trim();
   const group    = String(e.parameter.group    || '').trim();
