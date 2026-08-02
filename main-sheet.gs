@@ -41,6 +41,14 @@ function testTgSend() {
   Logger.log(res.getContentText());
 }
 
+// 診斷用：查看 webhook 現時指向哪個 URL
+function getWebhookInfo() {
+  const res = UrlFetchApp.fetch(TG_API_URL + '/getWebhookInfo');
+  Logger.log(res.getContentText());
+  // 同時 log 本 GAS 的 exec URL
+  Logger.log('This GAS exec URL: ' + ScriptApp.getService().getUrl());
+}
+
 function tgEdit_(msgId, text, replyMarkup) {
   const payload = { chat_id: TG_CHAT_ID, message_id: msgId, text: text, parse_mode: 'HTML' };
   if (replyMarkup) payload.reply_markup = replyMarkup;
