@@ -148,26 +148,42 @@ function handleTelegramUpdate_(update) {
       if (lastRow < 2) { tgSend_('✅ 沒有待處理訂單', null, fromChatId); return; }
 
       const data = sheet.getRange(2, 1, lastRow - 1, 28).getValues();
-      const pending = [];
+
+      // 收集現有 Position 種類（最新排前）
+      const posSet = new Set();
+      for (let i = data.length - 1; i >= 0; i--) {
+        const p = String(data[i][2] || '').trim();
+        if (p) posSet.add(p);
+      }
+      const positions = [...posSet];
+
+      let count = 0;
       for (let i = 0; i < data.length; i++) {
         const pos = String(data[i][2] || '').trim();
         const id  = String(data[i][3] || '').trim();
         const hasContent = data[i].some(cell => String(cell || '').trim() !== '');
         if (!pos && !id && hasContent) {
+          count++;
+          const rowNum = i + 2;
           let itemUrl = '';
           for (const cell of data[i]) {
             const v = String(cell || '').trim();
             if (v.includes('mercari.com')) { itemUrl = v; break; }
           }
-          pending.push(`• 第 ${i + 2} 行${itemUrl ? '\n  🔗 ' + itemUrl : ''}`);
+          const posButtons = positions.length
+            ? positions.map(p => [{ text: p, callback_data: ('pos:' + rowNum + ':' + p).substring(0, 64) }])
+            : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: 'pos:' + rowNum + ':' + p }))];
+          tgSend_(
+            `📋 <b>待填訂單</b>  第 ${rowNum} 行\n` +
+            (itemUrl ? `🔗 ${itemUrl}\n` : '') +
+            `\n係哪個 <b>Position</b>？`,
+            { inline_keyboard: posButtons },
+            fromChatId
+          );
         }
       }
 
-      if (!pending.length) {
-        tgSend_('✅ 沒有待填 Position/ID 的訂單', null, fromChatId);
-      } else {
-        tgSend_(`📋 <b>待填 Position/ID 的訂單（${pending.length} 筆）</b>\n\n` + pending.join('\n\n'), null, fromChatId);
-      }
+      if (!count) tgSend_('✅ 沒有待填 Position/ID 的訂單', null, fromChatId);
       return;
     }
   }
