@@ -580,6 +580,23 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'clearAllUnrated': {
+      try {
+        const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        if (lastRow < 2) return jsonResponse_({ cleared: 0 });
+        const col29 = sheet.getRange(2, 29, lastRow - 1, 1).getValues();
+        let cleared = 0;
+        for (let i = 0; i < col29.length; i++) {
+          if (String(col29[i][0] || '').trim() === '未評價') {
+            sheet.getRange(i + 2, 29).setValue('');
+            cleared++;
+          }
+        }
+        return jsonResponse_({ cleared });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     default:
       return jsonResponse_({ error: '未知 action: ' + action });
   }
@@ -1894,8 +1911,7 @@ function syncArrivalData() {
   SpreadsheetApp.getUi().alert(`完成同步，更新 ${updatedRows} 筆資料！`);
   if(transactionUrls.length>0){
     const lines = transactionUrls.map((u,i)=>`${i+1}. <a href="${u.tUrl}">${u.tUrl}</a>`).join('\n');
-    const allRows = transactionUrls.map(u=>u.orderRow).join(',');
-    const keyboard = [[{ text: '⭐ 已評價', callback_data: ('rated:'+allRows).substring(0,64) }]];
+    const keyboard = [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]];
     tgSend_(`⭐ <b>新到貨，請評價（${transactionUrls.length} 件）</b>\n\n${lines}`, {inline_keyboard: keyboard});
   }
 }

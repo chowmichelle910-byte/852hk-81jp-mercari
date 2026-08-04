@@ -71,12 +71,11 @@ async function handleUpdate(update) {
         return;
       }
       const lines   = items.map((u, i) => `${i + 1}. <a href="${u.tUrl}">${u.tUrl}</a>`).join('\n');
-      const allRows = items.map(u => u.rowNum).join(',');
       await tg('sendMessage', {
         chat_id: chatId,
         text: `⭐ <b>待評價（${items.length} 件）</b>\n\n${lines}`,
         parse_mode: 'HTML',
-        reply_markup: { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: ('rated:' + allRows).substring(0, 64) }]] }
+        reply_markup: { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]] }
       });
       return;
     }
@@ -176,14 +175,11 @@ async function handleUpdate(update) {
       text: (cb.message.text || '') + '\n\n⏭ 已跳過，請手動填入'
     });
 
-  } else if (action === 'rated') {
-    const orderRows = parts.slice(1).join(':').split(',').filter(Boolean);
-    await Promise.all(orderRows.map(async orderRow => {
-      const body = new URLSearchParams({ password: GAS_PASS, action: 'saveArrivalData', row: orderRow, status: '' });
-      const resp = await fetch(GAS_API2, { method: 'POST', body, redirect: 'follow' });
-      const text = await resp.text();
-      console.log(`GAS_API2 row=${orderRow} status=${resp.status} body=${text.substring(0, 300)}`);
-    }));
+  } else if (action === 'rated' || action === 'rated_all') {
+    const body = new URLSearchParams({ password: GAS_PASS, action: 'clearAllUnrated' });
+    const resp = await fetch(GAS_URL, { method: 'POST', body, redirect: 'follow' });
+    const text = await resp.text();
+    console.log(`clearAllUnrated status=${resp.status} body=${text.substring(0, 300)}`);
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已記錄！' });
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
