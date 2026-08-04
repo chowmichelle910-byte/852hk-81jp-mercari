@@ -2106,6 +2106,7 @@ function updateOrdersFromGmail() {
   [{name:"populateArrivals",fn:populateArrivals},{name:"updateChineseNamesByKeyword",fn:updateChineseNamesByKeyword}].forEach(task=>{
     try{task.fn();console.log(task.name+" ✅");}catch(e){console.error(task.name+" ❌:",e);}
   });
+  try { checkNewOrdersAndNotify(); } catch(e) { console.error('checkNewOrdersAndNotify ❌:', e); }
 }
 
 function processTrackingNumberEmails() {
