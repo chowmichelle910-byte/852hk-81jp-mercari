@@ -2115,6 +2115,7 @@ function processMercariShopsEmails() {
   try { populateArrivals(); }                      catch(e) { console.error(e); }
   try { updateSerialNumberInColO(); }              catch(e) { console.error(e); }
   try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) { console.error(e); }
+  try { checkNewOrdersAndNotify(); }               catch(e) { console.error(e); }
 }
 
 function updateOrdersFromGmail() {
