@@ -178,10 +178,11 @@ async function handleUpdate(update) {
 
   } else if (action === 'rated') {
     const orderRows = parts.slice(1).join(':').split(',').filter(Boolean);
-    // Call other GAS to mark all as evaluated
-    await Promise.all(orderRows.map(orderRow => {
+    await Promise.all(orderRows.map(async orderRow => {
       const body = new URLSearchParams({ password: GAS_PASS, action: 'saveArrivalData', row: orderRow, status: '' });
-      return fetch(GAS_API2, { method: 'POST', body, redirect: 'follow' });
+      const resp = await fetch(GAS_API2, { method: 'POST', body, redirect: 'follow' });
+      const text = await resp.text();
+      console.log(`GAS_API2 row=${orderRow} status=${resp.status} body=${text.substring(0, 300)}`);
     }));
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已記錄！' });
     await tg('editMessageText', {
