@@ -1156,9 +1156,11 @@ function saveNewGroup_(params) {
 
   // A=團號, B=Start, C=End, E=r1, F=r5k, G=r10k, H=r50k
   curSheet.getRange(nextRow, 1).setValue(group);
-  curSheet.getRange(nextRow, 2).setValue(start);
+  const startDate = new Date(String(start).replace(/\//g, '-'));
+  const endDate   = new Date(String(end).replace(/\//g, '-'));
+  curSheet.getRange(nextRow, 2).setValue(startDate);
   curSheet.getRange(nextRow, 2).setNumberFormat('yyyy/m/d');
-  curSheet.getRange(nextRow, 3).setValue(end);
+  curSheet.getRange(nextRow, 3).setValue(endDate);
   curSheet.getRange(nextRow, 3).setNumberFormat('yyyy/m/d');
   if (r1)   curSheet.getRange(nextRow, 5).setValue(parseFloat(r1));
   if (r5k)  curSheet.getRange(nextRow, 6).setValue(parseFloat(r5k));
