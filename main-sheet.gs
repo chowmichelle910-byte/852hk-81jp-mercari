@@ -1908,7 +1908,7 @@ function syncArrivalData() {
   }
   rowsToDelete.sort((a,b)=>b-a).forEach(row=>arrivalSheet.deleteRow(row));
   assignGroupByArrivalDate();
-  SpreadsheetApp.getUi().alert(`完成同步，更新 ${updatedRows} 筆資料！`);
+  try { SpreadsheetApp.getUi().alert(`完成同步，更新 ${updatedRows} 筆資料！`); } catch(e) {}
   if(transactionUrls.length>0){
     const lines = transactionUrls.map((u,i)=>`${i+1}. <a href="${u.tUrl}">${u.tUrl}</a>`).join('\n');
     const keyboard = [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]];
