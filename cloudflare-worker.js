@@ -180,12 +180,8 @@ async function handleUpdate(update) {
     const orderRows = parts.slice(1).join(':').split(',').filter(Boolean);
     // Call other GAS to mark all as evaluated
     await Promise.all(orderRows.map(orderRow => {
-      const url2 = new URL(GAS_API2);
-      url2.searchParams.set('password', GAS_PASS);
-      url2.searchParams.set('action', 'saveArrivalData');
-      url2.searchParams.set('row', orderRow);
-      url2.searchParams.set('status', '');
-      return fetch(url2.toString(), { redirect: 'follow' });
+      const body = new URLSearchParams({ password: GAS_PASS, action: 'saveArrivalData', row: orderRow, status: '' });
+      return fetch(GAS_API2, { method: 'POST', body, redirect: 'follow' });
     }));
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已記錄！' });
     await tg('editMessageText', {
