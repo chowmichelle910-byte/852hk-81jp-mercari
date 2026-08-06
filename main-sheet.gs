@@ -1304,7 +1304,7 @@ function getRecordData_(group) {
       const phone    = String(r[10] || '').trim();
       const address  = String(r[11] || '').trim();
       const method   = String(r[8]  || '').trim();
-      const prev     = (!receiver && !phone && !address && !method) ? (prevDelivery[userName] || null) : null;
+      const prev     = prevDelivery[userName] || null;
       return {
         rowNum,
         userName,
@@ -1315,9 +1315,9 @@ function getRecordData_(group) {
         postage     : r[6]  !== '' ? Number(r[6])  : 0, // G
         weightG     : r[7]  !== '' ? Number(r[7])  : 0, // H
         method      : method    || (prev ? prev.method   : ''),
-        receiver    : receiver || (prev ? prev.receiver : ''),
-        phone       : phone    || (prev ? prev.phone    : ''),
-        address     : address  || (prev ? prev.address  : ''),
+        receiver    : receiver  || (prev ? prev.receiver : ''),
+        phone       : phone     || (prev ? prev.phone    : ''),
+        address     : address   || (prev ? prev.address  : ''),
         tracking    : String(r[12] || '').trim()  // M
       };
     });
