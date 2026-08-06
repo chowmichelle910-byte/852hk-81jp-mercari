@@ -1387,7 +1387,6 @@ function renderRecordCard(r, group){
       <div class="rec-field"><label>到貨數量</label><div class="rv">${r.qty||'—'}</div></div>
       <div class="rec-field"><label>整體貨品編號</label><div class="rv">${esc(r.mark)||'—'}</div></div>
       <div class="rec-field"><label>貨品編號</label><div class="rv">${esc(r.codes)||'—'}</div></div>
-      ${r.prefilled?'<div style="font-size:11px;color:#B45309;margin-bottom:4px;">⚠️ 自動沿用上一團收件資料，請確認</div>':''}
       <div class="rec-field full"><label>收件人</label><input class="rv-inp" id="rcv-${r.rowNum}" value="${esc(r.receiver||'')}" placeholder="收件人姓名"></div>
       <div class="rec-field full"><label>電話</label><input class="rv-inp" id="rph-${r.rowNum}" value="${esc(r.phone||'')}" placeholder="電話號碼"></div>
       <div class="rec-field full"><label>地址</label><input class="rv-inp" id="rad-${r.rowNum}" value="${esc(r.address||'')}" placeholder="收件地址"></div>

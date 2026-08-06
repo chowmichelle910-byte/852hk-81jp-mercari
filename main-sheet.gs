@@ -1289,8 +1289,9 @@ function getRecordData_(group) {
     const receiver = String(data[i][9]  || '').trim();
     const phone    = String(data[i][10] || '').trim();
     const address  = String(data[i][11] || '').trim();
-    if (receiver || phone || address) {
-      prevDelivery[userName] = { receiver, phone, address };
+    const method   = String(data[i][8]  || '').trim();
+    if (receiver || phone || address || method) {
+      prevDelivery[userName] = { receiver, phone, address, method };
     }
   }
 
@@ -1302,7 +1303,8 @@ function getRecordData_(group) {
       const receiver = String(r[9]  || '').trim();
       const phone    = String(r[10] || '').trim();
       const address  = String(r[11] || '').trim();
-      const prev     = (!receiver && !phone && !address) ? (prevDelivery[userName] || null) : null;
+      const method   = String(r[8]  || '').trim();
+      const prev     = (!receiver && !phone && !address && !method) ? (prevDelivery[userName] || null) : null;
       return {
         rowNum,
         userName,
@@ -1312,12 +1314,11 @@ function getRecordData_(group) {
         mark        : String(r[5]  || '').trim(),  // F
         postage     : r[6]  !== '' ? Number(r[6])  : 0, // G
         weightG     : r[7]  !== '' ? Number(r[7])  : 0, // H
-        method      : String(r[8]  || '').trim(),  // I
+        method      : method    || (prev ? prev.method   : ''),
         receiver    : receiver || (prev ? prev.receiver : ''),
         phone       : phone    || (prev ? prev.phone    : ''),
         address     : address  || (prev ? prev.address  : ''),
-        tracking    : String(r[12] || '').trim(),  // M
-        prefilled   : !!prev   // 前端可用來顯示提示
+        tracking    : String(r[12] || '').trim()  // M
       };
     });
 
