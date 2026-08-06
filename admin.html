@@ -1381,7 +1381,7 @@ function renderRecordCard(r, group){
       </div>
     </div>
     <div class="rec-grid">
-      <div class="rec-field"><label>郵寄方式</label><div class="rv">${esc(r.method)||'—'}</div></div>
+      <div class="rec-field"><label>郵寄方式</label><input class="rv-inp" id="rmt-${r.rowNum}" value="${esc(r.method||'')}" placeholder="郵寄方式"></div>
       <div class="rec-field"><label>國際運費</label><div class="rv">HK$${r.postage!=null?Number(r.postage).toFixed(1):'—'}</div></div>
       <div class="rec-field"><label>重量</label><div class="rv">${r.weightG?r.weightG+'g':'—'}</div></div>
       <div class="rec-field"><label>到貨數量</label><div class="rv">${r.qty||'—'}</div></div>
@@ -2054,11 +2054,12 @@ async function saveRecordDelivery(rowNum){
   const btn=document.querySelector(`#rcard-${rowNum} .rec-delivery-save`);
   const orig=btn?btn.textContent:'';
   if(btn){btn.disabled=true;btn.textContent='儲存中…';}
+  const method  =(document.getElementById('rmt-'+rowNum)||{}).value||'';
   const receiver=(document.getElementById('rcv-'+rowNum)||{}).value||'';
-  const phone=(document.getElementById('rph-'+rowNum)||{}).value||'';
-  const address=(document.getElementById('rad-'+rowNum)||{}).value||'';
+  const phone   =(document.getElementById('rph-'+rowNum)||{}).value||'';
+  const address =(document.getElementById('rad-'+rowNum)||{}).value||'';
   try{
-    const d=await postMain({action:'saveRecordDelivery',password:pw,recordRow:rowNum,receiver,phone,address});
+    const d=await postMain({action:'saveRecordDelivery',password:pw,recordRow:rowNum,method,receiver,phone,address});
     if(d.error)throw new Error(d.error);
     if(btn){btn.textContent='✅ 已儲存';setTimeout(()=>{btn.disabled=false;btn.textContent=orig;},2000);}
   }catch(e){

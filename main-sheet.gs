@@ -473,7 +473,7 @@ function doPost(e) {
       catch(err) { return jsonResponse_({ error: err.message }); }
 
     case 'saveRecordDelivery':
-      try { return jsonResponse_(saveRecordDelivery_(e.parameter.recordRow, e.parameter.receiver, e.parameter.phone, e.parameter.address)); }
+      try { return jsonResponse_(saveRecordDelivery_(e.parameter.recordRow, e.parameter.method, e.parameter.receiver, e.parameter.phone, e.parameter.address)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
     case 'holdToNextGroup':
@@ -1285,13 +1285,20 @@ function getRecordData_(group) {
     const tag      = String(data[i][2] || '').trim();
     if (tag === arrTag) continue;
     const userName = String(data[i][0] || '').trim();
-    if (!userName || prevDelivery[userName]) continue;
+    if (!userName) continue;
+    // 已找到非「保留至下一團」的最終記錄，唔需要再搵
+    if (prevDelivery[userName] && prevDelivery[userName]._final) continue;
     const receiver = String(data[i][9]  || '').trim();
     const phone    = String(data[i][10] || '').trim();
     const address  = String(data[i][11] || '').trim();
     const method   = String(data[i][8]  || '').trim();
-    if (receiver || phone || address || method) {
-      prevDelivery[userName] = { receiver, phone, address, method };
+    if (!(receiver || phone || address || method)) continue;
+    if (method === '保留至下一團') {
+      // 暫存 receiver/phone/address，method 留空，繼續向上搵
+      if (!prevDelivery[userName]) prevDelivery[userName] = { receiver, phone, address, method: '', _final: false };
+    } else {
+      // 找到真實收件方式，定案
+      prevDelivery[userName] = { receiver, phone, address, method, _final: true };
     }
   }
 
@@ -1342,13 +1349,14 @@ function saveTrackingNo_(recordRow, tracking) {
 }
 
 // ─────────────────────────────────────────────
-//  儲存 Record 收件資料（J=收件人, K=電話, L=地址）
+//  儲存 Record 收件資料（I=郵寄方式, J=收件人, K=電話, L=地址）
 // ─────────────────────────────────────────────
-function saveRecordDelivery_(recordRow, receiver, phone, address) {
+function saveRecordDelivery_(recordRow, method, receiver, phone, address) {
   const ss          = SpreadsheetApp.getActiveSpreadsheet();
   const recordSheet = ss.getSheetByName('Record');
   const row         = parseInt(recordRow);
   if (isNaN(row) || row < 2) return { error: '無效行號' };
+  if (method   !== undefined) recordSheet.getRange(row, 9).setValue(method   || ''); // I
   recordSheet.getRange(row, 10).setValue(receiver || ''); // J
   recordSheet.getRange(row, 11).setValue(phone    || ''); // K
   recordSheet.getRange(row, 12).setValue(address  || ''); // L
