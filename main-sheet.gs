@@ -1284,7 +1284,7 @@ function getRecordData_(group) {
   for (let i = data.length - 1; i >= 0; i--) {
     const tag      = String(data[i][2] || '').trim();
     if (tag === arrTag) continue;
-    const userName = String(data[i][0] || '').trim();
+    const userName = String(data[i][1] || '').trim();
     if (!userName || prevDelivery[userName]) continue;
     const receiver = String(data[i][9]  || '').trim();
     const phone    = String(data[i][10] || '').trim();
@@ -1299,7 +1299,7 @@ function getRecordData_(group) {
     .map((r, i) => ({ r, rowNum: i + 2 }))
     .filter(({ r }) => String(r[2] || '').trim() === arrTag)
     .map(({ r, rowNum }) => {
-      const userName = String(r[0] || '').trim();
+      const userName = String(r[1] || '').trim(); // B
       const receiver = String(r[9]  || '').trim();
       const phone    = String(r[10] || '').trim();
       const address  = String(r[11] || '').trim();
