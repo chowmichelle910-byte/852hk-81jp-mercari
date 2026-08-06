@@ -1364,7 +1364,7 @@ async function loadRecordCards(group){
     const rows=d.rows||[];
     if(!rows.length){el.innerHTML='<div class="empty">Record 暫無此團資料，請先匯出</div>';return;}
     el.innerHTML=rows.map(r=>renderRecordCard(r,group)).join('');
-  }catch(e){el.innerHTML='<div class="empty">❌ 載入失敗</div>';}
+  }catch(e){el.innerHTML='<div class="empty">❌ 載入失敗：'+e.message+'</div>';}
 }
 
 function renderRecordCard(r, group){
