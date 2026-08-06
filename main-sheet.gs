@@ -1276,27 +1276,50 @@ function getRecordData_(group) {
   const lastRow     = recordSheet.getLastRow();
   if (lastRow < 2) return { rows: [] };
 
-  const data    = recordSheet.getRange(2, 1, lastRow - 1, 13).getValues();
-  const arrTag  = String(group).trim() + '到貨';
+  const data   = recordSheet.getRange(2, 1, lastRow - 1, 13).getValues();
+  const arrTag = String(group).trim() + '到貨';
+
+  // 建立每個 userName 最近一次有收件資料的 map（排除當前團）
+  const prevDelivery = {};
+  for (let i = data.length - 1; i >= 0; i--) {
+    const tag      = String(data[i][2] || '').trim();
+    if (tag === arrTag) continue;
+    const userName = String(data[i][0] || '').trim();
+    if (!userName || prevDelivery[userName]) continue;
+    const receiver = String(data[i][9]  || '').trim();
+    const phone    = String(data[i][10] || '').trim();
+    const address  = String(data[i][11] || '').trim();
+    if (receiver || phone || address) {
+      prevDelivery[userName] = { receiver, phone, address };
+    }
+  }
 
   const rows = data
     .map((r, i) => ({ r, rowNum: i + 2 }))
     .filter(({ r }) => String(r[2] || '').trim() === arrTag)
-    .map(({ r, rowNum }) => ({
-      rowNum,
-      userName    : String(r[0]  || '').trim(), // A
-      arrivalTag  : String(r[2]  || '').trim(), // C
-      qty         : r[3]  !== '' ? r[3]  : 0,  // D
-      codes       : String(r[4]  || '').trim(), // E
-      mark        : String(r[5]  || '').trim(), // F
-      postage     : r[6]  !== '' ? Number(r[6])  : 0, // G
-      weightG     : r[7]  !== '' ? Number(r[7])  : 0, // H
-      method      : String(r[8]  || '').trim(), // I
-      receiver    : String(r[9]  || '').trim(), // J
-      phone       : String(r[10] || '').trim(), // K
-      address     : String(r[11] || '').trim(), // L
-      tracking    : String(r[12] || '').trim()  // M
-    }));
+    .map(({ r, rowNum }) => {
+      const userName = String(r[0] || '').trim();
+      const receiver = String(r[9]  || '').trim();
+      const phone    = String(r[10] || '').trim();
+      const address  = String(r[11] || '').trim();
+      const prev     = (!receiver && !phone && !address) ? (prevDelivery[userName] || null) : null;
+      return {
+        rowNum,
+        userName,
+        arrivalTag  : String(r[2]  || '').trim(), // C
+        qty         : r[3]  !== '' ? r[3]  : 0,   // D
+        codes       : String(r[4]  || '').trim(),  // E
+        mark        : String(r[5]  || '').trim(),  // F
+        postage     : r[6]  !== '' ? Number(r[6])  : 0, // G
+        weightG     : r[7]  !== '' ? Number(r[7])  : 0, // H
+        method      : String(r[8]  || '').trim(),  // I
+        receiver    : receiver || (prev ? prev.receiver : ''),
+        phone       : phone    || (prev ? prev.phone    : ''),
+        address     : address  || (prev ? prev.address  : ''),
+        tracking    : String(r[12] || '').trim(),  // M
+        prefilled   : !!prev   // 前端可用來顯示提示
+      };
+    });
 
   return { rows };
 }
