@@ -1322,7 +1322,7 @@ function getRecordData_(group) {
       };
     });
 
-  return { rows };
+  return { rows, _debug_prevDelivery: prevDelivery };
 }
 
 // ─────────────────────────────────────────────
