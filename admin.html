@@ -1363,7 +1363,7 @@ async function loadRecordCards(group){
     if(d.error){el.innerHTML='<div class="empty">❌ '+d.error+'</div>';return;}
     const rows=d.rows||[];
     if(!rows.length){el.innerHTML='<div class="empty">Record 暫無此團資料，請先匯出</div>';return;}
-    el.innerHTML='<pre style="font-size:10px;background:#f5f5f5;padding:8px;border-radius:6px;overflow:auto;white-space:pre-wrap;">DEBUG:\narrTag='+d._arrTag+'\nprevCount='+d._prevCount+'\ndebugPrev='+JSON.stringify(d._debugPrev,null,2)+'\nsample='+JSON.stringify(d._sample,null,2)+'</pre>'+rows.map(r=>renderRecordCard(r,group)).join('');
+    el.innerHTML=rows.map(r=>renderRecordCard(r,group)).join('');
   }catch(e){el.innerHTML='<div class="empty">❌ 載入失敗：'+e.message+'</div>';}
 }
 
