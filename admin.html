@@ -661,9 +661,27 @@ function doLogin(){
 }
 
 async function callAdmin(){
+  // 有 cache 就即刻顯示，背景再刷新
+  const cached=localStorage.getItem('adminItemsCache');
+  if(cached){
+    try{
+      const c=JSON.parse(cached);
+      localStorage.setItem('adminPassword',pw);
+      processItems(c);
+      document.getElementById('loginWrap').style.display='none';
+      document.getElementById('adminUI').style.display='block';
+      igLoadTemplateFromSheet();
+      // 背景靜默更新
+      post({action:'getAdminItems',password:pw}).then(d=>{
+        if(!d.error){localStorage.setItem('adminItemsCache',JSON.stringify(d));processItems(d);}
+      }).catch(()=>{});
+      return;
+    }catch(e){localStorage.removeItem('adminItemsCache');}
+  }
   const d=await post({action:'getAdminItems',password:pw});
   if(d.error)throw new Error(d.error);
   localStorage.setItem('adminPassword',pw);
+  localStorage.setItem('adminItemsCache',JSON.stringify(d));
   processItems(d);
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('adminUI').style.display='block';
