@@ -1322,7 +1322,10 @@ function getRecordData_(group) {
       };
     });
 
-  return { rows };
+  const debugPrev = data.filter(r => String(r[2]||'').trim() !== arrTag).slice(-5).map(r => ({
+    a: String(r[0]||''), c: String(r[2]||''), j: String(r[9]||''), k: String(r[10]||''), l: String(r[11]||'')
+  }));
+  return { rows, _arrTag: arrTag, _prevCount: Object.keys(prevDelivery).length, _debugPrev: debugPrev, _sample: rows.slice(0,2).map(r=>({userName:r.userName,receiver:r.receiver,phone:r.phone})) };
 }
 
 // ─────────────────────────────────────────────
