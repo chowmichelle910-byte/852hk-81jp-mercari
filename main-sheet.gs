@@ -1807,7 +1807,14 @@ function exportArrivalData(group) {
   const recordLastRow = recordSheet.getLastRow();
   recordSheet.getRange(recordLastRow + 1, 1, output.length, output[0].length).setValues(output);
 
-  return `已匯出 ${output.length} 筆到貨資料到 Record（${arrivalTitle}）`;
+  // debug: 顯示匹配情況
+  const userNames = [...custMap.keys()];
+  const deliveryHits   = userNames.filter(n => deliveryMap.has(n)).length;
+  const recordHits     = userNames.filter(n => !deliveryMap.has(n) && recordDeliveryMap.has(n)).length;
+  const sampleKeys     = userNames.slice(0, 3).join(', ');
+  console.log(`exportArrival debug: userNames=${JSON.stringify(userNames)}, deliveryMapKeys=${JSON.stringify([...deliveryMap.keys()].slice(0,5))}, recordDeliveryMapKeys=${JSON.stringify([...recordDeliveryMap.keys()].slice(0,5))}`);
+
+  return `已匯出 ${output.length} 筆到貨資料到 Record（${arrivalTitle}）\n[debug] 收件資料命中=${deliveryHits}, Record命中=${recordHits}, 客人keys範例: ${sampleKeys}`;
 }
 
 // ─────────────────────────────────────────────
