@@ -1780,13 +1780,7 @@ function exportArrivalData(group) {
   const recordLastRow = recordSheet.getLastRow();
   recordSheet.getRange(recordLastRow + 1, 1, output.length, output[0].length).setValues(output);
 
-  const userNames = [...custMap.keys()];
-  const firstName = userNames[0] || '';
-  const rSample   = recordDeliveryMap.get(firstName) || null;
-  const recordKeys = [...recordDeliveryMap.keys()].slice(0, 3).join(' / ');
-  const custKeys   = userNames.slice(0, 3).join(' / ');
-
-  return `已匯出 ${output.length} 筆 (${arrivalTitle}) | Record欄A前3=${recordKeys} | 訂單前3=${custKeys} | 首筆命中=${JSON.stringify(rSample)}`;
+  return `已匯出 ${output.length} 筆到貨資料到 Record（${arrivalTitle}）`;
 }
 
 // ─────────────────────────────────────────────
