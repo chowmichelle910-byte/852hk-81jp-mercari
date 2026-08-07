@@ -1661,8 +1661,6 @@ function exportArrivalData(group) {
   const ss              = SpreadsheetApp.getActiveSpreadsheet();
   const orderSheet      = ss.getSheetByName('訂單');
   const recordSheet     = ss.getSheetByName('Record');
-  const deliverySheet   = ss.getSheetByName('收件資料');
-
   const arrivalTitle    = String(group).trim() + '到貨';
 
   // ── 讀取「訂單」分頁 ──
@@ -1680,31 +1678,6 @@ function exportArrivalData(group) {
     return `找不到「${group}」的訂單，請確認訂單分頁 A 欄已分配團次`;
   }
 
-  // ── 讀取「收件資料」分頁 ──
-  // A=0(用戶名稱前半), B=1(用戶名稱後半), C=2(第X團購買),
-  // D=3(郵寄方式), E=4(收件人), F=5(電話), G=6(地址)
-  const deliveryData = (deliverySheet && deliverySheet.getLastRow() >= 2)
-    ? deliverySheet.getRange(2, 1, deliverySheet.getLastRow() - 1, 7).getValues()
-    : [];
-
-  // 建立查找表：key = "A--B"（用戶名稱），value = 最後一筆收件資料
-  // 由底部開始計算，所以先反轉再建 Map（後面相同 key 唔會覆蓋前面，即保留最底部）
-  const deliveryMap = new Map();
-  for (let i = deliveryData.length - 1; i >= 0; i--) {
-    const row     = deliveryData[i];
-    const partA   = String(row[0] || '').trim();
-    const partB   = String(row[1] || '').trim();
-    if (!partA && !partB) continue;
-    const key     = partA && partB ? `${partA}--${partB}` : partA || partB;
-    if (!deliveryMap.has(key)) {
-      deliveryMap.set(key, {
-        method   : String(row[3] || '').trim(), // D: 郵寄方式
-        receiver : String(row[4] || '').trim(), // E: 收件人
-        phone    : String(row[5] || '').trim(), // F: 電話
-        address  : String(row[6] || '').trim()  // G: 地址
-      });
-    }
-  }
 
   // ── 按用戶名稱整合訂單 ──
   // 用戶名稱格式：C欄--D欄（例如 IG--abc）
@@ -1777,13 +1750,12 @@ function exportArrivalData(group) {
     const postage   = parseFloat((d.totalPostage < 4.5 ? 4.5 : d.totalPostage).toFixed(1));
     const weightG   = Math.round(d.totalWeightKg * 1000); // KG → g
 
-    // 從「收件資料」搵最新收件資訊，如無則從 Record fallback（per-field）
-    const dDel  = deliveryMap.get(userName)       || {};
-    const rDel  = recordDeliveryMap.get(userName) || {};
-    const method    = dDel.method   || rDel.method   || '';
-    const receiver  = dDel.receiver || rDel.receiver || '';
-    const phone     = dDel.phone    || rDel.phone    || '';
-    const address   = dDel.address  || rDel.address  || '';
+    // 從 Record 歷史行取得收件資料
+    const rDel      = recordDeliveryMap.get(userName) || {};
+    const method    = rDel.method   || '';
+    const receiver  = rDel.receiver || '';
+    const phone     = rDel.phone    || '';
+    const address   = rDel.address  || '';
 
     output.push([
       userName,      // A: 用戶名稱
@@ -1811,12 +1783,10 @@ function exportArrivalData(group) {
   // debug: 顯示第一筆客人的實際取值
   const userNames = [...custMap.keys()];
   const firstName = userNames[0] || '';
-  const dSample   = deliveryMap.get(firstName)       || null;
   const rSample   = recordDeliveryMap.get(firstName) || null;
   const outSample = output[0] ? `I=${output[0][8]}, J=${output[0][9]}, K=${output[0][10]}, L=${output[0][11]}` : '';
-  const recordMapSize = recordDeliveryMap.size;
 
-  return `已匯出 ${output.length} 筆到貨資料到 Record（${arrivalTitle}）\n[debug] 客人="${firstName}"\n收件資料=${JSON.stringify(dSample)}\nRecord=${JSON.stringify(rSample)}\n寫入值: ${outSample}\nRecord歷史筆數=${recordMapSize}`;
+  return `已匯出 ${output.length} 筆到貨資料到 Record（${arrivalTitle}）\n[debug] 客人="${firstName}"\nRecord歷史=${JSON.stringify(rSample)}\n寫入值: ${outSample}\nRecord歷史總筆數=${recordDeliveryMap.size}`;
 }
 
 // ─────────────────────────────────────────────
