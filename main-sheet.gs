@@ -1777,12 +1777,13 @@ function exportArrivalData(group) {
     const postage   = parseFloat((d.totalPostage < 4.5 ? 4.5 : d.totalPostage).toFixed(1));
     const weightG   = Math.round(d.totalWeightKg * 1000); // KG → g
 
-    // 從「收件資料」搵最新收件資訊，如無則從 Record fallback
-    const delivery  = deliveryMap.get(userName) || recordDeliveryMap.get(userName) || {};
-    const method    = delivery.method   || '';
-    const receiver  = delivery.receiver || '';
-    const phone     = delivery.phone    || '';
-    const address   = delivery.address  || '';
+    // 從「收件資料」搵最新收件資訊，如無則從 Record fallback（per-field）
+    const dDel  = deliveryMap.get(userName)       || {};
+    const rDel  = recordDeliveryMap.get(userName) || {};
+    const method    = dDel.method   || rDel.method   || '';
+    const receiver  = dDel.receiver || rDel.receiver || '';
+    const phone     = dDel.phone    || rDel.phone    || '';
+    const address   = dDel.address  || rDel.address  || '';
 
     output.push([
       userName,      // A: 用戶名稱
