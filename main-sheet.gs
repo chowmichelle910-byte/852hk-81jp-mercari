@@ -1783,10 +1783,10 @@ function exportArrivalData(group) {
   const userNames = [...custMap.keys()];
   const firstName = userNames[0] || '';
   const rSample   = recordDeliveryMap.get(firstName) || null;
-  const outSample = output[0] ? `I=${output[0][8]||'空'} J=${output[0][9]||'空'} K=${output[0][10]||'空'} L=${output[0][11]||'空'}` : '';
-  console.log(`[exportArrival] recordDeliveryMap size=${recordDeliveryMap.size}, keys=${JSON.stringify([...recordDeliveryMap.keys()].slice(0,5))}, firstName="${firstName}", rSample=${JSON.stringify(rSample)}, out=${outSample}`);
+  const recordKeys = [...recordDeliveryMap.keys()].slice(0, 3).join(' / ');
+  const custKeys   = userNames.slice(0, 3).join(' / ');
 
-  return `已匯出 ${output.length} 筆 (${arrivalTitle}) | hist=${recordDeliveryMap.size} | 首筆=${JSON.stringify(rSample)} | 寫入: ${outSample}`;
+  return `已匯出 ${output.length} 筆 (${arrivalTitle}) | Record欄A前3=${recordKeys} | 訂單前3=${custKeys} | 首筆命中=${JSON.stringify(rSample)}`;
 }
 
 // ─────────────────────────────────────────────
