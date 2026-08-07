@@ -1736,26 +1736,23 @@ function exportArrivalData(group) {
     : [];
   const recordDeliveryMap = new Map();
   for (let i = recordData.length - 1; i >= 0; i--) {
-    const rRow     = recordData[i];
-    const rName    = String(rRow[0]  || '').trim();
+    const rRow      = recordData[i];
+    const rName     = String(rRow[0]  || '').trim();
     if (!rName) continue;
-    const rMethod   = String(rRow[8]  || '').trim(); // I
-    const rReceiver = String(rRow[9]  || '').trim(); // J
-    const rPhone    = String(rRow[10] || '').trim(); // K
-    const rAddress  = String(rRow[11] || '').trim(); // L
+    const rMethod   = String(rRow[8]  || '').trim();
+    const rReceiver = String(rRow[9]  || '').trim();
+    const rPhone    = String(rRow[10] || '').trim();
+    const rAddress  = String(rRow[11] || '').trim();
     const isHeld    = rMethod === '保留至下一團';
     if (!rMethod && !rReceiver && !rPhone && !rAddress) continue;
     if (!recordDeliveryMap.has(rName)) {
-      recordDeliveryMap.set(rName, { method: isHeld ? '' : rMethod, receiver: rReceiver, phone: rPhone, address: rAddress, _done: !isHeld });
+      recordDeliveryMap.set(rName, { method: isHeld ? '' : rMethod, receiver: rReceiver, phone: rPhone, address: rAddress });
     } else {
       const cur = recordDeliveryMap.get(rName);
-      if (cur._done) continue;
-      // 補齊空缺欄位，搵到非「保留至下一團」就定案
-      if (!cur.method   && !isHeld) cur.method   = rMethod;
-      if (!cur.receiver)            cur.receiver  = rReceiver;
-      if (!cur.phone)               cur.phone     = rPhone;
-      if (!cur.address)             cur.address   = rAddress;
-      if (!isHeld)                  cur._done     = true;
+      if (!cur.method   && !isHeld && rMethod)   cur.method   = rMethod;
+      if (!cur.receiver && rReceiver)             cur.receiver = rReceiver;
+      if (!cur.phone    && rPhone)                cur.phone    = rPhone;
+      if (!cur.address  && rAddress)              cur.address  = rAddress;
     }
   }
 
