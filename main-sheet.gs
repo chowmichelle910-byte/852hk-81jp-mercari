@@ -1780,13 +1780,13 @@ function exportArrivalData(group) {
   const recordLastRow = recordSheet.getLastRow();
   recordSheet.getRange(recordLastRow + 1, 1, output.length, output[0].length).setValues(output);
 
-  // debug: 顯示第一筆客人的實際取值
   const userNames = [...custMap.keys()];
   const firstName = userNames[0] || '';
   const rSample   = recordDeliveryMap.get(firstName) || null;
-  const outSample = output[0] ? `I=${output[0][8]}, J=${output[0][9]}, K=${output[0][10]}, L=${output[0][11]}` : '';
+  const outSample = output[0] ? `I=${output[0][8]||'空'} J=${output[0][9]||'空'} K=${output[0][10]||'空'} L=${output[0][11]||'空'}` : '';
+  console.log(`[exportArrival] recordDeliveryMap size=${recordDeliveryMap.size}, keys=${JSON.stringify([...recordDeliveryMap.keys()].slice(0,5))}, firstName="${firstName}", rSample=${JSON.stringify(rSample)}, out=${outSample}`);
 
-  return `已匯出 ${output.length} 筆到貨資料到 Record（${arrivalTitle}）\n[debug] 客人="${firstName}"\nRecord歷史=${JSON.stringify(rSample)}\n寫入值: ${outSample}\nRecord歷史總筆數=${recordDeliveryMap.size}`;
+  return `已匯出 ${output.length} 筆 (${arrivalTitle}) | hist=${recordDeliveryMap.size} | 首筆=${JSON.stringify(rSample)} | 寫入: ${outSample}`;
 }
 
 // ─────────────────────────────────────────────
