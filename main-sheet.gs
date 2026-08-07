@@ -1808,14 +1808,15 @@ function exportArrivalData(group) {
   const recordLastRow = recordSheet.getLastRow();
   recordSheet.getRange(recordLastRow + 1, 1, output.length, output[0].length).setValues(output);
 
-  // debug: 顯示匹配情況
+  // debug: 顯示第一筆客人的實際取值
   const userNames = [...custMap.keys()];
-  const deliveryHits   = userNames.filter(n => deliveryMap.has(n)).length;
-  const recordHits     = userNames.filter(n => !deliveryMap.has(n) && recordDeliveryMap.has(n)).length;
-  const sampleKeys     = userNames.slice(0, 3).join(', ');
-  console.log(`exportArrival debug: userNames=${JSON.stringify(userNames)}, deliveryMapKeys=${JSON.stringify([...deliveryMap.keys()].slice(0,5))}, recordDeliveryMapKeys=${JSON.stringify([...recordDeliveryMap.keys()].slice(0,5))}`);
+  const firstName = userNames[0] || '';
+  const dSample   = deliveryMap.get(firstName)       || null;
+  const rSample   = recordDeliveryMap.get(firstName) || null;
+  const outSample = output[0] ? `I=${output[0][8]}, J=${output[0][9]}, K=${output[0][10]}, L=${output[0][11]}` : '';
+  const recordMapSize = recordDeliveryMap.size;
 
-  return `已匯出 ${output.length} 筆到貨資料到 Record（${arrivalTitle}）\n[debug] 收件資料命中=${deliveryHits}, Record命中=${recordHits}, 客人keys範例: ${sampleKeys}`;
+  return `已匯出 ${output.length} 筆到貨資料到 Record（${arrivalTitle}）\n[debug] 客人="${firstName}"\n收件資料=${JSON.stringify(dSample)}\nRecord=${JSON.stringify(rSample)}\n寫入值: ${outSample}\nRecord歷史筆數=${recordMapSize}`;
 }
 
 // ─────────────────────────────────────────────
