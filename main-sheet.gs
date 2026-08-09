@@ -2129,69 +2129,165 @@ function processMercariShopsEmails() {
   try { checkNewOrdersAndNotify(); }               catch(e) { console.error(e); }
 }
 
+// ─────────────────────────────────────────────
+//  統一 Gmail 處理（1次搜尋涵蓋全部類型，節省 quota）
+//  建議 trigger：每 5 分鐘執行一次
+// ─────────────────────────────────────────────
 function updateOrdersFromGmail() {
-  try { processTrackingNumberEmails(); }  catch(e) { console.error('processTrackingNumberEmails ❌:', e); }
-  try { processBuyerInfoEmails(); }       catch(e) { console.error('processBuyerInfoEmails ❌:', e); }
-  try { processMercariShopsEmails(); }    catch(e) { console.error('processMercariShopsEmails ❌:', e); }
-  [{name:"populateArrivals",fn:populateArrivals},{name:"updateChineseNamesByKeyword",fn:updateChineseNamesByKeyword}].forEach(task=>{
-    try{task.fn();console.log(task.name+" ✅");}catch(e){console.error(task.name+" ❌:",e);}
-  });
-  try { checkNewOrdersAndNotify(); } catch(e) { console.error('checkNewOrdersAndNotify ❌:', e); }
-}
+  const LABEL_MERCARI       = 'Processed-Mercari';
+  const LABEL_SHOPS         = 'Processed-MercariShops';
 
-function processTrackingNumberEmails() {
-  const threads=GmailApp.search('subject:"メルカリ送り状番号" newer_than:7d');
-  if(!threads.length)return;
-  const ss=SpreadsheetApp.getActiveSpreadsheet(),orderSheet=ss.getSheetByName('訂單');
-  const data=orderSheet.getDataRange().getValues();if(data.length<2)return;
-  const header=data[0],linkCol=header.indexOf('Link'),trackingCol=header.indexOf('Photo/送り状番号');
-  if(linkCol===-1||trackingCol===-1)return;
-  threads.forEach(thread=>{
-    let updated=false;
-    thread.getMessages().forEach(msg=>{
-      const body=msg.getPlainBody(),idMatch=body.match(/m\d{11}/),trackingMatch=body.match(/\b\d{12}\b/);
-      if(!idMatch||!trackingMatch)return;
-      const linkToFind=`https://jp.mercari.com/item/${idMatch[0].trim()}`;
-      for(let r=1;r<data.length;r++){
-        if(String(data[r][linkCol]).trim()===linkToFind){
-          if(String(data[r][trackingCol]).trim()!=='')break;
-          orderSheet.getRange(r+1,trackingCol+1).setValue(`送り状番号：${trackingMatch[0].trim()}`);
-          updated=true;break;
-        }
-      }
-    });
-    if(updated)thread.moveToArchive();
-  });
-}
+  // ── 1 次 search 涵蓋全部類型 ──
+  const q = `label:inbox -label:${LABEL_MERCARI} -label:${LABEL_SHOPS} newer_than:14d ` +
+    `(subject:"【メルカリ】ご購入ありがとうございます" OR ` +
+    `from:no-reply@mercari-shops.com OR ` +
+    `subject:"ご注文ありがとうございます" OR ` +
+    `subject:"メルカリ送り状番号" OR ` +
+    `subject:"メルカリ購入者")`;
 
-function processBuyerInfoEmails() {
-  const threads=GmailApp.search('subject:"メルカリ購入者" newer_than:7d');
-  if(!threads.length)return;
-  const ss=SpreadsheetApp.getActiveSpreadsheet(),orderSheet=ss.getSheetByName('訂單');
-  const data=orderSheet.getDataRange().getValues();if(data.length<2)return;
-  const linkCol=data[0].indexOf('Link');if(linkCol===-1)return;
-  threads.forEach(thread=>{
-    let updated=false;
-    thread.getMessages().forEach(msg=>{
-      const body=msg.getPlainBody(),idMatches=[...body.matchAll(/m\d{11}/g)];
-      if(!idMatches.length)return;
-      let platform='';
-      if(/IG/i.test(body))platform='IG';else if(/Whatsapp/i.test(body))platform='Whatsapp';else if(/Carousell/i.test(body))platform='Carousell';
-      const buyerMatch=body.match(/購入者：\s*(.+)/),buyerName=buyerMatch?buyerMatch[1].trim():'';
-      idMatches.forEach(match=>{
-        const linkToFind=`https://jp.mercari.com/item/${match[0]}`;
-        for(let r=1;r<data.length;r++){
-          if(String(data[r][linkCol]).trim()===linkToFind){
-            if(platform&&String(data[r][2]).trim()==='')orderSheet.getRange(r+1,3).setValue(platform);
-            if(buyerName&&String(data[r][3]).trim()==='')orderSheet.getRange(r+1,4).setValue(buyerName);
-            updated=true;break;
+  const threads = GmailApp.search(q);
+  if (!threads.length) {
+    try { checkNewOrdersAndNotify(); } catch(e) { console.error(e); }
+    return;
+  }
+
+  const ss         = SpreadsheetApp.getActiveSpreadsheet();
+  const orderSheet = ss.getSheetByName('訂單');
+  const data       = orderSheet.getDataRange().getValues();
+  const header     = data[0];
+  const linkCol    = header.indexOf('Link');
+  const trackCol   = header.indexOf('Photo/送り状番号');
+
+  // 預載現有 F 欄 URLs（避免重複寫入）
+  const lastRow      = orderSheet.getLastRow();
+  const existingUrls = lastRow >= 2
+    ? orderSheet.getRange('F2:F' + lastRow).getValues().flat().map(v => String(v).trim())
+    : [];
+
+  const labelMercari = GmailApp.createLabel(LABEL_MERCARI);
+  const labelShops   = GmailApp.createLabel(LABEL_SHOPS);
+
+  let anyNewOrder = false;
+
+  for (const thread of threads) {
+    let labeledMercari = false;
+    let labeledShops   = false;
+    let archiveThread  = false;
+
+    for (const msg of thread.getMessages()) {
+      const subj      = msg.getSubject() || '';
+      const plainBody = msg.getPlainBody() || '';
+      const dateStr   = Utilities.formatDate(msg.getDate(), Session.getScriptTimeZone(), 'yyyy/MM/dd');
+
+      // ── 類型 A：Mercari 普通訂單 ──
+      if (subj === '【メルカリ】ご購入ありがとうございます') {
+        const idMatch    = plainBody.match(/商品ID\s*:\s*(m\d+)/);
+        const nameMatch  = plainBody.match(/商品名\s*:\s*(.+)/);
+        const priceMatch = plainBody.match(/商品代金\s*:\s*￥([\d,]+)/);
+        if (idMatch && nameMatch && priceMatch) {
+          const itemUrl = 'https://jp.mercari.com/item/' + idMatch[1];
+          if (!existingUrls.includes(itemUrl)) {
+            const nextRow = orderSheet.getLastRow() + 1;
+            orderSheet.getRange(nextRow, 2).setValue(dateStr);
+            orderSheet.getRange(nextRow, 5).setValue('Mercari');
+            orderSheet.getRange(nextRow, 6).setValue(itemUrl);
+            orderSheet.getRange(nextRow, 7).setValue(nameMatch[1].trim());
+            orderSheet.getRange(nextRow, 8).setValue(priceMatch[1].replace(/,/g, ''));
+            existingUrls.push(itemUrl);
+            anyNewOrder = true;
           }
         }
-      });
-    });
-    if(updated)thread.moveToArchive();
-  });
-  updateUniqueRecipients();
+        labeledMercari = true;
+      }
+
+      // ── 類型 B：Mercari Shops 訂單 ──
+      else if (
+        plainBody.includes('ご注文ありがとうございます') ||
+        subj.includes('ご注文ありがとうございます')
+      ) {
+        const orderMatch = plainBody.match(/https?:\/\/mercari-shops\.com\/orders\/([A-Za-z0-9]+)/);
+        const nameMatch  = plainBody.match(/商品名\s*[：:]\s*(.+)/);
+        if (orderMatch && nameMatch) {
+          const orderUrl = 'https://mercari-shops.com/orders/' + orderMatch[1];
+          if (!existingUrls.includes(orderUrl)) {
+            const pm = plainBody.match(/商品価格\s*[：:]\s*[¥￥]([\d,]+)/) ||
+                       plainBody.match(/商品代金\s*[：:]\s*[¥￥]([\d,]+)/) ||
+                       plainBody.match(/注文金額合計\s*[：:]\s*[¥￥]([\d,]+)/);
+            const price = pm ? pm[1].replace(/,/g, '') : '';
+            const nextRow = orderSheet.getLastRow() + 1;
+            orderSheet.getRange(nextRow, 2).setValue(dateStr);
+            orderSheet.getRange(nextRow, 5).setValue('Mercari');
+            orderSheet.getRange(nextRow, 6).setValue(orderUrl);
+            orderSheet.getRange(nextRow, 7).setValue(nameMatch[1].trim());
+            if (price) orderSheet.getRange(nextRow, 8).setValue(price);
+            existingUrls.push(orderUrl);
+            anyNewOrder = true;
+            console.log('Mercari Shops 新增：' + nameMatch[1].trim());
+          }
+        }
+        labeledShops = true;
+      }
+
+      // ── 類型 C：送り状番号 ──
+      else if (subj.includes('メルカリ送り状番号')) {
+        if (linkCol !== -1 && trackCol !== -1) {
+          const idMatch       = plainBody.match(/m\d{11}/);
+          const trackingMatch = plainBody.match(/\b\d{12}\b/);
+          if (idMatch && trackingMatch) {
+            const linkToFind = 'https://jp.mercari.com/item/' + idMatch[0].trim();
+            for (let r = 1; r < data.length; r++) {
+              if (String(data[r][linkCol]).trim() === linkToFind) {
+                if (String(data[r][trackCol]).trim() === '') {
+                  orderSheet.getRange(r + 1, trackCol + 1).setValue('送り状番号：' + trackingMatch[0].trim());
+                }
+                break;
+              }
+            }
+          }
+        }
+        archiveThread = true;
+      }
+
+      // ── 類型 D：購入者情報 ──
+      else if (subj.includes('メルカリ購入者')) {
+        if (linkCol !== -1) {
+          const idMatches  = [...plainBody.matchAll(/m\d{11}/g)];
+          let platform = '';
+          if (/IG/i.test(plainBody)) platform = 'IG';
+          else if (/Whatsapp/i.test(plainBody)) platform = 'Whatsapp';
+          else if (/Carousell/i.test(plainBody)) platform = 'Carousell';
+          const buyerMatch = plainBody.match(/購入者：\s*(.+)/);
+          const buyerName  = buyerMatch ? buyerMatch[1].trim() : '';
+          idMatches.forEach(match => {
+            const linkToFind = 'https://jp.mercari.com/item/' + match[0];
+            for (let r = 1; r < data.length; r++) {
+              if (String(data[r][linkCol]).trim() === linkToFind) {
+                if (platform && String(data[r][2]).trim() === '') orderSheet.getRange(r + 1, 3).setValue(platform);
+                if (buyerName && String(data[r][3]).trim() === '') orderSheet.getRange(r + 1, 4).setValue(buyerName);
+                break;
+              }
+            }
+          });
+        }
+        archiveThread = true;
+      }
+    }
+
+    if (labeledMercari) thread.addLabel(labelMercari);
+    if (labeledShops)   thread.addLabel(labelShops);
+    if (archiveThread)  thread.moveToArchive();
+  }
+
+  // ── 後處理 ──
+  if (anyNewOrder) {
+    try { assignGroupByOrderDate(); }               catch(e) { console.error(e); }
+    try { populateArrivals(); }                      catch(e) { console.error(e); }
+    try { updateSerialNumberInColO(); }              catch(e) { console.error(e); }
+    try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) { console.error(e); }
+    try { updateChineseNamesByKeyword(); }           catch(e) { console.error(e); }
+  }
+  try { updateUniqueRecipients(); }  catch(e) { console.error(e); }
+  try { checkNewOrdersAndNotify(); } catch(e) { console.error(e); }
 }
 
 function updateChineseNamesByKeyword() {
