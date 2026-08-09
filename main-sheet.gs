@@ -2019,7 +2019,7 @@ function logMercariOrders() {
       if(message.getSubject()!=="【メルカリ】ご購入ありがとうございます")continue;
       const body=message.getPlainBody();
       const dateReceived=Utilities.formatDate(message.getDate(),Session.getScriptTimeZone(),"yyyy/MM/dd");
-      const itemIdMatch=body.match(/商品ID\s*:\s*(m\d+)/),itemNameMatch=body.match(/商品名\s*:\s*(.+)/),itemPriceMatch=body.match(/商品代金\s*:\s*￥([\d,]+)/);
+      const itemIdMatch=body.match(/商品ID\s*[：:]\s*(m\d+)/),itemNameMatch=body.match(/商品名\s*[：:]\s*(.+)/),itemPriceMatch=body.match(/商品代金\s*[：:]\s*[¥￥]([\d,]+)/);
       if(!itemIdMatch||!itemNameMatch||!itemPriceMatch)continue;
       const itemUrl="https://jp.mercari.com/item/"+itemIdMatch[1];
       const existingUrls=sheet.getRange("F2:F"+sheet.getLastRow()).getValues().flat();
@@ -2181,9 +2181,9 @@ function updateOrdersFromGmail() {
 
       // ── 類型 A：Mercari 普通訂單 ──
       if (subj === '【メルカリ】ご購入ありがとうございます') {
-        const idMatch    = plainBody.match(/商品ID\s*:\s*(m\d+)/);
-        const nameMatch  = plainBody.match(/商品名\s*:\s*(.+)/);
-        const priceMatch = plainBody.match(/商品代金\s*:\s*￥([\d,]+)/);
+        const idMatch    = plainBody.match(/商品ID\s*[：:]\s*(m\d+)/);
+        const nameMatch  = plainBody.match(/商品名\s*[：:]\s*(.+)/);
+        const priceMatch = plainBody.match(/商品代金\s*[：:]\s*[¥￥]([\d,]+)/);
         if (idMatch && nameMatch && priceMatch) {
           const itemUrl = 'https://jp.mercari.com/item/' + idMatch[1];
           if (!existingUrls.includes(itemUrl)) {
