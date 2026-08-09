@@ -2129,11 +2129,11 @@ function processMercariShopsEmails() {
   try { checkNewOrdersAndNotify(); }               catch(e) { console.error(e); }
 }
 
-// 找 column B 最後一個有內容的行，避免 data validation 空行影響
+// 找 column F（Link）最後一個有內容的行，避免 data validation 空行影響
 function getNextOrderRow_(sheet) {
-  const vals = sheet.getRange('B:B').getValues();
+  const vals = sheet.getRange('F:F').getValues();
   for (let i = vals.length - 1; i >= 0; i--) {
-    if (vals[i][0] !== '') return i + 2; // +1 for 0-index, +1 for next row
+    if (vals[i][0] !== '') return i + 2;
   }
   return 2;
 }
