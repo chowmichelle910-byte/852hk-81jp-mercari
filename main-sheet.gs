@@ -2203,7 +2203,10 @@ function updateOrdersFromGmail() {
       // ── 類型 B：Mercari Shops 訂單 ──
       else if (
         plainBody.includes('ご注文ありがとうございます') ||
-        subj.includes('ご注文ありがとうございます')
+        plainBody.includes('ご購入ありがとうございます') ||
+        subj.includes('ご注文ありがとうございます') ||
+        subj.includes('ご購入ありがとうございます') ||
+        msg.getFrom().includes('mercari-shops.com')
       ) {
         const orderMatch = plainBody.match(/https?:\/\/mercari-shops\.com\/orders\/([A-Za-z0-9]+)/);
         const nameMatch  = plainBody.match(/商品名\s*[：:]\s*(.+)/);
