@@ -2129,9 +2129,9 @@ function processMercariShopsEmails() {
   try { checkNewOrdersAndNotify(); }               catch(e) { console.error(e); }
 }
 
-// 找 column F（Link）最後一個有內容的行，避免 data validation 空行影響
+// 找 column G（Item）最後一個有內容的行，避免函數/data validation 影響
 function getNextOrderRow_(sheet) {
-  const vals = sheet.getRange('F:F').getValues();
+  const vals = sheet.getRange('G:G').getValues();
   for (let i = vals.length - 1; i >= 0; i--) {
     if (vals[i][0] !== '') return i + 2;
   }
