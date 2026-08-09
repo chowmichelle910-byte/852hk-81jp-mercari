@@ -2130,9 +2130,9 @@ function processMercariShopsEmails() {
 }
 
 function updateOrdersFromGmail() {
-  processTrackingNumberEmails();
-  processBuyerInfoEmails();
-  processMercariShopsEmails();
+  try { processTrackingNumberEmails(); }  catch(e) { console.error('processTrackingNumberEmails ❌:', e); }
+  try { processBuyerInfoEmails(); }       catch(e) { console.error('processBuyerInfoEmails ❌:', e); }
+  try { processMercariShopsEmails(); }    catch(e) { console.error('processMercariShopsEmails ❌:', e); }
   [{name:"populateArrivals",fn:populateArrivals},{name:"updateChineseNamesByKeyword",fn:updateChineseNamesByKeyword}].forEach(task=>{
     try{task.fn();console.log(task.name+" ✅");}catch(e){console.error(task.name+" ❌:",e);}
   });
