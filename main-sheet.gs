@@ -2024,7 +2024,7 @@ function logMercariOrders() {
       const itemUrl="https://jp.mercari.com/item/"+itemIdMatch[1];
       const existingUrls=sheet.getRange("F2:F"+sheet.getLastRow()).getValues().flat();
       if(existingUrls.includes(itemUrl))continue;
-      const nextRow=sheet.getRange("B:B").getValues().filter(r=>r[0]).length+1;
+      const nextRow=getNextOrderRow_(sheet);
       sheet.getRange(nextRow,2).setValue(dateReceived);sheet.getRange(nextRow,5).setValue("Mercari");
       sheet.getRange(nextRow,6).setValue(itemUrl);sheet.getRange(nextRow,7).setValue(itemNameMatch[1].trim());
       sheet.getRange(nextRow,8).setValue(itemPriceMatch[1].replace(/,/g,""));
@@ -2106,7 +2106,7 @@ function processMercariShopsEmails() {
       );
 
       // 5. 寫入訂單分頁
-      const nextRow = sheet.getRange("B:B").getValues().filter(r => r[0]).length + 1;
+      const nextRow = getNextOrderRow_(sheet);
       sheet.getRange(nextRow, 2).setValue(dateReceived);
       sheet.getRange(nextRow, 5).setValue("Mercari");
       sheet.getRange(nextRow, 6).setValue(orderUrl);
@@ -2127,6 +2127,15 @@ function processMercariShopsEmails() {
   try { updateSerialNumberInColO(); }              catch(e) { console.error(e); }
   try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) { console.error(e); }
   try { checkNewOrdersAndNotify(); }               catch(e) { console.error(e); }
+}
+
+// 找 column B 最後一個有內容的行，避免 data validation 空行影響
+function getNextOrderRow_(sheet) {
+  const vals = sheet.getRange('B:B').getValues();
+  for (let i = vals.length - 1; i >= 0; i--) {
+    if (vals[i][0] !== '') return i + 2; // +1 for 0-index, +1 for next row
+  }
+  return 2;
 }
 
 // ─────────────────────────────────────────────
@@ -2187,7 +2196,7 @@ function updateOrdersFromGmail() {
         if (idMatch && nameMatch && priceMatch) {
           const itemUrl = 'https://jp.mercari.com/item/' + idMatch[1];
           if (!existingUrls.includes(itemUrl)) {
-            const nextRow = orderSheet.getLastRow() + 1;
+            const nextRow = getNextOrderRow_(orderSheet);
             orderSheet.getRange(nextRow, 2).setValue(dateStr);
             orderSheet.getRange(nextRow, 5).setValue('Mercari');
             orderSheet.getRange(nextRow, 6).setValue(itemUrl);
@@ -2217,7 +2226,7 @@ function updateOrdersFromGmail() {
                        plainBody.match(/商品代金\s*[：:]\s*[¥￥]([\d,]+)/) ||
                        plainBody.match(/注文金額合計\s*[：:]\s*[¥￥]([\d,]+)/);
             const price = pm ? pm[1].replace(/,/g, '') : '';
-            const nextRow = orderSheet.getLastRow() + 1;
+            const nextRow = getNextOrderRow_(orderSheet);
             orderSheet.getRange(nextRow, 2).setValue(dateStr);
             orderSheet.getRange(nextRow, 5).setValue('Mercari');
             orderSheet.getRange(nextRow, 6).setValue(orderUrl);
