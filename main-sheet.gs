@@ -2304,30 +2304,6 @@ function updateChineseNamesByKeyword() {
   orderSheet.getRange("AB2:AB"+lastRow).setValues(output);
 }
 
-function emailBuyerSheetDaily() {
-  const ss=SpreadsheetApp.getActiveSpreadsheet();
-  const buyerSheet=ss.getSheetByName("Buyer"),arrivalSheet=ss.getSheetByName("到貨");
-  const emailTo=Session.getActiveUser().getEmail();
-  let buyerData=[],lastRow=buyerSheet.getLastRow();
-  if(lastRow>=2){const values=buyerSheet.getRange(1,5,lastRow,3).getDisplayValues();values.forEach((row,i)=>{if(i===0)buyerData.push(row);else if(row[0]&&row[1]&&row[2])buyerData.push(row);});}
-  let arrivalData=[],missingIDList=[],arrivalLastRow=arrivalSheet.getLastRow();
-  if(arrivalLastRow>=2){
-    const arrRange=arrivalSheet.getRange(1,2,arrivalLastRow,7).getDisplayValues();
-    arrRange.slice(1).forEach(row=>{
-      const[position,itemId,,link,item,,code]=row;
-      if(link&&item&&code)arrivalData.push({link,item,code});
-      if((!position||!itemId)&&link&&link.includes("https://jp.mercari.com/item/")){const match=link.match(/item\/([a-zA-Z0-9]+)/);if(match)missingIDList.push({id:match[1],link});}
-    });
-  }
-  if(buyerData.length<=1&&!arrivalData.length&&!missingIDList.length){MailApp.sendEmail({to:emailTo,subject:"每日 Buyer + 到貨 分頁資料",body:"目前沒有符合條件的資料。"});return;}
-  let html="<h2>每日 Buyer + 到貨 分頁資料</h2>";
-  if(buyerData.length>1){html+="<h3>Buyer 分頁資料</h3><table border='1' cellspacing='0' cellpadding='5' style='border-collapse:collapse;'>";buyerData.forEach((row,i)=>{html+="<tr>"+row.map(cell=>i===0?`<th style='background:#f2f2f2;'>${cell}</th>`:`<td>${cell||""}</td>`).join('')+"</tr>";});html+="</table>";}
-  else html+="<h3>Buyer 分頁資料</h3><p>沒有符合條件的 Buyer 資料。</p>";
-  if(arrivalData.length){html+="<br><h3>到貨分頁資料</h3><table border='1' cellspacing='0' cellpadding='5' style='border-collapse:collapse;'><tr><th style='background:#f2f2f2;'>Code</th><th style='background:#f2f2f2;'>Link</th><th style='background:#f2f2f2;'>Item</th></tr>";arrivalData.forEach(obj=>{html+=`<tr><td>${obj.code}</td><td><a href='${obj.link}' target='_blank'>${obj.link}</a></td><td>${obj.item}</td></tr>`;});html+="</table>";}
-  if(missingIDList.length){html+="<br><br>";missingIDList.forEach(obj=>{html+=obj.link+"<br>商品ID："+obj.id+"<br><br>購入者：<br><br>";});}
-  MailApp.sendEmail({to:emailTo,subject:"每日 Buyer + 到貨 分頁資料 ("+Utilities.formatDate(new Date(),"Asia/Taipei","yyyy-MM-dd")+")",htmlBody:html});
-}
-
 // ─────────────────────────────────────────────
 //  Public Sheet 同步（每 10 分鐘）
 // ─────────────────────────────────────────────
