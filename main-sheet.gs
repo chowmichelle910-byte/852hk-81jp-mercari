@@ -1280,7 +1280,9 @@ function getRecordData_(group) {
   const arrTag = String(group).trim() + '到貨';
 
   // 建立每個 userName 最近一次有收件資料的 map（排除當前團）
+  // 同時記錄最近一次「保留至下一團」係哪一團
   const prevDelivery = {};
+  const prevHeldGroup = {}; // userName -> 保留嗰團的團號標籤
   for (let i = data.length - 1; i >= 0; i--) {
     const tag      = String(data[i][2] || '').trim();
     if (tag === arrTag) continue;
@@ -1296,6 +1298,8 @@ function getRecordData_(group) {
     if (method === '保留至下一團') {
       // 暫存 receiver/phone/address，method 留空，繼續向上搵
       if (!prevDelivery[userName]) prevDelivery[userName] = { receiver, phone, address, method: '', _final: false };
+      // 記錄係哪一團保留
+      if (!prevHeldGroup[userName]) prevHeldGroup[userName] = tag.replace('到貨', '');
     } else {
       // 找到真實收件方式，定案
       prevDelivery[userName] = { receiver, phone, address, method, _final: true };
@@ -1325,7 +1329,8 @@ function getRecordData_(group) {
         receiver    : receiver  || (prev ? prev.receiver : ''),
         phone       : phone     || (prev ? prev.phone    : ''),
         address     : address   || (prev ? prev.address  : ''),
-        tracking    : String(r[12] || '').trim()  // M
+        tracking    : String(r[12] || '').trim(),  // M
+        heldGroup   : prevHeldGroup[userName] || null  // 上一團係「保留至下一團」嘅話，記錄係哪一團
       };
     });
 
