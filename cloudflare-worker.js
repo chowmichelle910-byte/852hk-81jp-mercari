@@ -40,9 +40,20 @@ function custKeyboard(ids, rowNum, pos, offset) {
 }
 
 // ─── 主邏輯 ─────────────────────────────────────
+const SPAM_KEYWORDS = ['БОТЫ', 'ПРОБИВА', 'ФИО', 'Госномеру', 'VIN', 'пробив', 'пробить', 't.me/'];
+
 async function handleUpdate(update) {
-  // ── 文字訊息 ──
+  // ── 垃圾訊息自動刪除 ──
   const msg = update.message;
+  if (msg && msg.text) {
+    const isSpam = SPAM_KEYWORDS.some(kw => msg.text.includes(kw));
+    if (isSpam) {
+      await tg('deleteMessage', { chat_id: String(msg.chat.id), message_id: msg.message_id });
+      return;
+    }
+  }
+
+  // ── 文字訊息 ──
   if (msg && msg.text) {
     const chatId = String(msg.chat.id);
     const text   = msg.text.trim();
