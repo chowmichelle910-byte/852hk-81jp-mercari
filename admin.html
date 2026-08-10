@@ -1425,7 +1425,7 @@ function buildMsg(r, arrTag, receiptUrl){
   const postage = r.postage != null ? Number(r.postage).toFixed(1) : '—';
   const trk     = r.tracking || '（未提供）';
   const weightG = Number(r.weightG) || 0;
-  const urlLine = receiptUrl ? ('\n到貨資料: ' + receiptUrl + '\n\n') : '\n到貨資料: \n\n';
+  const urlLine = receiptUrl ? ('到貨資料: ' + receiptUrl) : '到貨資料: ';
 
   if(method.includes('易寄取')){
     let local = 10;
@@ -1436,9 +1436,10 @@ function buildMsg(r, arrTag, receiptUrl){
     }
     const total = (parseFloat(postage) + local).toFixed(1);
     return `客人你好, ${arrTag}嘅貨品已運往香港途中~
-    ${urlLine}
-    請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
-及易寄取郵費HK$${local}, 共HK$${total}🙏🏻
+
+${urlLine}
+
+請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}及易寄取郵費HK$${local}, 共HK$${total}🙏🏻
 
 如果收件資料冇更改，我哋會用以下運單編號寄出：
 ${trk}
@@ -1447,8 +1448,10 @@ ${trk}
   }
   else if(method.toUpperCase().includes('SF')){
     return `客人你好, ${arrTag}嘅貨品已運往香港途中~
-    ${urlLine}
-    請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
+
+${urlLine}
+
+請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
 香港運費部分會由順豐收取
 
 如果收件資料冇更改，我哋會用以下運單編號寄出：
@@ -1458,17 +1461,20 @@ ${trk}
   }
   else if(method.includes('平郵')){
     return `客人你好, ${arrTag}嘅貨品已運往香港途中~
-    ${urlLine}
-    請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
-🙏🏻
+
+${urlLine}
+
+請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}🙏🏻
 香港平郵郵費部分會於寄出後提供寄出證明時收取
 
 謝謝!`;
   }
   else{
     return `客人你好, ${arrTag}嘅貨品已運往香港途中~
-    ${urlLine}
-    請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
+
+${urlLine}
+
+請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
 
 謝謝!`;
   }
@@ -1501,7 +1507,8 @@ async function copyMsg(rowNum){
   if(urlRow && !msg.includes(urlRow.href)){
     const url = urlRow.href;
     msg = msg.replace('到貨資料: \n', `到貨資料: ${url}\n`)
-             .replace('途中~\n請', `途中~\n到貨資料: ${url}\n請`);
+             .replace('到貨資料: \r\n', `到貨資料: ${url}\r\n`)
+             .replace(/到貨資料: (?!\S)/, `到貨資料: ${url}`);
   }
 
   navigator.clipboard.writeText(msg).then(()=>{
@@ -1642,11 +1649,7 @@ function showReceiptUrl(userName, url){
         let msg=msgEl.value;
         if(!msg.includes(url)){
           // 如果訊息有到貨資料行就補入URL，否則插入到第一行後
-          if(msg.includes('到貨資料: \n')){
-            msg=msg.replace('到貨資料: \n',`到貨資料: ${url}\n`);
-          } else {
-            msg=msg.replace('途中~\n','途中~\n到貨資料: '+url+'\n');
-          }
+          msg=msg.replace(/到貨資料: (?!\S)/,`到貨資料: ${url}`);
           msgEl.value=msg;
         }
       }
