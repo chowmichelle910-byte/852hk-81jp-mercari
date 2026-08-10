@@ -38,8 +38,7 @@
   }
 
   try{
-    const proxyUrl = '/api/proxy?src=' + encodeURIComponent(src);
-    const res = await fetch(proxyUrl, { cache: 'no-store' });
+    const res = await fetch(src, { cache: 'no-store' });
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const html = await res.text();
 

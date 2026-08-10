@@ -1283,7 +1283,8 @@ async function generateShipPage(){
     if(!res.ok)throw new Error('上傳失敗 '+res.status+': '+await res.text());
     const publicUrl=`${SB_URL}/storage/v1/object/public/receipts/${filename}`;
     const VIEWER_BASE='https://852hk-81jp-mercari.vercel.app/viewer.html';
-    const viewerUrl=`${VIEWER_BASE}?src=${encodeURIComponent(publicUrl)}`;
+    const proxySrc=`https://852hk-81jp-mercari.vercel.app/api/proxy?src=${encodeURIComponent(publicUrl)}`;
+    const viewerUrl=`${VIEWER_BASE}?src=${encodeURIComponent(proxySrc)}`;
     const a=document.getElementById('shipPageUrl');
     a.href=viewerUrl; a.textContent='🔗 '+viewerUrl;
     document.getElementById('shipUrlRow').style.display='flex';
@@ -1599,8 +1600,9 @@ async function showReceipt(userName, group){
     const publicUrl = `${SB_URL}/storage/v1/object/public/receipts/${filename}`;
 
     // 6. 顯示 URL + 複製
-    const VIEWER_BASE = 'https://852hk-81jp-mercari.vercel.app/viewer.html'; // 改成你實際網域
-const viewerUrl = `${VIEWER_BASE}?src=${encodeURIComponent(publicUrl)}`;
+    const VIEWER_BASE = 'https://852hk-81jp-mercari.vercel.app/viewer.html';
+    const proxySrc = `https://852hk-81jp-mercari.vercel.app/api/proxy?src=${encodeURIComponent(publicUrl)}`;
+    const viewerUrl = `${VIEWER_BASE}?src=${encodeURIComponent(proxySrc)}`;
 showReceiptUrl(userName, viewerUrl);
 
   }catch(e){
