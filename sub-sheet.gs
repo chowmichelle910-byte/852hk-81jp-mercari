@@ -270,6 +270,17 @@ function assignGroupByArrivalDateRemote(ss) {
   if (hasNewUnrated) sendUnratedNotification_();
 }
 
+// 定時觸發函數：每日自動檢查有冇未評價商品，有就發 TG 通知
+function dailyUnratedCheck() {
+  const ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+  const sh = ss.getSheetByName(MAIN_ORDER_SHEET);
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return;
+  const values = sh.getRange(2, 29, lastRow - 1, 1).getValues();
+  const hasUnrated = values.some(r => r[0] === '未評價');
+  if (hasUnrated) sendUnratedNotification_();
+}
+
 function sendUnratedNotification_() {
   const props = PropertiesService.getScriptProperties();
   const today = Utilities.formatDate(new Date(), 'Asia/Hong_Kong', 'yyyy-MM-dd');
