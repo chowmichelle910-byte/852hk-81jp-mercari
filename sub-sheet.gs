@@ -228,6 +228,7 @@ function saveArrivalData_(row, imageUrl, weight, arrivalDate, position, custId, 
     const finalDate = arrivalDate || shipDate;
     if (finalDate && finalDate.trim() !== "") sh.getRange(row, MAIN_DATE_COL).setValue(finalDate);
     if (status !== undefined) sh.getRange(row, 29).setValue(status);
+    SpreadsheetApp.flush();
     assignGroupByArrivalDateRemote(ss);
     return json({ success: true });
   } catch(e) { return json({ error: e.toString() }); }
@@ -262,8 +263,8 @@ function assignGroupByArrivalDateRemote(ss) {
           }
         }
       }
-      if (status === "未評價") hasNewUnrated = true;
     }
+    if (status === "未評價") hasNewUnrated = true;
     results.push([groupId]);
   }
   orderSheet.getRange(2, 1, results.length, 1).setValues(results);
