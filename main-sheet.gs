@@ -931,8 +931,6 @@ function addChargeRecord_(date, jpy, hkd, place) {
 
   try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) { Logger.log('重算匯率失敗: ' + e); }
 
-  checkChargeBalanceAndNotify_();
-
   return { success: true };
 }
 
@@ -1895,6 +1893,8 @@ function updateOrdersCurrencyAndChargeWeighted() {
     const cellI=chargeSheet.getRange(i+1,chargeBalanceCol+1);
     if(accBuy===balance){cellI.clearContent();cellI.setBackground("#eeeeee");}else{cellI.setValue(balance);cellI.setFontColor(balance<0?'red':'black');cellI.setBackground(null);}
   }
+
+  checkChargeBalanceAndNotify_();
 }
 
 // ─────────────────────────────────────────────
