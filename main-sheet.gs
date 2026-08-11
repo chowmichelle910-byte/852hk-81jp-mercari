@@ -165,6 +165,23 @@ function handleTelegramUpdate_(update) {
     if (!text.startsWith('/')) {
       const props   = PropertiesService.getScriptProperties();
 
+      // 発送 送り状番号 輸入
+      const shipState = props.getProperty('tg_ship_state') || '';
+      if (shipState.startsWith('wait_track:')) {
+        const rowNum = parseInt(shipState.split(':')[1]);
+        props.deleteProperty('tg_ship_state');
+        if (!isNaN(rowNum) && rowNum >= 2) {
+          const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+          const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+          const trackCol = header.indexOf('Photo/送り状番号') + 1;
+          if (trackCol > 0) {
+            sheet.getRange(rowNum, trackCol).setValue('送り状番号：' + text);
+            tgSend_(`✅ 已記錄\n送り状番号：${text}`, null, fromChatId);
+          }
+        }
+        return;
+      }
+
       // チャージ 充值：等待 JPY
       if (props.getProperty('tg_charge_state') === 'wait_jpy') {
         const jpy = parseFloat(text.replace(/[^\d.]/g, ''));
@@ -349,6 +366,23 @@ function handleTelegramUpdate_(update) {
     tgAnswer_(cb.id, '好的');
     tgEdit_(msgId, cb.message.text + '\n\n❌ 跳過');
     PropertiesService.getScriptProperties().deleteProperty('tg_charge_state');
+
+  } else if (action === 'shipped_futsuu') {
+    const rowNum = parseInt(parts[1]);
+    tgAnswer_(cb.id, '');
+    if (!isNaN(rowNum) && rowNum >= 2) {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+      const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const trackCol = header.indexOf('Photo/送り状番号') + 1;
+      if (trackCol > 0) sheet.getRange(rowNum, trackCol).setValue('普通郵便');
+      tgEdit_(msgId, cb.message.text + '\n\n✅ 已記錄：普通郵便');
+    }
+
+  } else if (action === 'shipped_track') {
+    const rowNum = parseInt(parts[1]);
+    tgAnswer_(cb.id, '');
+    PropertiesService.getScriptProperties().setProperty('tg_ship_state', 'wait_track:' + rowNum);
+    tgEdit_(msgId, cb.message.text + '\n\n✏️ 請輸入送り状番号：');
   }
 }
 
@@ -2222,14 +2256,16 @@ function getNextOrderRow_(sheet) {
 function updateOrdersFromGmail() {
   const LABEL_MERCARI       = 'Processed-Mercari';
   const LABEL_SHOPS         = 'Processed-MercariShops';
+  const LABEL_SHIPPED       = 'Processed-Shipped';
 
   // ── 1 次 search 涵蓋全部類型 ──
-  const q = `label:inbox -label:${LABEL_MERCARI} -label:${LABEL_SHOPS} newer_than:14d ` +
+  const q = `label:inbox -label:${LABEL_MERCARI} -label:${LABEL_SHOPS} -label:${LABEL_SHIPPED} newer_than:14d ` +
     `(subject:"【メルカリ】ご購入ありがとうございます" OR ` +
     `from:no-reply@mercari-shops.com OR ` +
     `subject:"ご注文ありがとうございます" OR ` +
     `subject:"メルカリ送り状番号" OR ` +
-    `subject:"メルカリ購入者")`;
+    `subject:"メルカリ購入者" OR ` +
+    `subject:"が発送されました")`;
 
   const threads = GmailApp.search(q);
   if (!threads.length) {
@@ -2250,15 +2286,17 @@ function updateOrdersFromGmail() {
     ? orderSheet.getRange('F2:F' + lastRow).getValues().flat().map(v => String(v).trim())
     : [];
 
-  const labelMercari = GmailApp.createLabel(LABEL_MERCARI);
-  const labelShops   = GmailApp.createLabel(LABEL_SHOPS);
+  const labelMercari  = GmailApp.createLabel(LABEL_MERCARI);
+  const labelShops    = GmailApp.createLabel(LABEL_SHOPS);
+  const labelShipped  = GmailApp.createLabel(LABEL_SHIPPED);
 
   let anyNewOrder = false;
 
   for (const thread of threads) {
-    let labeledMercari = false;
-    let labeledShops   = false;
-    let archiveThread  = false;
+    let labeledMercari  = false;
+    let labeledShops    = false;
+    let labeledShipped  = false;
+    let archiveThread   = false;
 
     for (const msg of thread.getMessages()) {
       const subj      = msg.getSubject() || '';
@@ -2360,10 +2398,52 @@ function updateOrdersFromGmail() {
         }
         archiveThread = true;
       }
+
+      // ── 類型 E：発送されました ──
+      else if (subj.includes('が発送されました') || subj.includes('からご購入された商品が発送されました')) {
+        if (linkCol !== -1 && trackCol !== -1) {
+          // Mercari 普通：商品ID
+          const idMatch    = plainBody.match(/商品ID\s*[：: ]\s*(m\d+)/);
+          // Mercari Shops：訂單 URL
+          const shopsMatch = plainBody.match(/mercari-shops\.com\/orders\/([A-Za-z0-9]+)/);
+
+          let linkToFind = '';
+          if (idMatch) {
+            linkToFind = 'https://jp.mercari.com/item/' + idMatch[1];
+          } else if (shopsMatch) {
+            linkToFind = 'https://mercari-shops.com/orders/' + shopsMatch[1];
+          }
+
+          if (linkToFind) {
+            for (let r = 1; r < data.length; r++) {
+              if (String(data[r][linkCol]).trim() === linkToFind) {
+                const rowNum = r + 1;
+                // N欄為空才寫入
+                if (String(data[r][trackCol]).trim() === '') {
+                  orderSheet.getRange(rowNum, trackCol + 1).setValue('已發送');
+                  SpreadsheetApp.flush();
+                  // TG 詢問郵寄方式
+                  const itemName = String(data[r][6] || '').trim();
+                  tgSend_(
+                    `📦 <b>商品已發送！</b>${itemName ? '\n' + itemName : ''}\n\n請選擇郵寄方式：`,
+                    { inline_keyboard: [[
+                      { text: '📮 普通郵便', callback_data: 'shipped_futsuu:' + rowNum },
+                      { text: '📬 送り状番号', callback_data: 'shipped_track:' + rowNum }
+                    ]] }
+                  );
+                }
+                break;
+              }
+            }
+          }
+        }
+        labeledShipped = true;
+      }
     }
 
     if (labeledMercari) thread.addLabel(labelMercari);
     if (labeledShops)   thread.addLabel(labelShops);
+    if (labeledShipped) thread.addLabel(labelShipped);
     if (archiveThread)  thread.moveToArchive();
   }
 
