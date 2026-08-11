@@ -2282,7 +2282,8 @@ function updateOrdersFromGmail() {
     `subject:"ご注文ありがとうございます" OR ` +
     `subject:"メルカリ送り状番号" OR ` +
     `subject:"メルカリ購入者" OR ` +
-    `subject:"が発送されました")`;
+    `subject:"が発送されました" OR ` +
+    `from:no-reply@mercari.jp)`;
 
   const threads = GmailApp.search(q);
   if (!threads.length) {
@@ -2417,7 +2418,8 @@ function updateOrdersFromGmail() {
       }
 
       // ── 類型 E：発送されました ──
-      else if (subj.includes('が発送されました') || subj.includes('からご購入された商品が発送されました')) {
+      else if (subj.includes('が発送されました') || subj.includes('からご購入された商品が発送されました') ||
+               (msg.getFrom().includes('mercari.jp') && plainBody.includes('が発送されました'))) {
         // 從 email body 提取商品名（備用）
         const emailNameMatch = plainBody.match(/商品名\s*[：: ]\s*(.+)/);
         const emailItemName  = emailNameMatch ? emailNameMatch[1].trim() : '';
