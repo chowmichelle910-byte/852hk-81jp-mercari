@@ -223,9 +223,19 @@ function handleTelegramUpdate_(update) {
         const pos = posParts.join(':');
         props.deleteProperty('tg_pending_id');
         const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
-        sheet.getRange(parseInt(rowNum), 3).setValue(pos);
-        sheet.getRange(parseInt(rowNum), 4).setValue(text);
-        tgSend_(`✅ <b>已填入</b>\nPosition：<b>${pos}</b>\n客人 ID：<b>${text}</b>`, null, fromChatId);
+        const rn = parseInt(rowNum);
+        sheet.getRange(rn, 3).setValue(pos);
+        sheet.getRange(rn, 4).setValue(text);
+        const rowData2 = sheet.getRange(rn, 1, 1, 15).getValues()[0];
+        const code2    = String(rowData2[14] || '').trim();
+        const link2    = String(rowData2[5]  || '').trim();
+        tgSend_(
+          `✅ <b>已填入</b>` +
+          (code2 ? `\nCode: ${code2}` : '') +
+          (link2 ? `\n${link2}` : '') +
+          `\nPosition：<b>${pos}</b>\n客人 ID：<b>${text}</b>`,
+          null, fromChatId
+        );
         return;
       }
     }
@@ -348,9 +358,16 @@ function handleTelegramUpdate_(update) {
     sheet.getRange(rowNum, 3).setValue(pos);
     sheet.getRange(rowNum, 4).setValue(selId);
 
+    const rowData = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
+    const code    = String(rowData[14] || '').trim(); // O
+    const link    = String(rowData[5]  || '').trim(); // F
+
     tgAnswer_(cb.id, '✅ 已填入！');
     tgEdit_(msgId,
-      `✅ <b>已填入</b>\nPosition：<b>${pos}</b>\n客人 ID：<b>${selId}</b>`
+      `✅ <b>已填入</b>` +
+      (code ? `\nCode: ${code}` : '') +
+      (link ? `\n${link}` : '') +
+      `\nPosition：<b>${pos}</b>\n客人 ID：<b>${selId}</b>`
     );
 
   } else if (action === 'skip') {
