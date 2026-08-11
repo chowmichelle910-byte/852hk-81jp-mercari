@@ -2418,41 +2418,51 @@ function updateOrdersFromGmail() {
 
       // ── 類型 E：発送されました ──
       else if (subj.includes('が発送されました') || subj.includes('からご購入された商品が発送されました')) {
-        if (linkCol !== -1 && trackCol !== -1) {
-          // Mercari 普通：商品ID
-          const idMatch    = plainBody.match(/商品ID\s*[：: ]\s*(m\d+)/);
-          // Mercari Shops：訂單 URL
-          const shopsMatch = plainBody.match(/mercari-shops\.com\/orders\/([A-Za-z0-9]+)/);
+        // 從 email body 提取商品名（備用）
+        const emailNameMatch = plainBody.match(/商品名\s*[：: ]\s*(.+)/);
+        const emailItemName  = emailNameMatch ? emailNameMatch[1].trim() : '';
 
-          let linkToFind = '';
-          if (idMatch) {
-            linkToFind = 'https://jp.mercari.com/item/' + idMatch[1];
-          } else if (shopsMatch) {
-            linkToFind = 'https://mercari-shops.com/orders/' + shopsMatch[1];
-          }
+        // Mercari 普通：商品ID
+        const idMatch    = plainBody.match(/商品ID\s*[：: ]\s*(m\d+)/);
+        // Mercari Shops：訂單 URL
+        const shopsMatch = plainBody.match(/mercari-shops\.com\/orders\/([A-Za-z0-9]+)/);
 
-          if (linkToFind) {
-            for (let r = 1; r < data.length; r++) {
-              if (String(data[r][linkCol]).trim() === linkToFind) {
-                const rowNum = r + 1;
-                // N欄為空才寫入
-                if (String(data[r][trackCol]).trim() === '') {
-                  orderSheet.getRange(rowNum, trackCol + 1).setValue('已發送');
-                  SpreadsheetApp.flush();
-                  // TG 詢問郵寄方式
-                  const itemName = String(data[r][6] || '').trim();
-                  tgSend_(
-                    `📦 <b>商品已發送！</b>${itemName ? '\n' + itemName : ''}\n\n請選擇郵寄方式：`,
-                    { inline_keyboard: [[
-                      { text: '📮 普通郵便', callback_data: 'shipped_futsuu:' + rowNum },
-                      { text: '📬 送り状番号', callback_data: 'shipped_track:' + rowNum }
-                    ]] }
-                  );
-                }
-                break;
+        let linkToFind = '';
+        if (idMatch) {
+          linkToFind = 'https://jp.mercari.com/item/' + idMatch[1];
+        } else if (shopsMatch) {
+          linkToFind = 'https://mercari-shops.com/orders/' + shopsMatch[1];
+        }
+
+        if (linkToFind && linkCol !== -1 && trackCol !== -1) {
+          let found = false;
+          for (let r = 1; r < data.length; r++) {
+            if (String(data[r][linkCol]).trim() === linkToFind) {
+              found = true;
+              const rowNum   = r + 1;
+              const itemName = String(data[r][6] || '').trim() || emailItemName;
+              // N欄為空才寫入 + 發 TG
+              if (String(data[r][trackCol]).trim() === '') {
+                orderSheet.getRange(rowNum, trackCol + 1).setValue('已發送');
+                SpreadsheetApp.flush();
+                tgSend_(
+                  `📦 <b>商品已發送！</b>${itemName ? '\n' + itemName : ''}\n${linkToFind}\n\n請選擇郵寄方式：`,
+                  { inline_keyboard: [[
+                    { text: '📮 普通郵便', callback_data: 'shipped_futsuu:' + rowNum },
+                    { text: '📬 送り状番号', callback_data: 'shipped_track:' + rowNum }
+                  ]] }
+                );
               }
+              break;
             }
           }
+          // 訂單表找不到此商品 → 仍然通知
+          if (!found) {
+            tgSend_(`📦 <b>商品已發送（未在訂單表）</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkToFind}`);
+          }
+        } else if (linkToFind) {
+          // 找不到欄位，但至少通知
+          tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkToFind}`);
         }
         labeledShipped = true;
       }
