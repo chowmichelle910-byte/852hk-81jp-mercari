@@ -161,9 +161,45 @@ function handleTelegramUpdate_(update) {
     const fromChatId = msg.chat && msg.chat.id ? String(msg.chat.id) : TG_CHAT_ID;
     const text = String(msg.text || '').trim();
 
-    // 處理手動輸入客人 ID（pending state）
+    // 處理手動輸入客人 ID 或 チャージ 充值金額（pending state）
     if (!text.startsWith('/')) {
       const props   = PropertiesService.getScriptProperties();
+
+      // チャージ 充值：等待 JPY
+      if (props.getProperty('tg_charge_state') === 'wait_jpy') {
+        const jpy = parseFloat(text.replace(/[^\d.]/g, ''));
+        if (isNaN(jpy) || jpy <= 0) {
+          tgSend_('請輸入有效嘅日圓金額（例如：50000）', null, fromChatId);
+          return;
+        }
+        props.setProperty('tg_charge_jpy', String(jpy));
+        props.setProperty('tg_charge_state', 'wait_hkd');
+        tgSend_(`JPY：¥${jpy.toLocaleString()}\n\n請輸入港幣金額（HKD）：`, null, fromChatId);
+        return;
+      }
+
+      // チャージ 充值：等待 HKD
+      if (props.getProperty('tg_charge_state') === 'wait_hkd') {
+        const hkd = parseFloat(text.replace(/[^\d.]/g, ''));
+        if (isNaN(hkd) || hkd <= 0) {
+          tgSend_('請輸入有效嘅港幣金額（例如：2500）', null, fromChatId);
+          return;
+        }
+        const jpy = parseFloat(props.getProperty('tg_charge_jpy') || '0');
+        props.deleteProperty('tg_charge_state');
+        props.deleteProperty('tg_charge_jpy');
+
+        const today = Utilities.formatDate(new Date(), 'Asia/Hong_Kong', 'yyyy/M/d');
+        try {
+          addChargeRecord_(today, jpy, hkd, null);
+          tgSend_(`✅ <b>充值記錄已新增</b>\n\n日期：${today}\nJPY：¥${jpy.toLocaleString()}\nHKD：HK$${hkd.toLocaleString()}`, null, fromChatId);
+        } catch(e) {
+          tgSend_('❌ 新增失敗：' + e.message, null, fromChatId);
+        }
+        return;
+      }
+
+      // 訂單 ID pending state
       const pending = props.getProperty('tg_pending_id');
       if (pending) {
         const [rowNum, ...posParts] = pending.split(':');
@@ -303,6 +339,16 @@ function handleTelegramUpdate_(update) {
   } else if (action === 'skip') {
     tgAnswer_(cb.id, '已跳過');
     tgEdit_(msgId, cb.message.text + '\n\n⏭ 已跳過，請手動填入');
+
+  } else if (action === 'charge_add') {
+    tgAnswer_(cb.id, '');
+    tgEdit_(msgId, cb.message.text + '\n\n✅ 好，請輸入日圓金額（JPY）：');
+    PropertiesService.getScriptProperties().setProperty('tg_charge_state', 'wait_jpy');
+
+  } else if (action === 'charge_skip') {
+    tgAnswer_(cb.id, '好的');
+    tgEdit_(msgId, cb.message.text + '\n\n❌ 跳過');
+    PropertiesService.getScriptProperties().deleteProperty('tg_charge_state');
   }
 }
 
@@ -926,7 +972,13 @@ function addChargeRecord_(date, jpy, hkd, place) {
   chargeSheet.getRange(nextRow, 2).setNumberFormat('yyyy/m/d');
   chargeSheet.getRange(nextRow, 3).setValue(Number(jpy));
   chargeSheet.getRange(nextRow, 4).setValue(Number(hkd));
-  if (place) chargeSheet.getRange(nextRow, 6).setValue(place);
+  if (place) {
+    chargeSheet.getRange(nextRow, 6).setValue(place);
+  } else if (lastBRow >= 2) {
+    // F欄複製上一行
+    const prevF = chargeSheet.getRange(lastBRow, 6).getValue();
+    if (prevF) chargeSheet.getRange(nextRow, 6).setValue(prevF);
+  }
   SpreadsheetApp.flush();
 
   try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) { Logger.log('重算匯率失敗: ' + e); }
@@ -942,13 +994,13 @@ function checkChargeBalanceAndNotify_() {
   if (bal.error || bal.balance == null) return;
   if (bal.balance >= 10000) return;
   try {
-    const url = `https://api.telegram.org/bot${TG_TOKEN}/sendMessage`;
-    const payload = JSON.stringify({
-      chat_id: TG_CHAT_ID,
-      text: `⚠️ <b>チャージ 餘額不足</b>\n\n現時餘額：<b>¥${bal.balance.toLocaleString()}</b>\n請盡快增值！`,
-      parse_mode: 'HTML'
-    });
-    UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload, muteHttpExceptions: true });
+    tgSend_(
+      `⚠️ <b>チャージ 餘額不足</b>\n\n現時餘額：<b>¥${bal.balance.toLocaleString()}</b>\n\n要新增充值嗎？`,
+      { inline_keyboard: [[
+        { text: '✅ 係，新增充值', callback_data: 'charge_add' },
+        { text: '❌ 唔係', callback_data: 'charge_skip' }
+      ]] }
+    );
   } catch(e) { Logger.log('TG 發送失敗: ' + e); }
 }
 
