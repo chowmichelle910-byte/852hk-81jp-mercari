@@ -931,7 +931,27 @@ function addChargeRecord_(date, jpy, hkd, place) {
 
   try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) { Logger.log('重算匯率失敗: ' + e); }
 
+  checkChargeBalanceAndNotify_();
+
   return { success: true };
+}
+
+// ─────────────────────────────────────────────
+//  チャージ 餘額低於 10000 yen 時發 TG 通知
+// ─────────────────────────────────────────────
+function checkChargeBalanceAndNotify_() {
+  const bal = getChargeBalance_();
+  if (bal.error || bal.balance == null) return;
+  if (bal.balance >= 10000) return;
+  try {
+    const url = `https://api.telegram.org/bot${TG_TOKEN}/sendMessage`;
+    const payload = JSON.stringify({
+      chat_id: TG_CHAT_ID,
+      text: `⚠️ <b>チャージ 餘額不足</b>\n\n現時餘額：<b>¥${bal.balance.toLocaleString()}</b>\n請盡快增值！`,
+      parse_mode: 'HTML'
+    });
+    UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload, muteHttpExceptions: true });
+  } catch(e) { Logger.log('TG 發送失敗: ' + e); }
 }
 
 // ─────────────────────────────────────────────
