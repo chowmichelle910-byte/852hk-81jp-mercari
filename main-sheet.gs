@@ -413,7 +413,8 @@ function handleTelegramUpdate_(update) {
     const rowNum = parseInt(parts[1]);
     tgAnswer_(cb.id, '');
     PropertiesService.getScriptProperties().setProperty('tg_ship_state', 'wait_track:' + rowNum);
-    tgEdit_(msgId, '✏️ 請輸入送り状番号：', { inline_keyboard: [] });
+    tgEdit_(msgId, '📬 送り状番号を選択しました', { inline_keyboard: [] });
+    tgSend_('✏️ 請輸入送り状番号：');
   }
 }
 
