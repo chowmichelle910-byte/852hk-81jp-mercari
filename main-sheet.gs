@@ -57,6 +57,10 @@ function pollTelegramUpdates() {
   props.setProperty('tg_offset', String(nextOffset));
 }
 
+function tgEscape_(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function tgSend_(text, replyMarkup, chatId) {
   const cid = chatId || TG_CHAT_ID;
   const payload = { chat_id: cid, text: text, parse_mode: 'HTML' };
@@ -2416,25 +2420,26 @@ function updateOrdersFromGmail() {
               if (String(data[r][trackCol]).trim() === '') {
                 orderSheet.getRange(rowNum, trackCol + 1).setValue('已發送');
                 SpreadsheetApp.flush();
-                tgSend_(
-                  `📦 <b>商品已發送！</b>${itemName ? '\n' + itemName : ''}\n${linkDisplay}\n\n請選擇郵寄方式：`,
-                  { inline_keyboard: [[
-                    { text: '📮 普通郵便', callback_data: 'shipped_futsuu:' + rowNum },
-                    { text: '📬 送り状番号', callback_data: 'shipped_track:' + rowNum }
-                  ]] }
-                );
+                try {
+                  tgSend_(
+                    `📦 <b>商品已發送！</b>${itemName ? '\n' + tgEscape_(itemName) : ''}\n${linkDisplay}\n\n請選擇郵寄方式：`,
+                    { inline_keyboard: [[
+                      { text: '📮 普通郵便', callback_data: 'shipped_futsuu:' + rowNum },
+                      { text: '📬 送り状番号', callback_data: 'shipped_track:' + rowNum }
+                    ]] }
+                  );
+                } catch(tgErr) { Logger.log('tgSend_ error: ' + tgErr.message); }
               }
               break;
             }
           }
           if (!found) {
-            tgSend_(`📦 <b>商品已發送（未在訂單表）</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkDisplay}`);
+            tgSend_(`📦 <b>商品已發送（未在訂單表）</b>${emailItemName ? '\n' + tgEscape_(emailItemName) : ''}\n${linkDisplay}`);
           }
         } else if (linkToFind) {
-          tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkDisplay}`);
+          tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + tgEscape_(emailItemName) : ''}\n${linkDisplay}`);
         } else {
-          // 無法提取商品連結，仍發通知
-          tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + emailItemName : '\n（無法提取商品資料）'}`);
+          tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + tgEscape_(emailItemName) : '\n（無法提取商品資料）'}`);
         }
         labeledShipped = true;
       }
