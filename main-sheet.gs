@@ -2406,6 +2406,7 @@ function updateOrdersFromGmail() {
         } else if (shopsMatch) {
           linkToFind = 'https://mercari-shops.com/orders/' + shopsMatch[1];
         }
+        Logger.log('[TypeE] subj=' + subj + ' linkToFind=' + linkToFind + ' linkCol=' + linkCol + ' trackCol=' + trackCol);
         const linkDisplay = linkToFind.includes('jp.mercari.com/item/')
           ? linkToFind.replace('/item/', '/transaction/')
           : linkToFind;
@@ -2416,8 +2417,10 @@ function updateOrdersFromGmail() {
               found = true;
               const rowNum   = r + 1;
               const itemName = String(data[r][6] || '').trim() || emailItemName;
+              const nVal     = String(data[r][trackCol]).trim();
+              Logger.log('[TypeE] found row=' + rowNum + ' nVal="' + nVal + '"');
               // N 欄已有內容（用戶已記錄送り状番号）→ 靜默跳過
-              if (String(data[r][trackCol]).trim() === '') {
+              if (nVal === '') {
                 orderSheet.getRange(rowNum, trackCol + 1).setValue('已發送');
                 SpreadsheetApp.flush();
                 try {
@@ -2428,17 +2431,22 @@ function updateOrdersFromGmail() {
                       { text: '📬 送り状番号', callback_data: 'shipped_track:' + rowNum }
                     ]] }
                   );
-                } catch(tgErr) { Logger.log('tgSend_ error: ' + tgErr.message); }
+                } catch(tgErr) { Logger.log('[TypeE] tgSend_ error: ' + tgErr.message); }
+              } else {
+                Logger.log('[TypeE] N欄非空，靜默跳過');
               }
               break;
             }
           }
           if (!found) {
+            Logger.log('[TypeE] 未在訂單表，linkToFind=' + linkToFind);
             tgSend_(`📦 <b>商品已發送（未在訂單表）</b>${emailItemName ? '\n' + tgEscape_(emailItemName) : ''}\n${linkDisplay}`);
           }
         } else if (linkToFind) {
+          Logger.log('[TypeE] linkCol/trackCol=-1，直接發TG');
           tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + tgEscape_(emailItemName) : ''}\n${linkDisplay}`);
         } else {
+          Logger.log('[TypeE] 無linkToFind，發fallback TG');
           tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + tgEscape_(emailItemName) : '\n（無法提取商品資料）'}`);
         }
         labeledShipped = true;
