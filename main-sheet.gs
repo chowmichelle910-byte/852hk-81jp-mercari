@@ -2275,21 +2275,21 @@ function updateOrdersFromGmail() {
   const LABEL_SHOPS         = 'Processed-MercariShops';
   const LABEL_SHIPPED       = 'Processed-Shipped';
 
-  // ── 1 次 search 涵蓋全部類型 ──
+  // ── 1 次 search 涵蓋 A-D 類型（排除已處理 label）──
   const q = `label:inbox -label:${LABEL_MERCARI} -label:${LABEL_SHOPS} -label:${LABEL_SHIPPED} newer_than:14d ` +
     `(subject:"【メルカリ】ご購入ありがとうございます" OR ` +
     `from:no-reply@mercari-shops.com OR ` +
     `subject:"ご注文ありがとうございます" OR ` +
     `subject:"メルカリ送り状番号" OR ` +
-    `subject:"メルカリ購入者" OR ` +
-    `subject:"が発送されました" OR ` +
-    `from:no-reply@mercari.jp)`;
+    `subject:"メルカリ購入者")`;
 
-  const threads = GmailApp.search(q);
-  if (!threads.length) {
-    try { checkNewOrdersAndNotify(); } catch(e) { console.error(e); }
-    return;
-  }
+  // ── 発送 email 單獨搜尋（不排除 Processed-Mercari，因為同 thread 已被標籤）──
+  const qShipped = `label:inbox -label:${LABEL_SHIPPED} newer_than:14d ` +
+    `(subject:"が発送されました" OR from:no-reply@mercari.jp)`;
+
+  const seenIds  = new Set();
+  const threads  = [...GmailApp.search(q), ...GmailApp.search(qShipped)]
+    .filter(t => { if (seenIds.has(t.getId())) return false; seenIds.add(t.getId()); return true; });
 
   const ss         = SpreadsheetApp.getActiveSpreadsheet();
   const orderSheet = ss.getSheetByName('訂單');
@@ -2309,6 +2309,11 @@ function updateOrdersFromGmail() {
   const labelShipped  = GmailApp.createLabel(LABEL_SHIPPED);
 
   let anyNewOrder = false;
+
+  if (!threads.length) {
+    try { checkNewOrdersAndNotify(); } catch(e) { console.error(e); }
+    return;
+  }
 
   for (const thread of threads) {
     let labeledMercari  = false;
