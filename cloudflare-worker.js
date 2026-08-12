@@ -58,16 +58,31 @@ async function handleUpdate(update) {
     const chatId = String(msg.chat.id);
     const text   = msg.text.trim();
 
-    // 手動輸入客人 ID（回覆含 _ref:rowNum:pos_ 的訊息）
+    // 回覆訊息處理
     if (msg.reply_to_message) {
       const ref = msg.reply_to_message.text || '';
-      const m   = ref.match(/_ref:(\d+):(.+)_/);
-      if (m) {
-        const rowNum = m[1], pos = m[2], id = text;
+
+      // 手動輸入客人 ID（回覆含 _ref:rowNum:pos_ 的訊息）
+      const mRef = ref.match(/_ref:(\d+):(.+)_/);
+      if (mRef) {
+        const rowNum = mRef[1], pos = mRef[2], id = text;
         await gas({ action: 'writePositionId', row: rowNum, pos, id });
         await tg('sendMessage', {
           chat_id: chatId,
           text: `✅ <b>已填入</b>\nPosition：<b>${pos}</b>\n客人 ID：<b>${id}</b>`,
+          parse_mode: 'HTML'
+        });
+        return;
+      }
+
+      // 輸入送り状番号（回覆含 _ship:rowNum_ 的訊息）
+      const mShip = ref.match(/_ship:(\d+)_/);
+      if (mShip) {
+        const rowNum = mShip[1];
+        await gas({ action: 'writeTrackingNumber', row: rowNum, number: text });
+        await tg('sendMessage', {
+          chat_id: chatId,
+          text: `✅ <b>已記錄</b>\n送り状番号：<b>${text}</b>`,
           parse_mode: 'HTML'
         });
         return;
@@ -184,6 +199,30 @@ async function handleUpdate(update) {
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
       text: (cb.message.text || '') + '\n\n⏭ 已跳過，請手動填入'
+    });
+
+  } else if (action === 'shipped_futsuu') {
+    const rowNum = parts[1];
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    await gas({ action: 'writeShipMethod', row: rowNum, method: '普通郵便' });
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: '✅ 已記錄：普通郵便',
+      reply_markup: { inline_keyboard: [] }
+    });
+
+  } else if (action === 'shipped_track') {
+    const rowNum = parts[1];
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: '📬 送り状番号を選択しました',
+      reply_markup: { inline_keyboard: [] }
+    });
+    await tg('sendMessage', {
+      chat_id: chatId,
+      text: `✏️ 請輸入送り状番号：\n_ship:${rowNum}_`,
+      reply_markup: { force_reply: true, selective: true }
     });
 
   } else if (action === 'rated' || action === 'rated_all') {

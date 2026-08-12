@@ -711,6 +711,32 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'writeShipMethod': {
+      try {
+        const rowNum = parseInt(e.parameter.row);
+        const method = String(e.parameter.method || '').trim();
+        if (isNaN(rowNum) || rowNum < 2 || !method) return jsonResponse_({ error: 'invalid params' });
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const trackCol = header.indexOf('Photo/送り状番号') + 1;
+        if (trackCol > 0) sheet.getRange(rowNum, trackCol).setValue(method);
+        return jsonResponse_({ success: true });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
+    case 'writeTrackingNumber': {
+      try {
+        const rowNum = parseInt(e.parameter.row);
+        const number = String(e.parameter.number || '').trim();
+        if (isNaN(rowNum) || rowNum < 2 || !number) return jsonResponse_({ error: 'invalid params' });
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const trackCol = header.indexOf('Photo/送り状番号') + 1;
+        if (trackCol > 0) sheet.getRange(rowNum, trackCol).setValue('送り状番号：' + number);
+        return jsonResponse_({ success: true });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     default:
       return jsonResponse_({ error: '未知 action: ' + action });
   }
