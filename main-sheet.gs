@@ -11,6 +11,20 @@ const TG_TOKEN   = '8932041338:AAHRcNR1BNoLHU4sXdVSD2uZyQQ2PQN0ECI';
 const TG_CHAT_ID = '8392318130';
 const TG_API_URL = 'https://api.telegram.org/bot' + TG_TOKEN;
 
+// 執行一次：設定 webhook（令 TG 按鈕即時回應）
+// 步驟：1. 部署 GAS 為 Web App（執行者=我，存取=任何人）
+//       2. 在 GAS 編輯器執行 setWebhook() 一次
+function setWebhook() {
+  const url = ScriptApp.getService().getUrl();
+  const res = UrlFetchApp.fetch(TG_API_URL + '/setWebhook', {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify({ url: url, drop_pending_updates: true }),
+    muteHttpExceptions: true
+  });
+  Logger.log('setWebhook → ' + url);
+  Logger.log(res.getContentText());
+}
+
 // 執行一次：清除 webhook，改用 polling 模式
 function deleteWebhookAndUsePoll() {
   const res = UrlFetchApp.fetch(TG_API_URL + '/deleteWebhook', {
