@@ -2404,6 +2404,9 @@ function updateOrdersFromGmail() {
           }
         } else if (linkToFind) {
           tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkDisplay}`);
+        } else {
+          // 無法提取商品連結，仍發通知
+          tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + emailItemName : '\n（無法提取商品資料）'}`);
         }
         labeledShipped = true;
       }
