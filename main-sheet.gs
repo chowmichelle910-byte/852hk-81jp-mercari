@@ -406,14 +406,14 @@ function handleTelegramUpdate_(update) {
       const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       const trackCol = header.indexOf('Photo/送り状番号') + 1;
       if (trackCol > 0) sheet.getRange(rowNum, trackCol).setValue('普通郵便');
-      tgEdit_(msgId, cb.message.text + '\n\n✅ 已記錄：普通郵便');
+      tgEdit_(msgId, '✅ 已記錄：普通郵便', { inline_keyboard: [] });
     }
 
   } else if (action === 'shipped_track') {
     const rowNum = parseInt(parts[1]);
     tgAnswer_(cb.id, '');
     PropertiesService.getScriptProperties().setProperty('tg_ship_state', 'wait_track:' + rowNum);
-    tgEdit_(msgId, cb.message.text + '\n\n✏️ 請輸入送り状番号：');
+    tgEdit_(msgId, '✏️ 請輸入送り状番号：', { inline_keyboard: [] });
   }
 }
 
@@ -2297,9 +2297,8 @@ function updateOrdersFromGmail() {
     `subject:"メルカリ送り状番号" OR ` +
     `subject:"メルカリ購入者")`;
 
-  // ── 発送 email 單獨搜尋（不排除 Processed-Mercari，因為同 thread 已被標籤）──
-  const qShipped = `label:inbox -label:${LABEL_SHIPPED} newer_than:14d ` +
-    `(subject:"が発送されました" OR from:no-reply@mercari.jp)`;
+  // ── 発送 email：不加 label:inbox，因 Gmail filter 可能已 archive；只排 Processed-Shipped ──
+  const qShipped = `-label:${LABEL_SHIPPED} newer_than:14d from:no-reply@mercari.jp`;
 
   const seenIds  = new Set();
   const threads  = [...GmailApp.search(q), ...GmailApp.search(qShipped)]
