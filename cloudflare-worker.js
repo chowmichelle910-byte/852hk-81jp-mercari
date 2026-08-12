@@ -63,13 +63,19 @@ async function handleUpdate(update) {
       const ref = msg.reply_to_message.text || '';
 
       // 手動輸入客人 ID（回覆含 _ref:rowNum:pos_ 的訊息）
-      const mRef = ref.match(/_ref:(\d+):(.+)_/);
+      const mRef = ref.match(/_ref:(\d+):(.+?)_/);
       if (mRef) {
-        const rowNum = mRef[1], pos = mRef[2], id = text;
+        const rowNum  = mRef[1], pos = mRef[2], id = text;
+        const mCode   = ref.match(/_code:(.+?)_/);
+        const mUrl    = ref.match(/_url:(https?:\/\/\S+?)_/);
+        const refCode = mCode ? mCode[1] : '';
+        const refUrl  = mUrl  ? mUrl[1]  : '';
         await gas({ action: 'writePositionId', row: rowNum, pos, id });
         await tg('sendMessage', {
           chat_id: chatId,
-          text: `✅ <b>已填入</b>\nPosition：<b>${pos}</b>\n客人 ID：<b>${id}</b>`,
+          text: `✅${refCode ? ' <b>' + refCode + '</b>' : ''} 已填入` +
+                (refUrl ? `\n${refUrl}` : '') +
+                `\nPosition：<b>${pos}</b>\n客人 ID：<b>${id}</b>`,
           parse_mode: 'HTML'
         });
         return;
@@ -178,19 +184,33 @@ async function handleUpdate(update) {
     const selId  = parts.slice(3).join(':');
     await gas({ action: 'writePositionId', row: rowNum, pos, id: selId });
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已填入！' });
+    const origText = cb.message.text || '';
+    const codeMatch = origText.match(/待填訂單\s+(\S+)/);
+    const code      = codeMatch ? codeMatch[1] : '';
+    const urlMatch  = origText.match(/🔗\s*(https?:\/\/\S+)/);
+    const itemUrl   = urlMatch ? urlMatch[1] : '';
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
-      text: `✅ <b>已填入</b>\nPosition：<b>${pos}</b>\n客人 ID：<b>${selId}</b>`,
+      text: `✅${code ? ' <b>' + code + '</b>' : ''} 已填入` +
+            (itemUrl ? `\n${itemUrl}` : '') +
+            `\nPosition：<b>${pos}</b>\n客人 ID：<b>${selId}</b>`,
       parse_mode: 'HTML'
     });
 
   } else if (action === 'new_id') {
-    const rowNum = parts[1];
-    const pos    = parts.slice(2).join(':');
+    const rowNum    = parts[1];
+    const pos       = parts.slice(2).join(':');
+    const origText2 = cb.message.text || '';
+    const cm        = origText2.match(/待填訂單\s+(\S+)/);
+    const refCode   = cm ? cm[1] : '';
+    const um        = origText2.match(/🔗\s*(https?:\/\/\S+)/);
+    const refUrl    = um ? um[1] : '';
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
     await tg('sendMessage', {
       chat_id: chatId,
-      text: `✏️ 請輸入客人 ID：\n_ref:${rowNum}:${pos}_`,
+      text: `✏️ 請輸入客人 ID：\n_ref:${rowNum}:${pos}_` +
+            (refCode ? `\n_code:${refCode}_` : '') +
+            (refUrl  ? `\n_url:${refUrl}_`  : ''),
       reply_markup: { force_reply: true, selective: true }
     });
 
