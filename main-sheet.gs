@@ -2374,7 +2374,7 @@ function updateOrdersFromGmail() {
           linkToFind = 'https://mercari-shops.com/orders/' + shopsMatch[1];
         }
         const linkDisplay = linkToFind.includes('jp.mercari.com/item/')
-          ? `<a href="${linkToFind}">${linkToFind.replace('/item/', '/transaction/')}</a>`
+          ? linkToFind.replace('/item/', '/transaction/')
           : linkToFind;
         // email 本身已有送り状番号 → 直接記錄，不問
         const emailTrackMatch = plainBody.match(/\b(\d{12})\b/);
