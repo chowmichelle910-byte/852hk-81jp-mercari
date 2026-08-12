@@ -2436,6 +2436,11 @@ function updateOrdersFromGmail() {
           linkToFind = 'https://mercari-shops.com/orders/' + shopsMatch[1];
         }
 
+        // jp.mercari.com/item/ → 顯示 transaction URL，但 href 保留 item URL
+        const linkDisplay = linkToFind.includes('jp.mercari.com/item/')
+          ? `<a href="${linkToFind}">${linkToFind.replace('/item/', '/transaction/')}</a>`
+          : linkToFind;
+
         if (linkToFind && linkCol !== -1 && trackCol !== -1) {
           let found = false;
           for (let r = 1; r < data.length; r++) {
@@ -2448,7 +2453,7 @@ function updateOrdersFromGmail() {
                 orderSheet.getRange(rowNum, trackCol + 1).setValue('已發送');
                 SpreadsheetApp.flush();
                 tgSend_(
-                  `📦 <b>商品已發送！</b>${itemName ? '\n' + itemName : ''}\n${linkToFind}\n\n請選擇郵寄方式：`,
+                  `📦 <b>商品已發送！</b>${itemName ? '\n' + itemName : ''}\n${linkDisplay}\n\n請選擇郵寄方式：`,
                   { inline_keyboard: [[
                     { text: '📮 普通郵便', callback_data: 'shipped_futsuu:' + rowNum },
                     { text: '📬 送り状番号', callback_data: 'shipped_track:' + rowNum }
@@ -2460,11 +2465,11 @@ function updateOrdersFromGmail() {
           }
           // 訂單表找不到此商品 → 仍然通知
           if (!found) {
-            tgSend_(`📦 <b>商品已發送（未在訂單表）</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkToFind}`);
+            tgSend_(`📦 <b>商品已發送（未在訂單表）</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkDisplay}`);
           }
         } else if (linkToFind) {
           // 找不到欄位，但至少通知
-          tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkToFind}`);
+          tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkDisplay}`);
         }
         labeledShipped = true;
       }
