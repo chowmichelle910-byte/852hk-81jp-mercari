@@ -15,7 +15,9 @@ const TG_API_URL = 'https://api.telegram.org/bot' + TG_TOKEN;
 // 步驟：1. 部署 GAS 為 Web App（執行者=我，存取=任何人）
 //       2. 在 GAS 編輯器執行 setWebhook() 一次
 function setWebhook() {
-  const url = ScriptApp.getService().getUrl();
+  // getUrl() from editor returns /dev (auth-required); force /exec for public webhook
+  const rawUrl = ScriptApp.getService().getUrl();
+  const url = rawUrl.replace(/\/dev$/, '/exec');
   const res = UrlFetchApp.fetch(TG_API_URL + '/setWebhook', {
     method: 'post', contentType: 'application/json',
     payload: JSON.stringify({ url: url, drop_pending_updates: true }),
