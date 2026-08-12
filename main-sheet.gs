@@ -2376,6 +2376,10 @@ function updateOrdersFromGmail() {
         const linkDisplay = linkToFind.includes('jp.mercari.com/item/')
           ? `<a href="${linkToFind}">${linkToFind.replace('/item/', '/transaction/')}</a>`
           : linkToFind;
+        // email 本身已有送り状番号 → 直接記錄，不問
+        const emailTrackMatch = plainBody.match(/\b(\d{12})\b/);
+        const emailTrackNo    = emailTrackMatch ? emailTrackMatch[1] : '';
+
         if (linkToFind && linkCol !== -1 && trackCol !== -1) {
           let found = false;
           for (let r = 1; r < data.length; r++) {
@@ -2384,24 +2388,32 @@ function updateOrdersFromGmail() {
               const rowNum   = r + 1;
               const itemName = String(data[r][6] || '').trim() || emailItemName;
               if (String(data[r][trackCol]).trim() === '') {
-                orderSheet.getRange(rowNum, trackCol + 1).setValue('已發送');
-                SpreadsheetApp.flush();
-                tgSend_(
-                  `📦 <b>商品已發送！</b>${itemName ? '\n' + itemName : ''}\n${linkDisplay}\n\n請選擇郵寄方式：`,
-                  { inline_keyboard: [[
-                    { text: '📮 普通郵便', callback_data: 'shipped_futsuu:' + rowNum },
-                    { text: '📬 送り状番号', callback_data: 'shipped_track:' + rowNum }
-                  ]] }
-                );
+                if (emailTrackNo) {
+                  // 有追蹤號碼 → 靜默記錄，只發簡短通知
+                  orderSheet.getRange(rowNum, trackCol + 1).setValue('送り状番号：' + emailTrackNo);
+                  SpreadsheetApp.flush();
+                  tgSend_(`📦 <b>商品已發送</b>${itemName ? '\n' + itemName : ''}\n${linkDisplay}\n送り状番号：${emailTrackNo}`);
+                } else {
+                  // 沒追蹤號碼 → 問郵寄方式
+                  orderSheet.getRange(rowNum, trackCol + 1).setValue('已發送');
+                  SpreadsheetApp.flush();
+                  tgSend_(
+                    `📦 <b>商品已發送！</b>${itemName ? '\n' + itemName : ''}\n${linkDisplay}\n\n請選擇郵寄方式：`,
+                    { inline_keyboard: [[
+                      { text: '📮 普通郵便', callback_data: 'shipped_futsuu:' + rowNum },
+                      { text: '📬 送り状番号', callback_data: 'shipped_track:' + rowNum }
+                    ]] }
+                  );
+                }
               }
               break;
             }
           }
           if (!found) {
-            tgSend_(`📦 <b>商品已發送（未在訂單表）</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkDisplay}`);
+            tgSend_(`📦 <b>商品已發送（未在訂單表）</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkDisplay}${emailTrackNo ? '\n送り状番号：' + emailTrackNo : ''}`);
           }
         } else if (linkToFind) {
-          tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkDisplay}`);
+          tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + emailItemName : ''}\n${linkDisplay}${emailTrackNo ? '\n送り状番号：' + emailTrackNo : ''}`);
         }
         labeledShipped = true;
       }
