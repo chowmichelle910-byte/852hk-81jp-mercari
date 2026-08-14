@@ -150,6 +150,27 @@ function checkNewOrdersAndNotify() {
     );
     props.setProperty('tg_r' + rowNum, '1');
   }
+
+  // ── 待評價通知：Q欄有重量 + AC欄「未評價」→ 即時通知 ──
+  const data29 = sheet.getRange(2, 1, lastRow - 1, 29).getValues();
+  for (let i = 0; i < data29.length; i++) {
+    const rowNum   = i + 2;
+    const weight   = String(data29[i][16] || '').trim(); // Q: 重量
+    const link     = String(data29[i][5]  || '').trim(); // F: Link
+    const unrated  = String(data29[i][28] || '').trim(); // AC: 未評價
+    const itemName = String(data29[i][6]  || '').trim(); // G: 商品名
+    const code     = String(data29[i][14] || '').trim(); // O: Code
+
+    if (!weight || !link.includes('mercari.com/item/') || unrated !== '未評價') continue;
+    if (props.getProperty('tg_unrated_' + rowNum)) continue;
+
+    const tUrl = link.replace('/item/', '/transaction/');
+    tgSend_(
+      `⭐ <b>待評價商品</b>${code ? '  ' + tgEscape_(code) : ''}` +
+      `${itemName ? '\n' + tgEscape_(itemName) : ''}\n${tUrl}`
+    );
+    props.setProperty('tg_unrated_' + rowNum, '1');
+  }
 }
 
 function tgShowCustPage_(msgId, rowNum, pos, code, itemUrl, ids, offset) {
