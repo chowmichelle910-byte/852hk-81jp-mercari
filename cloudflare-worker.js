@@ -93,6 +93,45 @@ async function handleUpdate(update) {
         });
         return;
       }
+
+      // 充值第一步：輸入 JPY（回覆含 _charge:jpy_ 的訊息）
+      if (ref.includes('_charge:jpy_')) {
+        const jpy = parseFloat(text.replace(/[^\d.]/g, ''));
+        if (isNaN(jpy) || jpy <= 0) {
+          await tg('sendMessage', { chat_id: chatId, text: '請輸入有效嘅日圓金額（例如：50000）' });
+          return;
+        }
+        await tg('sendMessage', {
+          chat_id: chatId,
+          text: `JPY：¥${jpy.toLocaleString()}\n\n請輸入港幣金額（HKD）：\n_charge:hkd:${jpy}_`,
+          reply_markup: { force_reply: true, selective: true }
+        });
+        return;
+      }
+
+      // 充值第二步：輸入 HKD（回覆含 _charge:hkd:JPY_ 的訊息）
+      const mChargeHkd = ref.match(/_charge:hkd:([\d.]+)_/);
+      if (mChargeHkd) {
+        const jpy = parseFloat(mChargeHkd[1]);
+        const hkd = parseFloat(text.replace(/[^\d.]/g, ''));
+        if (isNaN(hkd) || hkd <= 0) {
+          await tg('sendMessage', { chat_id: chatId, text: '請輸入有效嘅港幣金額（例如：2500）' });
+          return;
+        }
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}`;
+        const result = await gas({ action: 'addChargeRecord', date: dateStr, jpy: String(jpy), hkd: String(hkd) });
+        if (result.error) {
+          await tg('sendMessage', { chat_id: chatId, text: '❌ 新增失敗：' + result.error });
+        } else {
+          await tg('sendMessage', {
+            chat_id: chatId,
+            text: `✅ <b>充值記錄已新增</b>\n\n日期：${dateStr}\nJPY：¥${jpy.toLocaleString()}\nHKD：HK$${hkd.toLocaleString()}`,
+            parse_mode: 'HTML'
+          });
+        }
+        return;
+      }
     }
 
     if (text === '/unrated' || text.startsWith('/unrated@')) {
@@ -219,6 +258,27 @@ async function handleUpdate(update) {
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
       text: (cb.message.text || '') + '\n\n⏭ 已跳過，請手動填入'
+    });
+
+  } else if (action === 'charge_skip') {
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '好的' });
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: (cb.message.text || '') + '\n\n❌ 跳過',
+      reply_markup: { inline_keyboard: [] }
+    });
+
+  } else if (action === 'charge_add') {
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: (cb.message.text || '') + '\n\n✅ 好，請輸入日圓金額：',
+      reply_markup: { inline_keyboard: [] }
+    });
+    await tg('sendMessage', {
+      chat_id: chatId,
+      text: '請輸入充值日圓金額（JPY）：\n_charge:jpy_',
+      reply_markup: { force_reply: true, selective: true }
     });
 
   } else if (action === 'shipped_futsuu') {
