@@ -1868,11 +1868,20 @@ function generatePostData(selectedGroup) {
       targetSFSheet.getRange(startRow,1,numRowsToClear,13).clearContent();
       targetSFSheet.getRange(startRow,1,sfDataRows.length,sfDataRows[0].length).setValues(sfDataRows);
       SpreadsheetApp.flush();
-      Utilities.sleep(8000);
       const url=`https://docs.google.com/spreadsheets/d/${TARGET_SF_SPREADSHEET_ID}/export?exportFormat=xlsx`;
       const token=ScriptApp.getOAuthToken();
-      const response=UrlFetchApp.fetch(url,{headers:{Authorization:'Bearer '+token},muteHttpExceptions:true});
-      attachments.push(response.getBlob().setName(`${selectedGroup} 順豐收件人範本.xlsx`));
+      // 最少要有的 size = 每行約 200 bytes，加上 template header ~8KB
+      const minBytes = 8000 + sfDataRows.length * 200;
+      let exportBlob = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        Utilities.sleep(attempt === 0 ? 4000 : 5000);
+        const resp = UrlFetchApp.fetch(url, {headers:{Authorization:'Bearer '+token}, muteHttpExceptions:true});
+        const blob = resp.getBlob();
+        if (blob.getBytes().length >= minBytes) { exportBlob = blob; break; }
+        Logger.log(`SF export attempt ${attempt+1}: size=${blob.getBytes().length}, need>=${minBytes}`);
+      }
+      if (!exportBlob) throw new Error('順豐 Excel 匯出失敗（3次均未取得完整資料）');
+      attachments.push(exportBlob.setName(`${selectedGroup} 順豐收件人範本.xlsx`));
     }catch(e){Logger.log('處理順豐附件錯誤：'+e.message);SpreadsheetApp.getUi().alert('警告：'+e.message);}
   }
 
