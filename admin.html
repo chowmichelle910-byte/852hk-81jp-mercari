@@ -1009,14 +1009,30 @@ async function doTrackSearch(val){
   const inp=document.getElementById('trackSearch');if(inp)inp.value='';
 }
 
-let quaggaRunning=false;
+let quaggaRunning=false,nativeScanStream=null,nativeScanRaf=null;
 async function toggleScan(){
-  if(quaggaRunning){stopScan();return;}
-  if(typeof Quagga==='undefined'){alert('掃描功能仍在載入中，請稍後再試。');return;}
+  if(quaggaRunning||nativeScanStream){stopScan();return;}
   const btn=document.getElementById('scanBtn');
   const video=document.getElementById('scanVideo');
-  video.style.display='block';
   btn.classList.add('active');btn.textContent='⏹';
+  // 原生 BarcodeDetector（Android Chrome）優先
+  if('BarcodeDetector'in window){
+    try{
+      nativeScanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+      video.srcObject=nativeScanStream;video.style.display='block';
+      const det=new BarcodeDetector({formats:['code_128','code_39','qr_code','ean_13','ean_8','upc_a','upc_e','itf','codabar']});
+      const scan=async()=>{
+        if(!nativeScanStream)return;
+        try{const codes=await det.detect(video);if(codes.length>0){const val=codes[0].rawValue;document.getElementById('trackSearch').value=val;stopScan();doTrackSearch(val);return;}}catch(e){}
+        nativeScanRaf=requestAnimationFrame(scan);
+      };
+      video.onloadedmetadata=()=>{nativeScanRaf=requestAnimationFrame(scan);};
+      return;
+    }catch(e){stopScan();}
+  }
+  // Fallback：Quagga2（iOS Safari / Firefox）
+  if(typeof Quagga==='undefined'){alert('掃描功能仍在載入中，請稍後再試。');stopScan();return;}
+  video.style.display='block';
   quaggaRunning=true;
   Quagga.init({
     inputStream:{type:'LiveStream',target:video,constraints:{facingMode:{ideal:'environment'}}},
@@ -1026,8 +1042,7 @@ async function toggleScan(){
     if(err){alert('無法開啟鏡頭：'+err);stopScan();return;}
     Quagga.start();
     Quagga.onDetected(function(result){
-      const val=result.codeResult.code;
-      if(!val)return;
+      const val=result.codeResult.code;if(!val)return;
       document.getElementById('trackSearch').value=val;
       stopScan();doTrackSearch(val);
     });
@@ -1035,8 +1050,10 @@ async function toggleScan(){
 }
 
 function stopScan(){
+  if(nativeScanRaf){cancelAnimationFrame(nativeScanRaf);nativeScanRaf=null;}
+  if(nativeScanStream){nativeScanStream.getTracks().forEach(t=>t.stop());nativeScanStream=null;}
   if(quaggaRunning){try{Quagga.stop();}catch(e){}quaggaRunning=false;}
-  const video=document.getElementById('scanVideo');if(video)video.style.display='none';
+  const video=document.getElementById('scanVideo');if(video){video.style.display='none';video.srcObject=null;}
   const btn=document.getElementById('scanBtn');if(btn){btn.classList.remove('active');btn.textContent='📷';}
 }
 
