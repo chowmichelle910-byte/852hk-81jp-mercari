@@ -90,7 +90,7 @@ button{font-family:var(--font);}
 .close-pbar{position:absolute;top:8px;right:10px;background:none;border:none;color:#94A3B8;font-size:16px;cursor:pointer;}
 
 /* Track search */
-.track-search-bar{display:flex;gap:6px;margin-bottom:10px;align-items:center;}
+.track-search-bar{display:flex;gap:6px;align-items:center;position:sticky;top:0;z-index:50;background:var(--bg);padding:8px 0 8px;margin-bottom:4px;}
 .track-search-inp{flex:1;padding:8px 11px;border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:13px;background:var(--white);color:var(--navy);}
 .track-scan-btn{padding:8px 12px;background:var(--navy);color:var(--gold);border:none;border-radius:var(--r-sm);cursor:pointer;font-size:17px;line-height:1;flex-shrink:0;}
 .track-scan-btn.active{background:var(--warn);}
@@ -1014,6 +1014,7 @@ async function doTrackSearch(val){
   await render();
   const card=document.getElementById('card-'+match.row);
   if(card){card.scrollIntoView({behavior:'smooth',block:'center'});card.classList.remove('flash-hit');void card.offsetWidth;card.classList.add('flash-hit');setTimeout(()=>card.classList.remove('flash-hit'),1400);}
+  const inp=document.getElementById('trackSearch');if(inp)inp.value='';
 }
 
 async function toggleScan(){
