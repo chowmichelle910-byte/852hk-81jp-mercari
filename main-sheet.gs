@@ -465,18 +465,7 @@ function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('出單')
     .addItem('工具', 'showSidebar')
-    .addSeparator()
-    .addItem('📦 更新未到貨', 'menuPopulateArrivals')
     .addToUi();
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("到貨");
-  const cell  = sheet.getRange("K1");
-  cell.setValue("更新");
-  cell.setNote("點擊此儲存格可同步資料回『訂單』分頁");
-}
-
-function menuPopulateArrivals() {
-  populateArrivals();
-  SpreadsheetApp.getUi().alert("✅ 已更新所有未到貨資料到『到貨』分頁！");
 }
 
 // ─────────────────────────────────────────────
@@ -1989,7 +1978,7 @@ function onEdit(e) {
     if(sheet.getName()!=="訂單")return;
     if(range.getNumRows()>1||range.getNumColumns()>1){
       const triggerCols=[3,4,5,6,7,8,16];
-      if(triggerCols.includes(col)){if(col===16)assignGroupByArrivalDate();if(col===7)populateArrivals();}
+      if(triggerCols.includes(col)){if(col===16)assignGroupByArrivalDate();}
       if(col===8)updateOrdersCurrencyAndChargeWeighted();
       if(col===4){updateUniquePlatformUser();}
       if(col===7)updateSerialNumberInColO();
@@ -1998,7 +1987,7 @@ function onEdit(e) {
     const AB_COL=28,abCell=sheet.getRange(row,AB_COL),originalAbValue=abCell.getValue();
     const abHadManualValue=(originalAbValue!==null&&originalAbValue.toString().trim()!=="");
     const triggerCols=[3,4,5,6,7,8,16];
-    if(triggerCols.includes(col)){if(col===16)assignGroupByArrivalDate();if(col===7)populateArrivals();}
+    if(triggerCols.includes(col)){if(col===16)assignGroupByArrivalDate();}
     if(col===8)updateOrdersCurrencyAndChargeWeighted();
     if(col===4){updateUniquePlatformUser();}
     if(col===7)updateSerialNumberInColO();
@@ -2068,62 +2057,6 @@ function updateOrdersCurrencyAndChargeWeighted() {
   checkChargeBalanceAndNotify_();
 }
 
-// ─────────────────────────────────────────────
-//  populateArrivals
-// ─────────────────────────────────────────────
-function populateArrivals() {
-  const ss=SpreadsheetApp.getActiveSpreadsheet();
-  const orderSheet=ss.getSheetByName('訂單'),arrivalSheet=ss.getSheetByName('到貨');
-  const orderData=orderSheet.getDataRange().getValues();
-  const filtered=orderData.filter((row,i)=>i>0&&!row[15]).map(row=>{
-    let formattedDate='';
-    const orderedDate=row[1];
-    if(orderedDate instanceof Date)formattedDate=`${orderedDate.getFullYear()}/${String(orderedDate.getMonth()+1).padStart(2,'0')}/${String(orderedDate.getDate()).padStart(2,'0')}`;
-    return[formattedDate,row[2],row[3],row[4],row[5],row[6],row[13],row[14]];
-  });
-  const lastArrivalRow=arrivalSheet.getLastRow();
-  if(lastArrivalRow>1)arrivalSheet.getRange(2,1,lastArrivalRow-1,10).clearContent();
-  if(filtered.length>0)arrivalSheet.getRange(2,1,filtered.length,8).setValues(filtered);
-}
-
-// ─────────────────────────────────────────────
-//  syncArrivalData
-// ─────────────────────────────────────────────
-function syncArrivalData() {
-  const ss=SpreadsheetApp.getActiveSpreadsheet();
-  const orderSheet=ss.getSheetByName('訂單'),arrivalSheet=ss.getSheetByName('到貨');
-  const lastRow=arrivalSheet.getLastRow();
-  if(lastRow<=1){SpreadsheetApp.getUi().alert("沒有可同步的到貨資料！");return;}
-  const arrivalData=arrivalSheet.getRange(2,1,lastRow-1,10).getValues();
-  const orderData=orderSheet.getDataRange().getValues();
-  const orderMap={},orderMapByCode={};
-  for(let i=1;i<orderData.length;i++){
-    const pos=orderData[i][2],id=orderData[i][3],code=orderData[i][14],rowNum=i+1;
-    if(pos&&id&&code)orderMap[`${pos}|||${id}|||${code}`]=rowNum;
-    if(code)orderMapByCode[code]=rowNum;
-  }
-  const rowsToDelete=[];let updatedRows=0;const transactionUrls=[];
-  for(let i=0;i<arrivalData.length;i++){
-    const row=arrivalData[i],pos=row[1],id=row[2],code=row[7],arrivalDate=row[8],netWeight=row[9];
-    if(!code||!arrivalDate||!netWeight)continue;
-    const orderRow=orderMap[`${pos}|||${id}|||${code}`]||orderMapByCode[code];
-    if(orderRow){
-      const dateObj=arrivalDate instanceof Date?arrivalDate:new Date(arrivalDate);
-      orderSheet.getRange(orderRow,16).setValue(dateObj);orderSheet.getRange(orderRow,16).setNumberFormat("yyyy/m/d");
-      orderSheet.getRange(orderRow,17).setValue(netWeight);
-      const url=row[4];if(url&&url.includes("mercari.com/item/")){const tUrl=url.replace("/item/","/transaction/");transactionUrls.push({tUrl,orderRow});}
-      rowsToDelete.push(i+2);updatedRows++;
-    }
-  }
-  rowsToDelete.sort((a,b)=>b-a).forEach(row=>arrivalSheet.deleteRow(row));
-  assignGroupByArrivalDate();
-  try { SpreadsheetApp.getUi().alert(`完成同步，更新 ${updatedRows} 筆資料！`); } catch(e) {}
-  if(transactionUrls.length>0){
-    const lines = transactionUrls.map((u,i)=>`${i+1}. <a href="${u.tUrl}">${u.tUrl}</a>`).join('\n');
-    const keyboard = [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]];
-    tgSend_(`⭐ <b>新到貨，請評價（${transactionUrls.length} 件）</b>\n\n${lines}`, {inline_keyboard: keyboard});
-  }
-}
 
 // ─────────────────────────────────────────────
 //  assignGroupByArrivalDate / assignGroupByOrderDate
@@ -2216,7 +2149,6 @@ function logMercariOrders() {
     thread.addLabel(GmailApp.createLabel(labelName));
   }
   try{assignGroupByOrderDate();}catch(e){console.error(e);}
-  try{populateArrivals();}catch(e){console.error(e);}
   try{updateSerialNumberInColO();}catch(e){console.error(e);}
   try{updateOrdersCurrencyAndChargeWeighted();}catch(e){console.error(e);}
 }
@@ -2307,7 +2239,6 @@ function processMercariShopsEmails() {
   }
 
   try { assignGroupByOrderDate(); }               catch(e) { console.error(e); }
-  try { populateArrivals(); }                      catch(e) { console.error(e); }
   try { updateSerialNumberInColO(); }              catch(e) { console.error(e); }
   try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) { console.error(e); }
   try { checkNewOrdersAndNotify(); }               catch(e) { console.error(e); }
@@ -2549,7 +2480,6 @@ function updateOrdersFromGmail() {
   // ── 後處理 ──
   if (anyNewOrder) {
     try { assignGroupByOrderDate(); }               catch(e) { console.error(e); }
-    try { populateArrivals(); }                      catch(e) { console.error(e); }
     try { updateSerialNumberInColO(); }              catch(e) { console.error(e); }
     try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) { console.error(e); }
     try { updateChineseNamesByKeyword(); }           catch(e) { console.error(e); }
