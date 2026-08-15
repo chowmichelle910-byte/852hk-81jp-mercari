@@ -295,6 +295,10 @@ button{font-family:var(--font);}
 .spin{width:26px;height:26px;border:3px solid rgba(201,168,76,.25);border-top-color:var(--gold);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 9px;}
 @keyframes sp{to{transform:rotate(360deg);}}
 </style>
+<script type="module">
+  import{BarcodeDetectorPolyfill}from'https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/es/index.js';
+  if(!('BarcodeDetector'in globalThis))globalThis.BarcodeDetector=BarcodeDetectorPolyfill;
+</script>
 </head>
 <body>
 <datalist id="idList"></datalist>
@@ -1009,10 +1013,7 @@ async function toggleScan(){
   if(scanStream){stopScan();return;}
   const btn=document.getElementById('scanBtn');
   const video=document.getElementById('scanVideo');
-  if(!('BarcodeDetector' in window)){
-    // fallback：開啟相機拍照再解析
-    alert('此瀏覽器不支援即時掃描，請直接輸入運單號碼。');return;
-  }
+
   try{
     scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
     video.srcObject=scanStream;video.style.display='block';
