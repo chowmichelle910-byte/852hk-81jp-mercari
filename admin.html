@@ -89,6 +89,15 @@ button{font-family:var(--font);}
 .save-btn{background:var(--warn);color:white;border:none;padding:9px 15px;border-radius:var(--r-sm);font-weight:700;cursor:pointer;font-size:12px;}
 .close-pbar{position:absolute;top:8px;right:10px;background:none;border:none;color:#94A3B8;font-size:16px;cursor:pointer;}
 
+/* Track search */
+.track-search-bar{display:flex;gap:6px;margin-bottom:10px;align-items:center;}
+.track-search-inp{flex:1;padding:8px 11px;border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:13px;background:var(--white);color:var(--navy);}
+.track-scan-btn{padding:8px 12px;background:var(--navy);color:var(--gold);border:none;border-radius:var(--r-sm);cursor:pointer;font-size:17px;line-height:1;flex-shrink:0;}
+.track-scan-btn.active{background:var(--warn);}
+#scanVideo{display:none;width:100%;border-radius:var(--r-sm);margin-bottom:8px;max-height:220px;object-fit:cover;}
+@keyframes flash-highlight{0%,100%{outline:none}25%,75%{outline:3px solid #F59E0B;background:#FFFBEB!important;}50%{outline:3px solid #F59E0B;background:#FEF3C7!important;}}
+.ic.flash-hit{animation:flash-highlight 1.2s ease 1;}
+
 /* Item card */
 .ic{background:var(--white);border-radius:var(--r-md);padding:12px;margin-bottom:10px;box-shadow:var(--sh-sm);border:2px solid transparent;display:flex;gap:10px;}
 .ic.pending{border-color:var(--warn)!important;background:#FFFAF5!important;}
@@ -341,6 +350,11 @@ button{font-family:var(--font);}
       </div>
       <div id="shipBanner" class="ship-banner"><span>🚚</span><div id="shipText" class="ship-banner-text">讀取中…</div></div>
       <div id="arrTabs" class="atabs"></div>
+      <div class="track-search-bar">
+        <input type="text" id="trackSearch" class="track-search-inp" placeholder="🔍 運單號碼查詢…" oninput="onTrackInput(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();doTrackSearch(this.value);}">
+        <button class="track-scan-btn" id="scanBtn" onclick="toggleScan()" title="掃描條碼">📷</button>
+      </div>
+      <video id="scanVideo" autoplay playsinline muted></video>
       <div id="itemList"></div>
       <button class="add-item-btn" onclick="openAddModal()">➕ 加入新商品到主表</button>
     </div>
@@ -727,7 +741,16 @@ function switchNav(n){
   if(n==='pick'&&!pickLoaded)loadPick();
   if(n==='finance')loadFinanceAll();
   if(n==='idsearch')loadIdList();
+  if(n==='arrival'&&pw)refreshArrival(null); // 每次切換磅重頁自動更新
 }
+
+// 切回瀏覽器 tab 時自動靜默更新
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&pw){
+    const isArrival=document.getElementById('panel-arrival')?.classList.contains('active');
+    if(isArrival)refreshArrival(null);
+  }
+});
 
 // ── Tool sub-tabs ──
 // ── Tool group tabs ──
@@ -924,7 +947,7 @@ async function render(){
     const isUn=curFilter==='unrated';
     let fL=dL;if(isUn&&fL.includes('mercari.com/item/'))fL=fL.replace('/item/','/transaction/');
     const locked=(it.position||it.custId)&&!editRows.has(it.row)&&!ip;
-    const card=document.createElement('div');card.className='ic'+(ip?' pending':'');
+    const card=document.createElement('div');card.id='card-'+it.row;card.className='ic'+(ip?' pending':'');
 
     let imgH='<div style="line-height:86px;color:#ccc;font-size:10px;text-align:center;">無圖</div>';
     if(dI)imgH=`<img src="${escAttr(dI)}" style="width:100%;height:100%;object-fit:cover;">`;
@@ -952,6 +975,70 @@ async function render(){
       </div>`;
     el.appendChild(card);
   }
+}
+
+// ── 運單號碼查詢 + 條碼掃描 ──
+let scanStream=null,scanRaf=null;
+
+function onTrackInput(val){
+  // 即時查詢（輸入停頓後）
+  clearTimeout(onTrackInput._t);
+  onTrackInput._t=setTimeout(()=>{if(val.trim().length>=3)doTrackSearch(val);},400);
+}
+
+async function doTrackSearch(val){
+  val=val.trim();
+  if(!val)return;
+  const term=val.toLowerCase();
+  const match=allItems.find(i=>(String(i.track||'')).toLowerCase().includes(term));
+  if(!match){
+    const inp=document.getElementById('trackSearch');
+    inp.style.borderColor='#EF4444';setTimeout(()=>inp.style.borderColor='',1200);
+    return;
+  }
+  // 切換到正確 tab
+  const targetArr=match.arrival?String(match.arrival).trim():'未到貨';
+  if(curArr!==targetArr){curArr=targetArr;buildArrTabs();}
+  if(curFilter==='unrated'||curFilter==='done'){curFilter='all';document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));document.getElementById('f-all').classList.add('active');}
+  await render();
+  const card=document.getElementById('card-'+match.row);
+  if(card){card.scrollIntoView({behavior:'smooth',block:'center'});card.classList.remove('flash-hit');void card.offsetWidth;card.classList.add('flash-hit');setTimeout(()=>card.classList.remove('flash-hit'),1400);}
+}
+
+async function toggleScan(){
+  if(scanStream){stopScan();return;}
+  const btn=document.getElementById('scanBtn');
+  const video=document.getElementById('scanVideo');
+  if(!('BarcodeDetector' in window)){
+    // fallback：開啟相機拍照再解析
+    alert('此瀏覽器不支援即時掃描，請直接輸入運單號碼。');return;
+  }
+  try{
+    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject=scanStream;video.style.display='block';
+    btn.classList.add('active');btn.textContent='⏹';
+    const det=new BarcodeDetector({formats:['code_128','code_39','qr_code','data_matrix','ean_13','ean_8','upc_a','upc_e','itf','codabar']});
+    const scan=async()=>{
+      if(!scanStream)return;
+      try{
+        const codes=await det.detect(video);
+        if(codes.length>0){
+          const val=codes[0].rawValue;
+          document.getElementById('trackSearch').value=val;
+          stopScan();doTrackSearch(val);return;
+        }
+      }catch(e){}
+      scanRaf=requestAnimationFrame(scan);
+    };
+    video.onloadedmetadata=()=>{scanRaf=requestAnimationFrame(scan);};
+  }catch(e){alert('無法開啟鏡頭：'+e.message);stopScan();}
+}
+
+function stopScan(){
+  if(scanRaf){cancelAnimationFrame(scanRaf);scanRaf=null;}
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+  const video=document.getElementById('scanVideo');if(video)video.style.display='none';
+  const btn=document.getElementById('scanBtn');if(btn){btn.classList.remove('active');btn.textContent='📷';}
 }
 
 async function allEval(){if(!confirm('確定一鍵完成所有評價？'))return;const b=event.target;b.disabled=true;b.textContent='處理中…';try{const d=await post({action:'clearAllUnrated',password:pw});if(d.success){alert(`成功 ${d.count||0} 項`);allItems.forEach(i=>{if(i.status==='未評價')i.status='';});render();}else alert('失敗：'+d.error);}catch{alert('連線失敗');}finally{b.disabled=false;}}
