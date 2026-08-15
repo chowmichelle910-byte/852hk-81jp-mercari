@@ -1991,7 +1991,7 @@ function onEdit(e) {
       const triggerCols=[3,4,5,6,7,8,16];
       if(triggerCols.includes(col)){if(col===16)assignGroupByArrivalDate();if(col===7)populateArrivals();}
       if(col===8)updateOrdersCurrencyAndChargeWeighted();
-      if(col===4){updateUniquePlatformUser();updateUniqueRecipients();}
+      if(col===4){updateUniquePlatformUser();}
       if(col===7)updateSerialNumberInColO();
       return;
     }
@@ -2000,7 +2000,7 @@ function onEdit(e) {
     const triggerCols=[3,4,5,6,7,8,16];
     if(triggerCols.includes(col)){if(col===16)assignGroupByArrivalDate();if(col===7)populateArrivals();}
     if(col===8)updateOrdersCurrencyAndChargeWeighted();
-    if(col===4){updateUniquePlatformUser();updateUniqueRecipients();}
+    if(col===4){updateUniquePlatformUser();}
     if(col===7)updateSerialNumberInColO();
     const abAfterOtherFuncs=abCell.getValue();
     if(abHadManualValue){if(abAfterOtherFuncs===null||abAfterOtherFuncs.toString().trim()==="")abCell.setValue(originalAbValue);return;}
@@ -2175,7 +2175,7 @@ function updateSerialNumberInColO() {
 }
 
 // ─────────────────────────────────────────────
-//  updateUniquePlatformUser / updateUniqueRecipients
+//  updateUniquePlatformUser
 // ─────────────────────────────────────────────
 function updateUniquePlatformUser() {
   const ss=SpreadsheetApp.getActiveSpreadsheet();
@@ -2188,20 +2188,7 @@ function updateUniquePlatformUser() {
   if(output.length>0)dataSheet.getRange(2,12,output.length,2).setValues(output);
 }
 
-function updateUniqueRecipients() {
-  const ss=SpreadsheetApp.getActiveSpreadsheet();
-  const orderSheet=ss.getSheetByName("訂單"),targetSheet=ss.getSheetByName("收件資料");
-  const lastRow=orderSheet.getLastRow();if(lastRow<2)return;
-  const orderData=orderSheet.getRange(2,3,lastRow-1,25).getValues();
-  const targetData=targetSheet.getRange(2,1,Math.max(targetSheet.getLastRow()-1,0),3).getValues();
-  const existingKeys=new Set(targetData.filter(r=>r[0]&&r[1]&&r[2]).map(r=>`${r[0]}||${r[1]}||${r[2]}`));
-  const newRows=[];
-  for(const row of orderData){
-    const c=row[0],d=row[1],aa=row[24];
-    if(c&&d&&aa){const key=`${c}||${d}||${aa}購買`;if(!existingKeys.has(key)){newRows.push([c,d,aa+'購買']);existingKeys.add(key);}}
-  }
-  if(newRows.length>0){const lastRowColA=targetSheet.getRange("A:A").getValues().filter(String).length;targetSheet.getRange(lastRowColA+1,1,newRows.length,3).setValues(newRows);}
-}
+
 
 // ─────────────────────────────────────────────
 //  Gmail 自動化
@@ -2564,7 +2551,6 @@ function updateOrdersFromGmail() {
     try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) { console.error(e); }
     try { updateChineseNamesByKeyword(); }           catch(e) { console.error(e); }
   }
-  try { updateUniqueRecipients(); }  catch(e) { console.error(e); }
   try { checkNewOrdersAndNotify(); } catch(e) { console.error(e); }
 }
 
