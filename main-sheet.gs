@@ -2659,8 +2659,12 @@ function processConsignmentName(productCodeStr,productNameLookup){
   if(!productCodeStr)return'';
   const rawCodes=String(productCodeStr).split(',').map(c=>c.trim()).filter(Boolean);
   const nameCounts={};
-  rawCodes.forEach(code=>{const resolvedName=productNameLookup[code]||code;nameCounts[resolvedName]=(nameCounts[resolvedName]||0)+1;});
-  return Object.entries(nameCounts).map(([name,count])=>count>1?`${name}*${count}`:name).join(', ');
+  rawCodes.forEach(code=>{
+    const resolvedName=(productNameLookup[code]||'').trim();
+    if(!resolvedName)return; // 冇物品內容就跳過，唔顯示 Code
+    nameCounts[resolvedName]=(nameCounts[resolvedName]||0)+1;
+  });
+  return Object.entries(nameCounts).map(([name,count])=>count>1?`${name}x${count}`:name).join(', ');
 }
 
 function extractAndValidateSFCode(addressStr,addressLookup,validCodes){
