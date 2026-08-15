@@ -994,7 +994,9 @@ async function doTrackSearch(val){
   val=val.trim();
   if(!val)return;
   const term=val.toLowerCase();
-  const match=allItems.find(i=>(String(i.track||'')).toLowerCase().includes(term));
+  // 優先：末尾4位完全吻合；其次：包含搜尋字串
+  const endMatch=term.length===4?allItems.find(i=>String(i.track||'').toLowerCase().endsWith(term)):null;
+  const match=endMatch||allItems.find(i=>(String(i.track||'')).toLowerCase().includes(term));
   if(!match){
     const inp=document.getElementById('trackSearch');
     inp.style.borderColor='#EF4444';setTimeout(()=>inp.style.borderColor='',1200);
