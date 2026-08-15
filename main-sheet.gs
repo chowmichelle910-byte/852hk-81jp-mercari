@@ -787,6 +787,21 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'addNewOrder': {
+      try {
+        const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const newRow = sheet.getLastRow() + 1;
+        const url    = e.parameter.url   ? String(e.parameter.url).trim()   : '';
+        const name   = e.parameter.name  ? String(e.parameter.name).trim()  : '';
+        const price  = e.parameter.price ? parseFloat(e.parameter.price)    : null;
+        if (url)                           sheet.getRange(newRow, 6).setValue(url);
+        if (name)                          sheet.getRange(newRow, 7).setValue(name);
+        if (price !== null && !isNaN(price)) sheet.getRange(newRow, 8).setValue(price);
+        checkNewOrdersAndNotify();
+        return jsonResponse_({ success: true, row: newRow });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     default:
       return jsonResponse_({ error: '未知 action: ' + action });
   }

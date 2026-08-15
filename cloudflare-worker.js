@@ -17,6 +17,77 @@ async function tg(method, params) {
   return res.json();
 }
 
+// ─── 商品資料抓取 ─────────────────────────────────
+async function scrapeProduct(url) {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'ja,en;q=0.9'
+      }
+    });
+    const html = await res.text();
+    let name = null, price = null;
+
+    // 1. Next.js __NEXT_DATA__ (Fril / PayPay FM)
+    const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+    if (nd) {
+      try {
+        const d = JSON.parse(nd[1]);
+        const pp = d?.props?.pageProps;
+        const item = pp?.item || pp?.itemData || pp?.itemDetail?.item || {};
+        name  = item.name  || item.title || null;
+        price = item.price != null ? parseInt(item.price) : null;
+      } catch(e) {}
+    }
+
+    // 2. JSON-LD
+    if (!name || !price) {
+      const jlds = [...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+      for (const [, content] of jlds) {
+        try {
+          const obj = JSON.parse(content);
+          if (!name)  name  = obj.name  || obj.offers?.name  || null;
+          if (!price) price = obj.offers?.price != null ? parseInt(obj.offers.price) : null;
+          if (name && price) break;
+        } catch(e) {}
+      }
+    }
+
+    // 3. og:title + price regex
+    if (!name) {
+      const m = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"'<>]+)["']/i)
+             || html.match(/<meta[^>]+content=["']([^"'<>]+)["'][^>]+property=["']og:title["']/i);
+      if (m) name = m[1].replace(/\s*[-–|ー]\s*(フリル|Fril|ラクマ|PayPay|メルカリ|Mercari).*$/i, '').trim();
+    }
+    if (!price) {
+      const m = html.match(/"price"\s*:\s*"?(\d+)"?/i) || html.match(/¥\s*([\d,]+)/);
+      if (m) price = parseInt(m[1].replace(/,/g, ''));
+    }
+
+    return { name: name || null, price: price || null };
+  } catch(e) { return { name: null, price: null }; }
+}
+
+// ─── 新訂單預覽訊息 ───────────────────────────────
+async function sendNewOrderPreview(chatId, url, name, price) {
+  const nd = name  != null ? String(name)  : '';
+  const np = price != null ? String(price) : '';
+  const nameDisplay  = nd || '❓ 未能自動取得';
+  const priceDisplay = np ? `¥${parseInt(np).toLocaleString()}` : '❓ 未能自動取得';
+  await tg('sendMessage', {
+    chat_id: chatId,
+    text: `🛒 <b>新訂單預覽</b>\n\n商品：${nameDisplay}\n價格：${priceDisplay}\n🔗 ${url}\n\n_nou_:${url}\n_non_:${nd}\n_nop_:${np}`,
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [[
+      { text: '✅ 確認新增', callback_data: 'confirm_no' },
+      { text: '✏️ 改名稱',  callback_data: 'edit_no_name' },
+      { text: '✏️ 改價格',  callback_data: 'edit_no_price' }
+    ]] }
+  });
+}
+
 // ─── GAS API ─────────────────────────────────────
 async function gas(params) {
   const body = new URLSearchParams({ password: GAS_PASS, ...params });
@@ -61,6 +132,24 @@ async function handleUpdate(update) {
     // 回覆訊息處理
     if (msg.reply_to_message) {
       const ref = msg.reply_to_message.text || '';
+
+      // 回覆編輯新訂單名稱
+      if (ref.includes('_no_edit_name_')) {
+        const url   = (ref.match(/_nou_:(\S+)/) || [])[1] || '';
+        const price = (ref.match(/_nop_:(\d*)/)  || [])[1] || '';
+        await sendNewOrderPreview(chatId, url, text, price ? parseInt(price) : null);
+        return;
+      }
+
+      // 回覆編輯新訂單價格
+      if (ref.includes('_no_edit_price_')) {
+        const url  = (ref.match(/_nou_:(\S+)/) || [])[1] || '';
+        const name = (ref.match(/_non_:([^\n]*)/) || [])[1] || '';
+        const price = parseInt(text.replace(/[^\d]/g, ''));
+        await sendNewOrderPreview(chatId, url, name, isNaN(price) ? null : price);
+        return;
+      }
+
 
       // 手動輸入客人 ID（回覆含 _ref:rowNum:pos_ 的訊息）
       const mRef = ref.match(/_ref:(\d+):(.+?)_/);
@@ -132,6 +221,19 @@ async function handleUpdate(update) {
         }
         return;
       }
+    }
+
+    // /neworder 新增訂單
+    if (text.startsWith('/neworder')) {
+      const urlMatch = text.match(/https?:\/\/\S+/);
+      if (!urlMatch) {
+        await tg('sendMessage', { chat_id: chatId, text: '📎 請提供商品連結，例如：\n/neworder https://item.fril.jp/xxx' });
+        return;
+      }
+      const url = urlMatch[0].replace(/[）)。、\s]+$/, '');
+      const { name, price } = await scrapeProduct(url);
+      await sendNewOrderPreview(chatId, url, name, price);
+      return;
     }
 
     if (text === '/unrated' || text.startsWith('/unrated@')) {
@@ -302,6 +404,45 @@ async function handleUpdate(update) {
     await tg('sendMessage', {
       chat_id: chatId,
       text: `✏️ 請輸入送り状番号：\n_ship:${rowNum}_`,
+      reply_markup: { force_reply: true, selective: true }
+    });
+
+  } else if (action === 'confirm_no') {
+    const msgText = cb.message.text || '';
+    const url   = (msgText.match(/_nou_:(\S+)/)    || [])[1] || '';
+    const name  = (msgText.match(/_non_:([^\n]*)/) || [])[1] || '';
+    const price = (msgText.match(/_nop_:(\d*)/)    || [])[1] || '';
+    if (!url) { await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '找不到連結資料' }); return; }
+    const result = await gas({ action: 'addNewOrder', url, name, price });
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: result.error ? '❌ 失敗' : '✅ 已新增！' });
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: result.error
+        ? `❌ 新增失敗：${result.error}`
+        : `✅ <b>新訂單已新增</b>\n\n商品：${name || '(未填)'}\n價格：${price ? '¥' + parseInt(price).toLocaleString() : '(未填)'}\n🔗 ${url}`,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [] }
+    });
+
+  } else if (action === 'edit_no_name') {
+    const msgText = cb.message.text || '';
+    const url   = (msgText.match(/_nou_:(\S+)/)    || [])[1] || '';
+    const price = (msgText.match(/_nop_:(\d*)/)    || [])[1] || '';
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    await tg('sendMessage', {
+      chat_id: chatId,
+      text: `✏️ 請輸入商品名稱：\n_no_edit_name_\n_nou_:${url}\n_nop_:${price}`,
+      reply_markup: { force_reply: true, selective: true }
+    });
+
+  } else if (action === 'edit_no_price') {
+    const msgText = cb.message.text || '';
+    const url  = (msgText.match(/_nou_:(\S+)/)    || [])[1] || '';
+    const name = (msgText.match(/_non_:([^\n]*)/) || [])[1] || '';
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    await tg('sendMessage', {
+      chat_id: chatId,
+      text: `✏️ 請輸入商品價格（日圓數字）：\n_no_edit_price_\n_nou_:${url}\n_non_:${name}`,
       reply_markup: { force_reply: true, selective: true }
     });
 
