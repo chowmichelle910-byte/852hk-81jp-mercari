@@ -446,11 +446,6 @@ function handleTelegramUpdate_(update) {
       tgEdit_(msgId, cb.message.text + '\n\n❌ 複製失敗：' + e.message);
     }
 
-  } else if (action === 'charge_skip') {
-    tgAnswer_(cb.id, '好的');
-    tgEdit_(msgId, cb.message.text + '\n\n❌ 跳過');
-    PropertiesService.getScriptProperties().deleteProperty('tg_charge_state');
-
   } else if (action === 'shipped_futsuu') {
     const rowNum = parseInt(parts[1]);
     tgAnswer_(cb.id, '');
@@ -1158,8 +1153,7 @@ function checkChargeBalanceAndNotify_() {
       `⚠️ <b>チャージ 餘額不足</b>\n\n現時餘額：<b>¥${bal.balance.toLocaleString()}</b>\n\n要新增充值嗎？`,
       { inline_keyboard: [[
         { text: '✅ 新增充值', callback_data: 'charge_add' },
-        { text: '📋 複製上一筆', callback_data: 'charge_copy' },
-        { text: '❌ 唔係', callback_data: 'charge_skip' }
+        { text: '📋 複製上一筆', callback_data: 'charge_copy' }
       ]] }
     );
   } catch(e) { Logger.log('TG 發送失敗: ' + e); }
