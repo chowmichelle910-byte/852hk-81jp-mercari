@@ -420,6 +420,32 @@ function handleTelegramUpdate_(update) {
     tgEdit_(msgId, cb.message.text + '\n\n✅ 好，請輸入日圓金額（JPY）：');
     PropertiesService.getScriptProperties().setProperty('tg_charge_state', 'wait_jpy');
 
+  } else if (action === 'charge_copy') {
+    tgAnswer_(cb.id, '');
+    try {
+      const ss          = SpreadsheetApp.getActiveSpreadsheet();
+      const chargeSheet = ss.getSheetByName('チャージ');
+      const lastRow     = chargeSheet.getLastRow();
+      const data        = chargeSheet.getRange(2, 1, lastRow - 1, 6).getValues();
+      let lastJpy = null, lastHkd = null, lastPlace = null;
+      for (let i = data.length - 1; i >= 0; i--) {
+        if (data[i][2]) { lastJpy = data[i][2]; lastHkd = data[i][3] || 0; lastPlace = data[i][5] || null; break; }
+      }
+      if (!lastJpy) {
+        tgEdit_(msgId, cb.message.text + '\n\n❌ 搵唔到上一筆紀錄');
+      } else {
+        const today = Utilities.formatDate(new Date(), 'Asia/Hong_Kong', 'yyyy/M/d');
+        addChargeRecord_(today, lastJpy, lastHkd, lastPlace);
+        tgEdit_(msgId,
+          cb.message.text +
+          `\n\n📋 <b>已複製上一筆</b>\n日期：${today}\nJPY：¥${Number(lastJpy).toLocaleString()}\nHKD：HK$${Number(lastHkd).toLocaleString()}` +
+          (lastPlace ? `\n地點：${lastPlace}` : '')
+        );
+      }
+    } catch(e) {
+      tgEdit_(msgId, cb.message.text + '\n\n❌ 複製失敗：' + e.message);
+    }
+
   } else if (action === 'charge_skip') {
     tgAnswer_(cb.id, '好的');
     tgEdit_(msgId, cb.message.text + '\n\n❌ 跳過');
@@ -1101,11 +1127,38 @@ function checkChargeBalanceAndNotify_() {
   const bal = getChargeBalance_();
   if (bal.error || bal.balance == null) return;
   if (bal.balance >= 10000) return;
+
+  // 如果已有下一筆充值紀錄（J欄最後有值的行之後還有資料行），不重複通知
+  try {
+    const ss          = SpreadsheetApp.getActiveSpreadsheet();
+    const chargeSheet = ss.getSheetByName('チャージ');
+    if (chargeSheet) {
+      const lastRow  = chargeSheet.getLastRow();
+      const jCol     = chargeSheet.getRange(2, 10, lastRow - 1, 1).getValues();
+      let lastJRow   = 1;
+      for (let i = jCol.length - 1; i >= 0; i--) {
+        const v = jCol[i][0];
+        if (v !== '' && v !== null && !isNaN(Number(v))) { lastJRow = i + 2; break; }
+      }
+      // B欄最後有日期的行
+      const bCol   = chargeSheet.getRange(2, 2, lastRow - 1, 1).getValues();
+      let lastBRow = 1;
+      for (let i = bCol.length - 1; i >= 0; i--) {
+        if (bCol[i][0] !== '' && bCol[i][0] !== null) { lastBRow = i + 2; break; }
+      }
+      if (lastBRow > lastJRow) return; // 已有下一筆，跳過
+    }
+  } catch(e) { Logger.log('充值檢查失敗: ' + e); }
+
+  // 如果 TG 充值流程已在進行中，不重複通知
+  if (PropertiesService.getScriptProperties().getProperty('tg_charge_state')) return;
+
   try {
     tgSend_(
       `⚠️ <b>チャージ 餘額不足</b>\n\n現時餘額：<b>¥${bal.balance.toLocaleString()}</b>\n\n要新增充值嗎？`,
       { inline_keyboard: [[
-        { text: '✅ 係，新增充值', callback_data: 'charge_add' },
+        { text: '✅ 新增充值', callback_data: 'charge_add' },
+        { text: '📋 複製上一筆', callback_data: 'charge_copy' },
         { text: '❌ 唔係', callback_data: 'charge_skip' }
       ]] }
     );
