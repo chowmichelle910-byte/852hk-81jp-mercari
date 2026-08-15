@@ -295,7 +295,7 @@ button{font-family:var(--font);}
 .spin{width:26px;height:26px;border:3px solid rgba(201,168,76,.25);border-top-color:var(--gold);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 9px;}
 @keyframes sp{to{transform:rotate(360deg);}}
 </style>
-<script async src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
 </head>
 <body>
 <datalist id="idList"></datalist>
@@ -1009,9 +1009,9 @@ async function doTrackSearch(val){
   const inp=document.getElementById('trackSearch');if(inp)inp.value='';
 }
 
-let quaggaRunning=false,nativeScanStream=null,nativeScanRaf=null;
+let zxingControls=null,nativeScanStream=null,nativeScanRaf=null;
 async function toggleScan(){
-  if(quaggaRunning||nativeScanStream){stopScan();return;}
+  if(zxingControls||nativeScanStream){stopScan();return;}
   const btn=document.getElementById('scanBtn');
   const video=document.getElementById('scanVideo');
   btn.classList.add('active');btn.textContent='⏹';
@@ -1030,29 +1030,24 @@ async function toggleScan(){
       return;
     }catch(e){stopScan();}
   }
-  // Fallback：Quagga2（iOS Safari / Firefox）
-  if(typeof Quagga==='undefined'){alert('掃描功能仍在載入中，請稍後再試。');stopScan();return;}
-  video.style.display='block';
-  quaggaRunning=true;
-  Quagga.init({
-    inputStream:{type:'LiveStream',target:video,constraints:{facingMode:{ideal:'environment'}}},
-    decoder:{readers:['code_128_reader','code_39_reader','ean_reader','ean_8_reader','itf_reader','codabar_reader']},
-    locate:true
-  },function(err){
-    if(err){alert('無法開啟鏡頭：'+err);stopScan();return;}
-    Quagga.start();
-    Quagga.onDetected(function(result){
-      const val=result.codeResult.code;if(!val)return;
+  // Fallback：@zxing/browser（iOS Safari / Firefox）
+  if(typeof ZXingBrowser==='undefined'){alert('掃描功能仍在載入中，請稍後再試。');stopScan();return;}
+  try{
+    video.style.display='block';
+    const reader=new ZXingBrowser.BrowserMultiFormatReader();
+    zxingControls=await reader.decodeFromVideoDevice(undefined,video,(result,err)=>{
+      if(!result)return;
+      const val=result.getText();
       document.getElementById('trackSearch').value=val;
       stopScan();doTrackSearch(val);
     });
-  });
+  }catch(e){alert('無法開啟鏡頭：'+(e.message||e));stopScan();}
 }
 
 function stopScan(){
   if(nativeScanRaf){cancelAnimationFrame(nativeScanRaf);nativeScanRaf=null;}
   if(nativeScanStream){nativeScanStream.getTracks().forEach(t=>t.stop());nativeScanStream=null;}
-  if(quaggaRunning){try{Quagga.stop();}catch(e){}quaggaRunning=false;}
+  if(zxingControls){try{zxingControls.stop();}catch(e){}zxingControls=null;}
   const video=document.getElementById('scanVideo');if(video){video.style.display='none';video.srcObject=null;}
   const btn=document.getElementById('scanBtn');if(btn){btn.classList.remove('active');btn.textContent='📷';}
 }
