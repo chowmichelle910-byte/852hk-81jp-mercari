@@ -1867,7 +1867,8 @@ function generatePostData(selectedGroup) {
       const startRow=5,numRowsToClear=Math.max(targetSFSheet.getLastRow()-startRow+1,100);
       targetSFSheet.getRange(startRow,1,numRowsToClear,13).clearContent();
       targetSFSheet.getRange(startRow,1,sfDataRows.length,sfDataRows[0].length).setValues(sfDataRows);
-      Utilities.sleep(5000);
+      SpreadsheetApp.flush();
+      Utilities.sleep(8000);
       const url=`https://docs.google.com/spreadsheets/d/${TARGET_SF_SPREADSHEET_ID}/export?exportFormat=xlsx`;
       const token=ScriptApp.getOAuthToken();
       const response=UrlFetchApp.fetch(url,{headers:{Authorization:'Bearer '+token},muteHttpExceptions:true});
