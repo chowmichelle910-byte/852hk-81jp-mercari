@@ -480,35 +480,6 @@ const ADMIN_PASSWORD               = '4916';
 // ─────────────────────────────────────────────
 //  onOpen
 // ─────────────────────────────────────────────
-function onOpen() {
-  const ui = SpreadsheetApp.getUi();
-  ui.createMenu('出單')
-    .addItem('工具', 'showSidebar')
-    .addToUi();
-}
-
-// ─────────────────────────────────────────────
-//  Sidebar
-// ─────────────────────────────────────────────
-function showSidebar() {
-  const ss        = SpreadsheetApp.getActiveSpreadsheet();
-  const dataSheet = ss.getSheetByName('Data');
-  const data      = dataSheet.getRange('H2:H').getValues().flat();
-  const groups    = [...new Set(data.filter(g => g))];
-  groups.sort((a, b) => {
-    const numA = parseInt(a.toString().match(/\d+/));
-    const numB = parseInt(b.toString().match(/\d+/));
-    return numB - numA;
-  });
-  if (groups.length === 0) {
-    SpreadsheetApp.getUi().alert('「Data」分頁的 H 欄沒有任何團次可選擇。');
-    return;
-  }
-  const template  = HtmlService.createTemplateFromFile('Sidebar');
-  template.groups = groups;
-  const html      = template.evaluate().setTitle('📮 新團工具').setWidth(320);
-  SpreadsheetApp.getUi().showSidebar(html);
-}
 
 // ─────────────────────────────────────────────
 //  doPost — 完整 Web App 入口
@@ -1880,10 +1851,10 @@ function generatePostData(selectedGroup) {
     const consignmentName=processConsignmentName(String(row[COL_PRODUCT_CODES]),productNameLookup);
     let [province,city,district,detailAddress]=['','','',''];
     if(sfCode)[province,city,district,detailAddress]=sfAddressLookup[sfCode]||['','','',''];
-    const newRow=Array(14).fill('');
-    newRow[1]=recipient;newRow[2]='852';newRow[3]=String(row[COL_PHONE]).trim();
-    newRow[6]=province;newRow[7]=city;newRow[8]=district;newRow[9]=detailAddress;
-    newRow[10]='到付';newRow[12]=consignmentName;newRow[13]=sfCode||'';
+    const newRow=Array(13).fill('');
+    newRow[0]=recipient;newRow[1]='852';newRow[2]=String(row[COL_PHONE]).trim();
+    newRow[5]=province;newRow[6]=city;newRow[7]=district;newRow[8]=detailAddress;
+    newRow[9]='到付';newRow[11]=consignmentName;newRow[12]=sfCode||'';
     sfDataRows.push(newRow);
     sfTextRows.push({product:consignmentName,receiver:recipient,phone:String(row[COL_PHONE]).trim(),address:fullAddress,recordF:String(row[COL_RECORD_F]||'').trim(),userName:String(row[COL_USER_NAME]||'').trim()});
   });
@@ -1894,7 +1865,7 @@ function generatePostData(selectedGroup) {
       const targetSFSheet=targetSFSpreadsheet.getSheetByName(SF_TEMPLATE_SHEET_NAME);
       if(!targetSFSheet){SpreadsheetApp.getUi().alert(`錯誤：找不到分頁 "${SF_TEMPLATE_SHEET_NAME}"`);return '失敗：順豐分頁名稱錯誤。';}
       const startRow=5,numRowsToClear=Math.max(targetSFSheet.getLastRow()-startRow+1,100);
-      targetSFSheet.getRange(startRow,1,numRowsToClear,14).clearContent();
+      targetSFSheet.getRange(startRow,1,numRowsToClear,13).clearContent();
       targetSFSheet.getRange(startRow,1,sfDataRows.length,sfDataRows[0].length).setValues(sfDataRows);
       Utilities.sleep(5000);
       const url=`https://docs.google.com/spreadsheets/d/${TARGET_SF_SPREADSHEET_ID}/export?exportFormat=xlsx`;
