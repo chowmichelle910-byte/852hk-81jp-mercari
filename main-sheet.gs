@@ -772,6 +772,46 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'saveArrivalData': {
+      try {
+        const rowNum      = parseInt(e.parameter.row);
+        if (isNaN(rowNum) || rowNum < 2) return jsonResponse_({ error: 'invalid row' });
+        const sheet       = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const position    = e.parameter.position    !== undefined ? String(e.parameter.position).trim()   : null;
+        const custId      = e.parameter.custId      !== undefined ? String(e.parameter.custId).trim()     : null;
+        const weight      = e.parameter.weight      !== undefined ? parseFloat(e.parameter.weight)         : null;
+        const arrivalDate = e.parameter.arrivalDate !== undefined ? String(e.parameter.arrivalDate).trim() : null;
+        const image       = e.parameter.image       !== undefined ? String(e.parameter.image).trim()       : null;
+        const track       = e.parameter.track       !== undefined ? String(e.parameter.track).trim()       : null;
+
+        if (position !== null) sheet.getRange(rowNum, 3).setValue(position);
+        if (custId   !== null) sheet.getRange(rowNum, 4).setValue(custId);
+        if (weight   !== null && !isNaN(weight)) sheet.getRange(rowNum, 17).setValue(weight);
+        if (image    !== null) sheet.getRange(rowNum, 19).setValue(image);
+        if (track    !== null) {
+          const hdr      = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+          const trackCol = hdr.indexOf('Photo/送り状番号') + 1;
+          if (trackCol > 0) sheet.getRange(rowNum, trackCol).setValue('送り状番号：' + track);
+        }
+        if (arrivalDate !== null && arrivalDate !== '') {
+          sheet.getRange(rowNum, 16).setValue(arrivalDate);
+          sheet.getRange(rowNum, 16).setNumberFormat('yyyy/m/d');
+          try { assignGroupByArrivalDate(); } catch(err) {}
+          const url = String(sheet.getRange(rowNum, 6).getValue() || '').trim();
+          if (url.includes('mercari.com/item/')) {
+            const tUrl = url.replace('/item/', '/transaction/');
+            try {
+              tgSend_(
+                `⭐ <b>新到貨，請評價</b>\n\n<a href="${tUrl}">${tUrl}</a>`,
+                { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]] }
+              );
+            } catch(err) { Logger.log('TG 評價通知失敗: ' + err); }
+          }
+        }
+        return jsonResponse_({ success: true });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     default:
       return jsonResponse_({ error: '未知 action: ' + action });
   }
@@ -1157,23 +1197,6 @@ function checkChargeBalanceAndNotify_() {
       ]] }
     );
   } catch(e) { Logger.log('TG 發送失敗: ' + e); }
-}
-
-// ─────────────────────────────────────────────
-//  到貨時發 TG 評價通知（onEdit P欄觸發）
-// ─────────────────────────────────────────────
-function notifyRatingIfArrived_(sheet, row) {
-  const arrivalDate = sheet.getRange(row, 16).getValue();
-  if (!arrivalDate) return; // 日期被清空，不通知
-  const url = String(sheet.getRange(row, 6).getValue() || '').trim();
-  if (!url.includes('mercari.com/item/')) return;
-  const tUrl = url.replace('/item/', '/transaction/');
-  try {
-    tgSend_(
-      `⭐ <b>新到貨，請評價</b>\n\n<a href="${tUrl}">${tUrl}</a>`,
-      { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]] }
-    );
-  } catch(e) { Logger.log('TG 評價通知失敗: ' + e); }
 }
 
 // ─────────────────────────────────────────────
@@ -2051,7 +2074,7 @@ function onEdit(e) {
     const AB_COL=28,abCell=sheet.getRange(row,AB_COL),originalAbValue=abCell.getValue();
     const abHadManualValue=(originalAbValue!==null&&originalAbValue.toString().trim()!=="");
     const triggerCols=[3,4,5,6,7,8,16];
-    if(triggerCols.includes(col)){if(col===16){assignGroupByArrivalDate();notifyRatingIfArrived_(sheet,row);}}
+    if(triggerCols.includes(col)){if(col===16)assignGroupByArrivalDate();}
     if(col===8)updateOrdersCurrencyAndChargeWeighted();
     if(col===4){updateUniquePlatformUser();}
     if(col===7)updateSerialNumberInColO();
