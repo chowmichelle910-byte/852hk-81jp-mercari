@@ -295,7 +295,7 @@ button{font-family:var(--font);}
 .spin{width:26px;height:26px;border:3px solid rgba(201,168,76,.25);border-top-color:var(--gold);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 9px;}
 @keyframes sp{to{transform:rotate(360deg);}}
 </style>
-<script async src="https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/iife/index.js" onload="if(!('BarcodeDetector'in window)&&window.barcodeDetectorPolyfill)window.BarcodeDetector=barcodeDetectorPolyfill.BarcodeDetectorPolyfill;"></script>
+<script async src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
 </head>
 <body>
 <datalist id="idList"></datalist>
@@ -979,7 +979,6 @@ async function render(){
 }
 
 // ── 運單號碼查詢 + 條碼掃描 ──
-let scanStream=null,scanRaf=null;
 
 function onTrackInput(val){
   // 即時查詢（輸入停頓後）
@@ -1010,37 +1009,33 @@ async function doTrackSearch(val){
   const inp=document.getElementById('trackSearch');if(inp)inp.value='';
 }
 
+let quaggaRunning=false;
 async function toggleScan(){
-  if(scanStream){stopScan();return;}
+  if(quaggaRunning){stopScan();return;}
+  if(typeof Quagga==='undefined'){alert('掃描功能仍在載入中，請稍後再試。');return;}
   const btn=document.getElementById('scanBtn');
   const video=document.getElementById('scanVideo');
-
-  if(!('BarcodeDetector'in window)&&window.barcodeDetectorPolyfill)window.BarcodeDetector=barcodeDetectorPolyfill.BarcodeDetectorPolyfill;
-  if(!('BarcodeDetector'in window)){alert('掃描功能仍在載入中，請稍後再試。');return;}
-  try{
-    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
-    video.srcObject=scanStream;video.style.display='block';
-    btn.classList.add('active');btn.textContent='⏹';
-    const det=new BarcodeDetector({formats:['code_128','code_39','qr_code','data_matrix','ean_13','ean_8','upc_a','upc_e','itf','codabar']});
-    const scan=async()=>{
-      if(!scanStream)return;
-      try{
-        const codes=await det.detect(video);
-        if(codes.length>0){
-          const val=codes[0].rawValue;
-          document.getElementById('trackSearch').value=val;
-          stopScan();doTrackSearch(val);return;
-        }
-      }catch(e){}
-      scanRaf=requestAnimationFrame(scan);
-    };
-    video.onloadedmetadata=()=>{scanRaf=requestAnimationFrame(scan);};
-  }catch(e){alert('無法開啟鏡頭：'+(e.name||'')+' '+e.message);stopScan();}
+  video.style.display='block';
+  btn.classList.add('active');btn.textContent='⏹';
+  quaggaRunning=true;
+  Quagga.init({
+    inputStream:{type:'LiveStream',target:video,constraints:{facingMode:{ideal:'environment'}}},
+    decoder:{readers:['code_128_reader','code_39_reader','ean_reader','ean_8_reader','itf_reader','codabar_reader']},
+    locate:true
+  },function(err){
+    if(err){alert('無法開啟鏡頭：'+err);stopScan();return;}
+    Quagga.start();
+    Quagga.onDetected(function(result){
+      const val=result.codeResult.code;
+      if(!val)return;
+      document.getElementById('trackSearch').value=val;
+      stopScan();doTrackSearch(val);
+    });
+  });
 }
 
 function stopScan(){
-  if(scanRaf){cancelAnimationFrame(scanRaf);scanRaf=null;}
-  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+  if(quaggaRunning){try{Quagga.stop();}catch(e){}quaggaRunning=false;}
   const video=document.getElementById('scanVideo');if(video)video.style.display='none';
   const btn=document.getElementById('scanBtn');if(btn){btn.classList.remove('active');btn.textContent='📷';}
 }
