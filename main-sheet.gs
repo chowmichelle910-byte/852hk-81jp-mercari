@@ -849,21 +849,21 @@ function getGroupEmailPreview_(groupId) {
 
   const html = `<div style="font-family:sans-serif;font-size:14px;line-height:1.9;">
 <b>【Mercari代購｜${group}開始啦！${format(endDate)}截】</b><br><br>
-୨୧┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈୨୧<br>
-<b>收單時間</b>｜${format(startDate)} 至 ${format(endDate)}<br>
-<b>日本寄出日</b>｜預計 ${fOffset(endDate,1)}<br>
-<b>香港到貨日</b>｜預計 ${fOffset(endDate,7)} 後<br>
+୨୧┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈୨୧<br><br>
+收單時間｜${format(startDate)} 至 ${format(endDate)}<br>
+日本寄出日｜預計 ${fOffset(endDate,1)}<br>
+香港到貨日｜預計 ${fOffset(endDate,7)} 後<br><br>
 ୨୧┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈୨୧<br><br>
 ✓ 無其他手續費<br>
 ✓ 收到款項即時代拍<br>
 ✓ 到港後以順豐到付／郵局易寄取／平郵寄出<br><br>
-<b>本團匯率（以每團每位客人總金額計算）：</b><br>
+本團匯率（以每團每位客人總金額計算）：<br>
 ・¥1～10,000 → ${rate1}算<br>
 ・¥10,001～50,000 → ${rate2}算<br>
-・¥50,001或以上 → ${rate3}算<br>
-<b>到港運費：</b>HK$4.5／50g（50g起跳，超過50g以實重計算）<br><br>
+・¥50,001或以上 → ${rate3}算<br><br>
+到港運費：HK$4.5／50g（50g起跳，超過50g以實重計算）<br><br>
 👉🏻 歡迎dm/wts查詢 🔍<br>
-*<i>wts link可以喺profile搵到</i> 🥰<br>
+*wts link可以喺profile搵到 🥰<br>
 📱 +852 9337 5712<br><br>
 #Mercari代購 #日本限定 #代購推薦</div>`;
 
