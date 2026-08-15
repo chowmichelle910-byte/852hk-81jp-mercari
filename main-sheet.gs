@@ -271,8 +271,7 @@ function handleTelegramUpdate_(update) {
         const code2    = String(rowData2[14] || '').trim();
         const link2    = String(rowData2[5]  || '').trim();
         tgSend_(
-          `✅ <b>已填入</b>` +
-          (code2 ? `\nCode: ${code2}` : '') +
+          `✅ ${code2 ? `(${code2}) ` : ''}<b>已填入</b>` +
           (link2 ? `\n${link2}` : '') +
           `\nPosition：<b>${pos}</b>\n客人 ID：<b>${text}</b>`,
           null, fromChatId
@@ -405,8 +404,7 @@ function handleTelegramUpdate_(update) {
 
     tgAnswer_(cb.id, '✅ 已填入！');
     tgEdit_(msgId,
-      `✅ <b>已填入</b>` +
-      (code ? `\nCode: ${code}` : '') +
+      `✅ ${code ? `(${code}) ` : ''}<b>已填入</b>` +
       (link ? `\n${link}` : '') +
       `\nPosition：<b>${pos}</b>\n客人 ID：<b>${selId}</b>`
     );
@@ -797,12 +795,13 @@ function doPost(e) {
           sheet.getRange(rowNum, 16).setValue(arrivalDate);
           sheet.getRange(rowNum, 16).setNumberFormat('yyyy/m/d');
           try { assignGroupByArrivalDate(); } catch(err) {}
-          const url = String(sheet.getRange(rowNum, 6).getValue() || '').trim();
-          if (url.includes('mercari.com/item/')) {
-            const tUrl = url.replace('/item/', '/transaction/');
+          const url  = String(sheet.getRange(rowNum, 6).getValue() || '').trim();
+          const code = String(sheet.getRange(rowNum, 15).getValue() || '').trim();
+          const tUrl = url.includes('mercari.com/item/') ? url.replace('/item/', '/transaction/') : url;
+          if (tUrl) {
             try {
               tgSend_(
-                `⭐ <b>新到貨，請評價</b>\n\n<a href="${tUrl}">${tUrl}</a>`,
+                `⭐ <b>新到貨，請評價</b>\n\n${code ? code + '. ' : ''}${tUrl}`,
                 { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]] }
               );
             } catch(err) { Logger.log('TG 評價通知失敗: ' + err); }
