@@ -2340,7 +2340,7 @@ function updateOrdersFromGmail() {
     `subject:"メルカリ購入者")`;
 
   // ── 発送 email：不加 label:inbox，因 Gmail filter 可能已 archive；只排 Processed-Shipped ──
-  const qShipped = `-label:${LABEL_SHIPPED} newer_than:14d from:no-reply@mercari.jp`;
+  const qShipped = `-label:${LABEL_MERCARI} -label:${LABEL_SHOPS} -label:${LABEL_SHIPPED} newer_than:14d from:no-reply@mercari.jp`;
 
   const seenIds  = new Set();
   const threads  = [...GmailApp.search(q), ...GmailApp.search(qShipped)]
