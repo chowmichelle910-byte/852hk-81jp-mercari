@@ -16,7 +16,7 @@
   --font:'Noto Sans HK',sans-serif;--mono:'DM Mono',monospace;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-body{font-family:var(--font);background:var(--mist);margin:0;padding:0;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+body{font-family:var(--font);background:var(--mist);margin:0;padding:0;overflow-x:clip;-webkit-font-smoothing:antialiased;}
 button{font-family:var(--font);}
 
 /* Topbar */
@@ -295,13 +295,15 @@ button{font-family:var(--font);}
 .spin{width:26px;height:26px;border:3px solid rgba(201,168,76,.25);border-top-color:var(--gold);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 9px;}
 @keyframes sp{to{transform:rotate(360deg);}}
 </style>
-<script>
-// Polyfill BarcodeDetector lazily on first scan attempt
-window._ensureBarcodeDetector=async function(){
-  if('BarcodeDetector'in globalThis)return;
-  const m=await import('https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/es/index.js');
-  globalThis.BarcodeDetector=m.BarcodeDetectorPolyfill;
-};
+<script type="module">
+// Preload polyfill at page start so it's ready before any user gesture
+if(!('BarcodeDetector'in globalThis)){
+  try{
+    const m=await import('https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/es/index.js');
+    globalThis.BarcodeDetector=m.BarcodeDetectorPolyfill;
+  }catch(e){}
+}
+window._barcodeDetectorReady=true;
 </script>
 </head>
 <body>
@@ -1023,7 +1025,6 @@ async function toggleScan(){
   const video=document.getElementById('scanVideo');
 
   try{
-    await window._ensureBarcodeDetector();
     scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
     video.srcObject=scanStream;video.style.display='block';
     btn.classList.add('active');btn.textContent='⏹';
@@ -1041,7 +1042,7 @@ async function toggleScan(){
       scanRaf=requestAnimationFrame(scan);
     };
     video.onloadedmetadata=()=>{scanRaf=requestAnimationFrame(scan);};
-  }catch(e){alert('無法開啟鏡頭：'+e.message);stopScan();}
+  }catch(e){alert('無法開啟鏡頭：'+(e.name||'')+' '+e.message);stopScan();}
 }
 
 function stopScan(){
