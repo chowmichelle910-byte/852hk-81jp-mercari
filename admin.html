@@ -295,16 +295,7 @@ button{font-family:var(--font);}
 .spin{width:26px;height:26px;border:3px solid rgba(201,168,76,.25);border-top-color:var(--gold);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 9px;}
 @keyframes sp{to{transform:rotate(360deg);}}
 </style>
-<script type="module">
-// Preload polyfill at page start so it's ready before any user gesture
-if(!('BarcodeDetector'in globalThis)){
-  try{
-    const m=await import('https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/es/index.js');
-    globalThis.BarcodeDetector=m.BarcodeDetectorPolyfill;
-  }catch(e){}
-}
-window._barcodeDetectorReady=true;
-</script>
+<script async src="https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/iife/index.js" onload="if(!('BarcodeDetector'in window)&&window.barcodeDetectorPolyfill)window.BarcodeDetector=barcodeDetectorPolyfill.BarcodeDetectorPolyfill;"></script>
 </head>
 <body>
 <datalist id="idList"></datalist>
@@ -1024,6 +1015,8 @@ async function toggleScan(){
   const btn=document.getElementById('scanBtn');
   const video=document.getElementById('scanVideo');
 
+  if(!('BarcodeDetector'in window)&&window.barcodeDetectorPolyfill)window.BarcodeDetector=barcodeDetectorPolyfill.BarcodeDetectorPolyfill;
+  if(!('BarcodeDetector'in window)){alert('掃描功能仍在載入中，請稍後再試。');return;}
   try{
     scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
     video.srcObject=scanStream;video.style.display='block';
