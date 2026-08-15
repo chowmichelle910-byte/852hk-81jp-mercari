@@ -765,6 +765,8 @@ function doPost(e) {
         if (arrivalDate !== null && arrivalDate !== '') {
           sheet.getRange(rowNum, 16).setValue(arrivalDate);
           sheet.getRange(rowNum, 16).setNumberFormat('yyyy/m/d');
+          // 只有到貨日期存在時才寫「未評價」到 AC 欄（col 29）
+          sheet.getRange(rowNum, 29).setValue('未評價');
           try { assignGroupByArrivalDate(); } catch(err) {}
           const url  = String(sheet.getRange(rowNum, 6).getValue() || '').trim();
           const code = String(sheet.getRange(rowNum, 15).getValue() || '').trim();
@@ -778,6 +780,9 @@ function doPost(e) {
             } catch(err) { Logger.log('TG 評價通知失敗: ' + err); }
           }
         }
+        // status='' 時清除 AC 欄（已評價）
+        const statusParam = e.parameter.status !== undefined ? String(e.parameter.status).trim() : null;
+        if (statusParam === '') sheet.getRange(rowNum, 29).setValue('');
         return jsonResponse_({ success: true });
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
