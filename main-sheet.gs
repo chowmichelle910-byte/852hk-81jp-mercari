@@ -2206,11 +2206,12 @@ function logMercariOrders() {
       if(!itemIdMatch||!itemNameMatch||!itemPriceMatch)continue;
       const itemUrl="https://jp.mercari.com/item/"+itemIdMatch[1];
       const existingUrls=sheet.getRange("F2:F"+sheet.getLastRow()).getValues().flat();
-      if(existingUrls.includes(itemUrl))continue;
+      if(existingUrls.includes(itemUrl)||isUrlBlacklisted_(itemUrl))continue;
       const nextRow=getNextOrderRow_(sheet);
       sheet.getRange(nextRow,2).setValue(dateReceived);sheet.getRange(nextRow,5).setValue("Mercari");
       sheet.getRange(nextRow,6).setValue(itemUrl);sheet.getRange(nextRow,7).setValue(itemNameMatch[1].trim());
       sheet.getRange(nextRow,8).setValue(itemPriceMatch[1].replace(/,/g,""));
+      blacklistUrl_(itemUrl);
     }
     thread.addLabel(GmailApp.createLabel(labelName));
   }
@@ -2387,7 +2388,7 @@ function updateOrdersFromGmail() {
         const priceMatch = plainBody.match(/商品代金\s*[：:]\s*[¥￥]([\d,]+)/);
         if (idMatch && nameMatch && priceMatch) {
           const itemUrl = 'https://jp.mercari.com/item/' + idMatch[1];
-          if (!existingUrls.includes(itemUrl)) {
+          if (!existingUrls.includes(itemUrl) && !isUrlBlacklisted_(itemUrl)) {
             const nextRow = getNextOrderRow_(orderSheet);
             orderSheet.getRange(nextRow, 2).setValue(dateStr);
             orderSheet.getRange(nextRow, 5).setValue('Mercari');
@@ -2395,6 +2396,7 @@ function updateOrdersFromGmail() {
             orderSheet.getRange(nextRow, 7).setValue(nameMatch[1].trim());
             orderSheet.getRange(nextRow, 8).setValue(priceMatch[1].replace(/,/g, ''));
             existingUrls.push(itemUrl);
+            blacklistUrl_(itemUrl);
             anyNewOrder = true;
           }
         }
@@ -2472,7 +2474,7 @@ function updateOrdersFromGmail() {
         const nameMatch  = plainBody.match(/商品名\s*[：:]\s*(.+)/);
         if (orderMatch && nameMatch) {
           const orderUrl = 'https://mercari-shops.com/orders/' + orderMatch[1];
-          if (!existingUrls.includes(orderUrl)) {
+          if (!existingUrls.includes(orderUrl) && !isUrlBlacklisted_(orderUrl)) {
             const pm = plainBody.match(/商品価格\s*[：:]\s*[¥￥]([\d,]+)/) ||
                        plainBody.match(/商品代金\s*[：:]\s*[¥￥]([\d,]+)/) ||
                        plainBody.match(/注文金額合計\s*[：:]\s*[¥￥]([\d,]+)/);
@@ -2484,6 +2486,7 @@ function updateOrdersFromGmail() {
             orderSheet.getRange(nextRow, 7).setValue(nameMatch[1].trim());
             if (price) orderSheet.getRange(nextRow, 8).setValue(price);
             existingUrls.push(orderUrl);
+            blacklistUrl_(orderUrl);
             anyNewOrder = true;
             console.log('Mercari Shops 新增：' + nameMatch[1].trim());
           }
@@ -2620,6 +2623,16 @@ function syncDailyColumns() {
 // ─────────────────────────────────────────────
 //  輔助函數
 // ─────────────────────────────────────────────
+// ── 永久黑名單：URL 一旦寫入過，即使行被 delete 都唔會再寫 ──
+function isUrlBlacklisted_(url) {
+  const key = 'bl_' + url.replace(/[^A-Za-z0-9]/g, '_').substring(0, 230);
+  return !!PropertiesService.getScriptProperties().getProperty(key);
+}
+function blacklistUrl_(url) {
+  const key = 'bl_' + url.replace(/[^A-Za-z0-9]/g, '_').substring(0, 230);
+  PropertiesService.getScriptProperties().setProperty(key, '1');
+}
+
 function generateUsername(length=15){const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';let result='';for(let i=0;i<length;i++)result+=chars.charAt(Math.floor(Math.random()*chars.length));return result;}
 function formatDate(date){if(!date)return'';if(!(date instanceof Date)){const parsed=new Date(date);if(!isNaN(parsed.getTime()))date=parsed;else return String(date);}return`${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()}`;}
 function formatPhoneNumber(phone){const p=String(phone).replace(/[^0-9]/g,'').trim();return p.length===8?p.slice(0,4)+' '+p.slice(4):p;}
