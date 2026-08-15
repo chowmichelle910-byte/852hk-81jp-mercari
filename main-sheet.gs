@@ -1160,6 +1160,23 @@ function checkChargeBalanceAndNotify_() {
 }
 
 // ─────────────────────────────────────────────
+//  到貨時發 TG 評價通知（onEdit P欄觸發）
+// ─────────────────────────────────────────────
+function notifyRatingIfArrived_(sheet, row) {
+  const arrivalDate = sheet.getRange(row, 16).getValue();
+  if (!arrivalDate) return; // 日期被清空，不通知
+  const url = String(sheet.getRange(row, 6).getValue() || '').trim();
+  if (!url.includes('mercari.com/item/')) return;
+  const tUrl = url.replace('/item/', '/transaction/');
+  try {
+    tgSend_(
+      `⭐ <b>新到貨，請評價</b>\n\n<a href="${tUrl}">${tUrl}</a>`,
+      { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]] }
+    );
+  } catch(e) { Logger.log('TG 評價通知失敗: ' + e); }
+}
+
+// ─────────────────────────────────────────────
 //  Buyer 分頁摘要
 //  E=名稱, F=金額, G=匯率, F1=當前團號
 // ─────────────────────────────────────────────
@@ -2034,7 +2051,7 @@ function onEdit(e) {
     const AB_COL=28,abCell=sheet.getRange(row,AB_COL),originalAbValue=abCell.getValue();
     const abHadManualValue=(originalAbValue!==null&&originalAbValue.toString().trim()!=="");
     const triggerCols=[3,4,5,6,7,8,16];
-    if(triggerCols.includes(col)){if(col===16)assignGroupByArrivalDate();}
+    if(triggerCols.includes(col)){if(col===16){assignGroupByArrivalDate();notifyRatingIfArrived_(sheet,row);}}
     if(col===8)updateOrdersCurrencyAndChargeWeighted();
     if(col===4){updateUniquePlatformUser();}
     if(col===7)updateSerialNumberInColO();
