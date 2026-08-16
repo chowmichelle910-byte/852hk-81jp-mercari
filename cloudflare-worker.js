@@ -78,7 +78,7 @@ async function sendNewOrderPreview(chatId, url, name, price) {
   const priceDisplay = np ? `¥${parseInt(np).toLocaleString()}` : '❓ 未能自動取得';
   await tg('sendMessage', {
     chat_id: chatId,
-    text: `🛒 <b>新訂單預覽</b>\n\n商品：${nameDisplay}\n價格：${priceDisplay}\n🔗 ${url}\n\n_nou_:${url}\n_non_:${nd}\n_nop_:${np}`,
+    text: `🛒 <b>新訂單預覽</b>\n\n商品：${nameDisplay}\n價格：${priceDisplay}\n🔗 ${url}\n<tg-spoiler>_nou_:${url}\n_non_:${nd}\n_nop_:${np}</tg-spoiler>`,
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: [[
       { text: '✅ 確認新增', callback_data: 'confirm_no' },
