@@ -243,7 +243,10 @@ async function handleUpdate(update) {
         await tg('sendMessage', { chat_id: chatId, text: '✅ 沒有待評價的商品' });
         return;
       }
-      const lines   = items.map((u, i) => `${i + 1}. <a href="${u.tUrl}">${u.tUrl}</a>`).join('\n');
+      const lines = items.map((u, i) => {
+        const label = [u.code, u.name].filter(Boolean).join('  ');
+        return `${i + 1}. ${label ? label + '\n' : ''}<a href="${u.tUrl}">${u.tUrl}</a>`;
+      }).join('\n\n');
       await tg('sendMessage', {
         chat_id: chatId,
         text: `⭐ <b>待評價（${items.length} 件）</b>\n\n${lines}`,

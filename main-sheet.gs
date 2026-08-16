@@ -167,7 +167,8 @@ function checkNewOrdersAndNotify() {
     const tUrl = link.replace('/item/', '/transaction/');
     tgSend_(
       `⭐ <b>待評價商品</b>${code ? '  ' + tgEscape_(code) : ''}` +
-      `${itemName ? '\n' + tgEscape_(itemName) : ''}\n${tUrl}`
+      `${itemName ? '\n' + tgEscape_(itemName) : ''}\n${tUrl}`,
+      { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]] }
     );
     props.setProperty('tg_unrated_' + rowNum, '1');
   }
@@ -691,7 +692,8 @@ function doPost(e) {
           items.push({
             rowNum  : i + 2,
             tUrl    : link.replace('/item/', '/transaction/'),
-            code    : String(data[i][14] || '').trim()
+            code    : String(data[i][14] || '').trim(),
+            name    : String(data[i][6]  || '').trim()
           });
         }
         return jsonResponse_({ items });
