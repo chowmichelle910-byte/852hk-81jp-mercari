@@ -198,7 +198,7 @@ function tgShowCustPage_(msgId, rowNum, pos, code, itemUrl, ids, offset) {
 
 function tgForceReply_(text, chatId) {
   const cid = chatId || TG_CHAT_ID;
-  const url = `https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`;
+  const url = `https://api.telegram.org/bot${TG_TOKEN}/sendMessage`;
   UrlFetchApp.fetch(url, {
     method: 'post',
     contentType: 'application/json',
