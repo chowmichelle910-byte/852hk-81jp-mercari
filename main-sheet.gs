@@ -196,6 +196,22 @@ function tgShowCustPage_(msgId, rowNum, pos, code, itemUrl, ids, offset) {
   );
 }
 
+function tgForceReply_(text, chatId) {
+  const cid = chatId || TG_CHAT_ID;
+  const url = `https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`;
+  UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({
+      chat_id: cid,
+      text: text,
+      parse_mode: 'HTML',
+      reply_markup: { force_reply: true, selective: true }
+    }),
+    muteHttpExceptions: true
+  });
+}
+
 function handleTelegramUpdate_(update) {
   // 處理文字指令（如 /pending）
   const msg = update.message;
@@ -203,15 +219,14 @@ function handleTelegramUpdate_(update) {
     const fromChatId = msg.chat && msg.chat.id ? String(msg.chat.id) : TG_CHAT_ID;
     const text = String(msg.text || '').trim();
 
-    // 處理手動輸入客人 ID 或 チャージ 充值金額（pending state）
-    if (!text.startsWith('/')) {
-      const props   = PropertiesService.getScriptProperties();
+    // 處理 force_reply 回覆（通過 reply_to_message 中的 marker 判斷）
+    if (!text.startsWith('/') && msg.reply_to_message) {
+      const refText = String(msg.reply_to_message.text || '');
 
-      // 発送 送り状番号 輸入
-      const shipState = props.getProperty('tg_ship_state') || '';
-      if (shipState.startsWith('wait_track:')) {
-        const rowNum = parseInt(shipState.split(':')[1]);
-        props.deleteProperty('tg_ship_state');
+      // 送り状番号
+      const shipMatch = refText.match(/_ship:(\d+)_/);
+      if (shipMatch) {
+        const rowNum = parseInt(shipMatch[1]);
         if (!isNaN(rowNum) && rowNum >= 2) {
           const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
           const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -224,30 +239,26 @@ function handleTelegramUpdate_(update) {
         return;
       }
 
-      // チャージ 充值：等待 JPY
-      if (props.getProperty('tg_charge_state') === 'wait_jpy') {
+      // チャージ 充值 JPY
+      if (refText.includes('_charge:jpy_')) {
         const jpy = parseFloat(text.replace(/[^\d.]/g, ''));
         if (isNaN(jpy) || jpy <= 0) {
-          tgSend_('請輸入有效嘅日圓金額（例如：50000）', null, fromChatId);
+          tgForceReply_('請輸入有效嘅日圓金額（例如：50000）\n_charge:jpy_', fromChatId);
           return;
         }
-        props.setProperty('tg_charge_jpy', String(jpy));
-        props.setProperty('tg_charge_state', 'wait_hkd');
-        tgSend_(`JPY：¥${jpy.toLocaleString()}\n\n請輸入港幣金額（HKD）：`, null, fromChatId);
+        tgForceReply_(`JPY：¥${jpy.toLocaleString()}\n請輸入港幣金額（HKD）：\n_charge:hkd:${jpy}_`, fromChatId);
         return;
       }
 
-      // チャージ 充值：等待 HKD
-      if (props.getProperty('tg_charge_state') === 'wait_hkd') {
+      // チャージ 充值 HKD
+      const chargeHkdMatch = refText.match(/_charge:hkd:(\d+(?:\.\d+)?)_/);
+      if (chargeHkdMatch) {
+        const jpy = parseFloat(chargeHkdMatch[1]);
         const hkd = parseFloat(text.replace(/[^\d.]/g, ''));
         if (isNaN(hkd) || hkd <= 0) {
-          tgSend_('請輸入有效嘅港幣金額（例如：2500）', null, fromChatId);
+          tgForceReply_(`請輸入有效嘅港幣金額（例如：2500）\n_charge:hkd:${jpy}_`, fromChatId);
           return;
         }
-        const jpy = parseFloat(props.getProperty('tg_charge_jpy') || '0');
-        props.deleteProperty('tg_charge_state');
-        props.deleteProperty('tg_charge_jpy');
-
         const today = Utilities.formatDate(new Date(), 'Asia/Hong_Kong', 'yyyy/M/d');
         try {
           addChargeRecord_(today, jpy, hkd, null);
@@ -258,14 +269,12 @@ function handleTelegramUpdate_(update) {
         return;
       }
 
-      // 訂單 ID pending state
-      const pending = props.getProperty('tg_pending_id');
-      if (pending) {
-        const [rowNum, ...posParts] = pending.split(':');
-        const pos = posParts.join(':');
-        props.deleteProperty('tg_pending_id');
+      // 訂單 ID（_ref:rowNum:pos_）
+      const refMatch = refText.match(/_ref:(\d+):([^_]+)_/);
+      if (refMatch) {
+        const rn  = parseInt(refMatch[1]);
+        const pos = refMatch[2];
         const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
-        const rn = parseInt(rowNum);
         sheet.getRange(rn, 3).setValue(pos);
         sheet.getRange(rn, 4).setValue(text);
         const rowData2 = sheet.getRange(rn, 1, 1, 15).getValues()[0];
@@ -381,13 +390,12 @@ function handleTelegramUpdate_(update) {
     tgShowCustPage_(msgId, rowNum, pos, code, itemUrl, ids, offset);
 
   } else if (action === 'new_id') {
-    // 用戶選擇手動輸入 → 儲存待輸入狀態，提示輸入
+    // 用戶選擇手動輸入 → force_reply 提示輸入客人 ID
     const rowNum = parseInt(parts[1]);
     const pos    = parts.slice(2).join(':');
-    const props  = PropertiesService.getScriptProperties();
-    props.setProperty('tg_pending_id', rowNum + ':' + pos);
     tgAnswer_(cb.id, '');
-    tgEdit_(msgId, cb.message.text + '\n\n✏️ 請直接輸入客人 ID：');
+    tgEdit_(msgId, cb.message.text + '\n\n✏️ 請回覆以輸入客人 ID');
+    tgForceReply_(`✏️ 請輸入客人 ID：\n_ref:${rowNum}:${pos}_`, cb.message.chat && cb.message.chat.id ? String(cb.message.chat.id) : TG_CHAT_ID);
 
   } else if (action === 'id') {
     // 第二步：選好客人 → 填入 Sheet
@@ -416,8 +424,8 @@ function handleTelegramUpdate_(update) {
 
   } else if (action === 'charge_add') {
     tgAnswer_(cb.id, '');
-    tgEdit_(msgId, cb.message.text + '\n\n✅ 好，請輸入日圓金額（JPY）：');
-    PropertiesService.getScriptProperties().setProperty('tg_charge_state', 'wait_jpy');
+    tgEdit_(msgId, cb.message.text + '\n\n✅ 好，請回覆以輸入日圓金額（JPY）：');
+    tgForceReply_('請輸入充值日圓金額（JPY）：\n_charge:jpy_', cb.message.chat && cb.message.chat.id ? String(cb.message.chat.id) : TG_CHAT_ID);
 
   } else if (action === 'charge_copy') {
     tgAnswer_(cb.id, '');
@@ -459,9 +467,8 @@ function handleTelegramUpdate_(update) {
   } else if (action === 'shipped_track') {
     const rowNum = parseInt(parts[1]);
     tgAnswer_(cb.id, '');
-    PropertiesService.getScriptProperties().setProperty('tg_ship_state', 'wait_track:' + rowNum);
     tgEdit_(msgId, '📬 送り状番号を選択しました', { inline_keyboard: [] });
-    tgSend_('✏️ 請輸入送り状番号：');
+    tgForceReply_(`✏️ 請輸入送り状番号：\n_ship:${rowNum}_`, cb.message.chat && cb.message.chat.id ? String(cb.message.chat.id) : TG_CHAT_ID);
   }
 }
 
