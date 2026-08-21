@@ -799,7 +799,7 @@ function doPost(e) {
     case 'addNewOrder': {
       try {
         const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
-        const newRow = sheet.getLastRow() + 1;
+        const newRow = getNextOrderRow_(sheet);
         const url    = e.parameter.url   ? String(e.parameter.url).trim()   : '';
         const name   = e.parameter.name  ? String(e.parameter.name).trim()  : '';
         const price  = e.parameter.price ? parseFloat(e.parameter.price)    : null;
