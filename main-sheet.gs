@@ -284,7 +284,8 @@ function handleTelegramUpdate_(update) {
           `✅ ${code2 ? `(${code2}) ` : ''}<b>已填入</b>` +
           (link2 ? `\n${link2}` : '') +
           `\nPosition：<b>${pos}</b>\n客人 ID：<b>${text}</b>`,
-          null, fromChatId
+          { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: 'shipped_track:' + rn }]] },
+          fromChatId
         );
         return;
       }
@@ -415,7 +416,8 @@ function handleTelegramUpdate_(update) {
     tgEdit_(msgId,
       `✅ ${code ? `(${code}) ` : ''}<b>已填入</b>` +
       (link ? `\n${link}` : '') +
-      `\nPosition：<b>${pos}</b>\n客人 ID：<b>${selId}</b>`
+      `\nPosition：<b>${pos}</b>\n客人 ID：<b>${selId}</b>`,
+      { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: 'shipped_track:' + rowNum }]] }
     );
 
   } else if (action === 'skip') {
