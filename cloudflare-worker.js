@@ -162,10 +162,11 @@ async function handleUpdate(update) {
         await gas({ action: 'writePositionId', row: rowNum, pos, id });
         await tg('sendMessage', {
           chat_id: chatId,
-          text: `✅${refCode ? ' <b>' + refCode + '</b>' : ''} 已填入` +
+          text: `✅${refCode ? ' (' + refCode + ')' : ''} <b>已填入</b>` +
                 (refUrl ? `\n${refUrl}` : '') +
                 `\nPosition：<b>${pos}</b>\n客人 ID：<b>${id}</b>`,
-          parse_mode: 'HTML'
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: `shipped_track:${rowNum}` }]] }
         });
         return;
       }
@@ -335,10 +336,11 @@ async function handleUpdate(update) {
     const itemUrl   = urlMatch ? urlMatch[1] : '';
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
-      text: `✅${code ? ' <b>' + code + '</b>' : ''} 已填入` +
+      text: `✅${code ? ' (' + code + ')' : ''} <b>已填入</b>` +
             (itemUrl ? `\n${itemUrl}` : '') +
             `\nPosition：<b>${pos}</b>\n客人 ID：<b>${selId}</b>`,
-      parse_mode: 'HTML'
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: `shipped_track:${rowNum}` }]] }
     });
 
   } else if (action === 'new_id') {
