@@ -117,11 +117,14 @@ function checkNewOrdersAndNotify() {
 
   const data = sheet.getRange(2, 1, lastRow - 1, 28).getValues();
 
-  // 收集現有 Position 種類（由最新排前）
+  // 收集現有 Position 種類（由最新排前）+ 上一個有 pos+id 的訂單
   const posSet = new Set();
+  let prevPos = '', prevId = '';
   for (let i = data.length - 1; i >= 0; i--) {
     const p = String(data[i][2] || '').trim();
+    const d = String(data[i][3] || '').trim();
     if (p) posSet.add(p);
+    if (!prevPos && p && d) { prevPos = p; prevId = d; }
   }
   const positions = [...posSet];
 
@@ -141,6 +144,9 @@ function checkNewOrdersAndNotify() {
     const posButtons = positions.length
       ? positions.map(p => [{ text: p, callback_data: ('pos:' + rowNum + ':' + p).substring(0, 64) }])
       : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: 'pos:' + rowNum + ':' + p }))];
+    if (prevPos && prevId) {
+      posButtons.unshift([{ text: `📋 同上 (${prevPos} ${prevId})`, callback_data: ('copy_prev:' + rowNum).substring(0, 64) }]);
+    }
 
     tgSend_(
       `🆕 <b>新訂單！</b>${code ? '  ' + code : ''}\n` +
@@ -300,13 +306,16 @@ function handleTelegramUpdate_(update) {
 
       const data = sheet.getRange(2, 1, lastRow - 1, 28).getValues();
 
-      // 收集現有 Position 種類（最新排前）
-      const posSet = new Set();
+      // 收集現有 Position 種類（最新排前）+ 上一個有 pos+id 的訂單
+      const posSet2 = new Set();
+      let prevPos2 = '', prevId2 = '';
       for (let i = data.length - 1; i >= 0; i--) {
         const p = String(data[i][2] || '').trim();
-        if (p) posSet.add(p);
+        const d = String(data[i][3] || '').trim();
+        if (p) posSet2.add(p);
+        if (!prevPos2 && p && d) { prevPos2 = p; prevId2 = d; }
       }
-      const positions = [...posSet];
+      const positions = [...posSet2];
 
       let count = 0;
       for (let i = 0; i < data.length; i++) {
@@ -321,6 +330,9 @@ function handleTelegramUpdate_(update) {
           const posButtons = positions.length
             ? positions.map(p => [{ text: p, callback_data: ('pos:' + rowNum + ':' + p).substring(0, 64) }])
             : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: 'pos:' + rowNum + ':' + p }))];
+          if (prevPos2 && prevId2) {
+            posButtons.unshift([{ text: `📋 同上 (${prevPos2} ${prevId2})`, callback_data: ('copy_prev:' + rowNum).substring(0, 64) }]);
+          }
           tgSend_(
             `📋 <b>待填訂單</b>${code ? '  ' + code : ''}\n` +
             (itemUrl ? `🔗 ${itemUrl}\n` : '') +
@@ -344,7 +356,36 @@ function handleTelegramUpdate_(update) {
   const parts  = cbData.split(':');
   const action = parts[0];
 
-  if (action === 'pos') {
+  if (action === 'copy_prev') {
+    // 複製上一個有 pos+id 的訂單
+    const rowNum = parseInt(parts[1]);
+    const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+    const lastRow = sheet.getLastRow();
+    const data    = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 15).getValues() : [];
+    let prevPos = '', prevId = '';
+    for (let i = data.length - 1; i >= 0; i--) {
+      const p = String(data[i][2] || '').trim();
+      const d = String(data[i][3] || '').trim();
+      if (p && d) { prevPos = p; prevId = d; break; }
+    }
+    tgAnswer_(cb.id, prevPos ? '✅ 已複製' : '找不到上一筆');
+    if (prevPos && prevId && !isNaN(rowNum) && rowNum >= 2) {
+      sheet.getRange(rowNum, 3).setValue(prevPos);
+      sheet.getRange(rowNum, 4).setValue(prevId);
+      const rowData = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
+      const code    = String(rowData[14] || '').trim();
+      const link    = String(rowData[5]  || '').trim();
+      tgEdit_(msgId,
+        `✅${code ? ' (' + code + ')' : ''} <b>已填入（同上）</b>` +
+        (link ? `\n${link}` : '') +
+        `\nPosition：<b>${prevPos}</b>\n客人 ID：<b>${prevId}</b>`,
+        { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: 'shipped_track:' + rowNum }]] }
+      );
+    } else {
+      tgEdit_(msgId, (cb.message.text || '') + '\n\n❌ 找不到上一筆紀錄');
+    }
+
+  } else if (action === 'pos') {
     // 第一步：選好 Position → 顯示歷史客人列表（最新6個）
     const rowNum = parseInt(parts[1]);
     const pos    = parts.slice(2).join(':');
@@ -640,9 +681,12 @@ function doPost(e) {
         if (lastRow < 2) return jsonResponse_({ orders: [], positions: [] });
         const data = sheet.getRange(2, 1, lastRow - 1, 15).getValues();
         const posSet = new Set();
+        let prevPos = '', prevId = '';
         for (let i = data.length - 1; i >= 0; i--) {
           const p = String(data[i][2] || '').trim();
+          const d = String(data[i][3] || '').trim();
           if (p) posSet.add(p);
+          if (!prevPos && p && d) { prevPos = p; prevId = d; }
         }
         const orders = [];
         for (let i = 0; i < data.length; i++) {
@@ -657,7 +701,7 @@ function doPost(e) {
             });
           }
         }
-        return jsonResponse_({ orders, positions: [...posSet] });
+        return jsonResponse_({ orders, positions: [...posSet], prevPos, prevId });
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
@@ -675,6 +719,32 @@ function doPost(e) {
           if (p === pos && id && !seen.has(id)) { seen.add(id); ids.push(id); }
         }
         return jsonResponse_({ ids });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
+    case 'copyPrevOrder': {
+      try {
+        const rowNum = parseInt(e.parameter.row);
+        const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        const data   = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 15).getValues() : [];
+        let prevPos = '', prevId = '';
+        for (let i = data.length - 1; i >= 0; i--) {
+          const p = String(data[i][2] || '').trim();
+          const d = String(data[i][3] || '').trim();
+          if (p && d) { prevPos = p; prevId = d; break; }
+        }
+        if (!prevPos) return jsonResponse_({ success: false });
+        sheet.getRange(rowNum, 3).setValue(prevPos);
+        sheet.getRange(rowNum, 4).setValue(prevId);
+        const rowData = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
+        return jsonResponse_({
+          success: true,
+          pos  : prevPos,
+          id   : prevId,
+          code : String(rowData[14] || '').trim(),
+          link : String(rowData[5]  || '').trim()
+        });
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 

@@ -268,15 +268,21 @@ async function handleUpdate(update) {
         ? positions.map(p => [{ text: p, callback_data: `pos:${p}`.substring(0, 64) }])
         : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: `pos:${p}` }))];
 
+      const prevPos = data.prevPos || '';
+      const prevId  = data.prevId  || '';
       for (const order of data.orders) {
         const kb = positions.length
           ? positions.map(p => [{ text: p, callback_data: `pos:${order.rowNum}:${p}`.substring(0, 64) }])
           : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: `pos:${order.rowNum}:${p}` }))];
+        if (prevPos && prevId) {
+          kb.unshift([{ text: `📋 同上 (${prevPos} ${prevId})`, callback_data: `copy_prev:${order.rowNum}`.substring(0, 64) }]);
+        }
         await tg('sendMessage', {
           chat_id: chatId,
           text: `📋 <b>待填訂單</b>${order.code ? '  ' + order.code : ''}\n` +
                 (order.itemUrl ? `🔗 ${order.itemUrl}\n` : '') +
-                `\n係哪個 <b>Position</b>？`,
+                `\n係哪個 <b>Position</b>？` +
+                (order.code ? `\n_code:${order.code}_` : ''),
           parse_mode: 'HTML',
           reply_markup: { inline_keyboard: kb }
         });
@@ -294,7 +300,27 @@ async function handleUpdate(update) {
   const parts  = data.split(':');
   const action = parts[0];
 
-  if (action === 'pos') {
+  if (action === 'copy_prev') {
+    const rowNum = parts[1];
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    const result = await gas({ action: 'copyPrevOrder', row: rowNum });
+    if (result.success) {
+      await tg('editMessageText', {
+        chat_id: chatId, message_id: msgId,
+        text: `✅${result.code ? ' (' + result.code + ')' : ''} <b>已填入（同上）</b>` +
+              (result.link ? `\n${result.link}` : '') +
+              `\nPosition：<b>${result.pos}</b>\n客人 ID：<b>${result.id}</b>`,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: `shipped_track:${rowNum}` }]] }
+      });
+    } else {
+      await tg('editMessageText', {
+        chat_id: chatId, message_id: msgId,
+        text: (cb.message.text || '') + '\n\n❌ 找不到上一筆紀錄'
+      });
+    }
+
+  } else if (action === 'pos') {
     const rowNum = parts[1];
     const pos    = parts.slice(2).join(':');
     const result = await gas({ action: 'getCustomersByPosition', pos });
