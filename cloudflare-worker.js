@@ -302,10 +302,17 @@ async function handleUpdate(update) {
 
     // 取訂單資料顯示（從原訊息解析）
     const origText = cb.message.text || '';
+    const codeM    = origText.match(/_code:(.+?)_/);
+    const posCode  = codeM ? codeM[1] : '';
+    const urlM     = origText.match(/🔗\s*(https?:\/\/\S+)/);
+    const posUrl   = urlM ? urlM[1] : '';
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
-      text: origText.split('\n係哪個')[0] + `\nPosition：<b>${pos}</b>\n\n係哪個客人購入？`,
+      text: `${posCode || '訂單'}\n` +
+            (posUrl ? `🔗 ${posUrl}\n` : '') +
+            `Position：<b>${pos}</b>\n\n係哪個客人購入？` +
+            (posCode ? `\n_code:${posCode}_` : ''),
       parse_mode: 'HTML',
       reply_markup: custKeyboard(ids, rowNum, pos, 0)
     });
@@ -330,7 +337,7 @@ async function handleUpdate(update) {
     await gas({ action: 'writePositionId', row: rowNum, pos, id: selId });
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已填入！' });
     const origText = cb.message.text || '';
-    const codeMatch = origText.match(/待填訂單\s+(\S+)/);
+    const codeMatch = origText.match(/_code:(.+?)_/);
     const code      = codeMatch ? codeMatch[1] : '';
     const urlMatch  = origText.match(/🔗\s*(https?:\/\/\S+)/);
     const itemUrl   = urlMatch ? urlMatch[1] : '';
@@ -347,7 +354,7 @@ async function handleUpdate(update) {
     const rowNum    = parts[1];
     const pos       = parts.slice(2).join(':');
     const origText2 = cb.message.text || '';
-    const cm        = origText2.match(/待填訂單\s+(\S+)/);
+    const cm        = origText2.match(/_code:(.+?)_/);
     const refCode   = cm ? cm[1] : '';
     const um        = origText2.match(/🔗\s*(https?:\/\/\S+)/);
     const refUrl    = um ? um[1] : '';

@@ -145,7 +145,8 @@ function checkNewOrdersAndNotify() {
     tgSend_(
       `🆕 <b>新訂單！</b>${code ? '  ' + code : ''}\n` +
       (itemUrl ? `🔗 ${itemUrl}\n` : '') +
-      `\n係哪個 <b>Position</b>？`,
+      `\n係哪個 <b>Position</b>？` +
+      (code ? `\n<tg-spoiler>_code:${code}_</tg-spoiler>` : ''),
       { inline_keyboard: posButtons }
     );
     props.setProperty('tg_r' + rowNum, '1');
@@ -191,7 +192,8 @@ function tgShowCustPage_(msgId, rowNum, pos, code, itemUrl, ids, offset) {
   tgEdit_(msgId,
     `${code ? code : '訂單'}\n` +
     (itemUrl ? `🔗 ${itemUrl}\n` : '') +
-    `Position：<b>${pos}</b>\n\n係哪個客人購入？`,
+    `Position：<b>${pos}</b>\n\n係哪個客人購入？` +
+    (code ? `\n<tg-spoiler>_code:${code}_</tg-spoiler>` : ''),
     { inline_keyboard: custButtons }
   );
 }
@@ -322,7 +324,8 @@ function handleTelegramUpdate_(update) {
           tgSend_(
             `📋 <b>待填訂單</b>${code ? '  ' + code : ''}\n` +
             (itemUrl ? `🔗 ${itemUrl}\n` : '') +
-            `\n係哪個 <b>Position</b>？`,
+            `\n係哪個 <b>Position</b>？` +
+            (code ? `\n<tg-spoiler>_code:${code}_</tg-spoiler>` : ''),
             { inline_keyboard: posButtons },
             fromChatId
           );
