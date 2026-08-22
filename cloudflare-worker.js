@@ -159,15 +159,17 @@ async function handleUpdate(update) {
         const mUrl    = ref.match(/_url:(https?:\/\/\S+?)_/);
         const refCode = mCode ? mCode[1] : '';
         const refUrl  = mUrl  ? mUrl[1]  : '';
+        const mMid = ref.match(/_mid:(\d+)_/);
         await gas({ action: 'writePositionId', row: rowNum, pos, id });
-        await tg('sendMessage', {
-          chat_id: chatId,
-          text: `✅${refCode ? ' (' + refCode + ')' : ''} <b>已填入</b>` +
-                (refUrl ? `\n${refUrl}` : '') +
-                `\nPosition：<b>${pos}</b>\n客人 ID：<b>${id}</b>`,
-          parse_mode: 'HTML',
-          reply_markup: { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: `shipped_track:${rowNum}` }]] }
-        });
+        const confirmText   = `✅${refCode ? ' (' + refCode + ')' : ''} <b>已填入</b>` +
+                              (refUrl ? `\n${refUrl}` : '') +
+                              `\nPosition：<b>${pos}</b>\n客人 ID：<b>${id}</b>`;
+        const confirmMarkup = { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: `shipped_track:${rowNum}` }]] };
+        if (mMid) {
+          await tg('editMessageText', { chat_id: chatId, message_id: parseInt(mMid[1]), text: confirmText, parse_mode: 'HTML', reply_markup: confirmMarkup });
+        } else {
+          await tg('sendMessage', { chat_id: chatId, text: confirmText, parse_mode: 'HTML', reply_markup: confirmMarkup });
+        }
         return;
       }
 
@@ -385,11 +387,18 @@ async function handleUpdate(update) {
     const um        = origText2.match(/🔗\s*(https?:\/\/\S+)/);
     const refUrl    = um ? um[1] : '';
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: (cb.message.text || '') + '\n\n✏️ 請回覆以輸入客人 ID',
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [] }
+    });
     await tg('sendMessage', {
       chat_id: chatId,
       text: `✏️ 請輸入客人 ID：\n_ref:${rowNum}:${pos}_` +
             (refCode ? `\n_code:${refCode}_` : '') +
-            (refUrl  ? `\n_url:${refUrl}_`  : ''),
+            (refUrl  ? `\n_url:${refUrl}_`  : '') +
+            `\n_mid:${msgId}_`,
       reply_markup: { force_reply: true, selective: true }
     });
 

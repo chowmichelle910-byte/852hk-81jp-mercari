@@ -288,13 +288,17 @@ function handleTelegramUpdate_(update) {
         const rowData2 = sheet.getRange(rn, 1, 1, 15).getValues()[0];
         const code2    = String(rowData2[14] || '').trim();
         const link2    = String(rowData2[5]  || '').trim();
-        tgSend_(
-          `✅ ${code2 ? `(${code2}) ` : ''}<b>已填入</b>` +
+        const confirmText =
+          `✅${code2 ? ' (' + code2 + ')' : ''} <b>已填入</b>` +
           (link2 ? `\n${link2}` : '') +
-          `\nPosition：<b>${pos}</b>\n客人 ID：<b>${text}</b>`,
-          { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: 'shipped_track:' + rn }]] },
-          fromChatId
-        );
+          `\nPosition：<b>${pos}</b>\n客人 ID：<b>${text}</b>`;
+        const confirmMarkup = { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: 'shipped_track:' + rn }]] };
+        const midMatch = refText.match(/_mid:(\d+)_/);
+        if (midMatch) {
+          tgEdit_(parseInt(midMatch[1]), confirmText, confirmMarkup);
+        } else {
+          tgSend_(confirmText, confirmMarkup, fromChatId);
+        }
         return;
       }
     }
@@ -440,7 +444,7 @@ function handleTelegramUpdate_(update) {
     const pos    = parts.slice(2).join(':');
     tgAnswer_(cb.id, '');
     tgEdit_(msgId, cb.message.text + '\n\n✏️ 請回覆以輸入客人 ID');
-    tgForceReply_(`✏️ 請輸入客人 ID：\n_ref:${rowNum}:${pos}_`, cb.message.chat && cb.message.chat.id ? String(cb.message.chat.id) : TG_CHAT_ID);
+    tgForceReply_(`✏️ 請輸入客人 ID：\n_ref:${rowNum}:${pos}_\n_mid:${msgId}_`, cb.message.chat && cb.message.chat.id ? String(cb.message.chat.id) : TG_CHAT_ID);
 
   } else if (action === 'id') {
     // 第二步：選好客人 → 填入 Sheet
