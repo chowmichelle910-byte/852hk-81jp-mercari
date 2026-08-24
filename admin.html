@@ -1525,7 +1525,7 @@ function buildMsg(r, arrTag, receiptUrl){
   const weightG = Number(r.weightG) || 0;
   const urlLine = receiptUrl ? ('到貨資料: ' + receiptUrl) : '到貨資料: ';
   const shipLine = r.heldGroup
-    ? `如果收件資料冇更改，我哋會連同寄出嘅${r.heldGroup}貨品，一齊用以下運單編號寄出：`
+    ? `如果收件資料冇更改，我哋會連同第${r.heldGroup}團嘅貨品，一齊用以下運單編號寄出：`
     : `如果收件資料冇更改，我哋會用以下運單編號寄出：`;
 
   if(method.includes('易寄取')){
