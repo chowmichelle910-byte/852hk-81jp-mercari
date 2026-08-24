@@ -8,7 +8,6 @@ export default async function handler(req) {
     return new Response('missing src', { status: 400 });
   }
 
-  // Only allow Supabase storage URLs
   let parsed;
   try { parsed = new URL(src); } catch {
     return new Response('invalid url', { status: 400 });
@@ -17,7 +16,13 @@ export default async function handler(req) {
     return new Response('forbidden', { status: 403 });
   }
 
-  const upstream = await fetch(src, { cf: { cacheTtl: 300 } });
+  let upstream;
+  try {
+    upstream = await fetch(src);
+  } catch (e) {
+    return new Response('upstream fetch failed: ' + e.message, { status: 502 });
+  }
+
   const html = await upstream.text();
 
   return new Response(html, {
@@ -26,6 +31,7 @@ export default async function handler(req) {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'public, max-age=300',
       'Access-Control-Allow-Origin': '*',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }
