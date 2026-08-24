@@ -1380,11 +1380,8 @@ async function generateShipPage(){
     });
     if(!res.ok)throw new Error('上傳失敗 '+res.status+': '+await res.text());
     const publicUrl=`${SB_URL}/storage/v1/object/public/receipts/${filename}`;
-    const VIEWER_BASE='https://852hk-81jp-mercari.vercel.app/viewer.html';
-    const proxySrc=`https://852hk-81jp-mercari.vercel.app/api/proxy?src=${encodeURIComponent(publicUrl)}`;
-    const viewerUrl=`${VIEWER_BASE}?src=${encodeURIComponent(proxySrc)}`;
     const a=document.getElementById('shipPageUrl');
-    a.href=viewerUrl; a.textContent='🔗 '+viewerUrl;
+    a.href=publicUrl; a.textContent='🔗 '+publicUrl;
     document.getElementById('shipUrlRow').style.display='flex';
     setSts('shipToolSts','✅ 頁面已生成','ok');
   }catch(e){setSts('shipToolSts','❌ 失敗：'+e.message,'err');}
