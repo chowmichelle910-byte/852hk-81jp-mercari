@@ -656,6 +656,16 @@ function doPost(e) {
       try { return jsonResponse_(holdToNextGroup_(e.parameter.recordRow, e.parameter.nextTag)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
+    case 'markPostageCollected': {
+      try {
+        const recordSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Record');
+        const rn = parseInt(e.parameter.recordRow);
+        const collected = e.parameter.collected === 'true';
+        recordSheet.getRange(rn, 14).setValue(collected ? '✅' : '');
+        return jsonResponse_({ success: true });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     case 'saveIgPost':
       try { return jsonResponse_(saveIgPost_(e.parameter.imageUrl, e.parameter.content, e.parameter.date)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
@@ -1665,7 +1675,7 @@ function getCustomerReceipt_(group, userName) {
 // ─────────────────────────────────────────────
 //  A=用戶名稱, C=第X團到貨, D=到貨數量, E=貨品編號,
 //  F=整體貨品編號, G=郵費, H=重量(g), I=郵寄方式,
-//  J=收件人, K=電話, L=地址, M=Tracking no.
+//  J=收件人, K=電話, L=地址, M=Tracking no., N=已收取運費
 // ─────────────────────────────────────────────
 function getRecordData_(group) {
   if (!group) return { error: '請提供團次' };
@@ -1675,13 +1685,15 @@ function getRecordData_(group) {
   const lastRow     = recordSheet.getLastRow();
   if (lastRow < 2) return { rows: [] };
 
-  const data   = recordSheet.getRange(2, 1, lastRow - 1, 13).getValues();
+  const data   = recordSheet.getRange(2, 1, lastRow - 1, 14).getValues();
   const arrTag = String(group).trim() + '到貨';
 
   // 建立每個 userName 最近一次有收件資料的 map（排除當前團）
-  // 同時記錄最近一次「保留至下一團」係哪一團
-  const prevDelivery = {};
+  // 同時記錄最近一次「保留至下一團」係哪一團及其運費資料
+  const prevDelivery  = {};
   const prevHeldGroup = {}; // userName -> 保留嗰團的團號標籤
+  const prevHeldPostage = {}; // userName -> { postage, postageCollected }
+  const currentNum = getGroupNum_(group);
   for (let i = data.length - 1; i >= 0; i--) {
     const tag      = String(data[i][2] || '').trim();
     if (tag === arrTag) continue;
@@ -1697,8 +1709,14 @@ function getRecordData_(group) {
     if (method === '保留至下一團') {
       // 暫存 receiver/phone/address，method 留空，繼續向上搵
       if (!prevDelivery[userName]) prevDelivery[userName] = { receiver, phone, address, method: '', _final: false };
-      // 記錄係哪一團保留
-      if (!prevHeldGroup[userName]) prevHeldGroup[userName] = tag.replace('到貨', '');
+      // 記錄係哪一團保留（只記錄上一團，即 currentNum - 1）
+      if (!prevHeldGroup[userName] && getGroupNum_(tag) === currentNum - 1) {
+        prevHeldGroup[userName] = tag.replace('到貨', '');
+        prevHeldPostage[userName] = {
+          postage          : data[i][6] !== '' ? Number(data[i][6]) : 0,
+          postageCollected : !!data[i][13]
+        };
+      }
     } else {
       // 找到真實收件方式，定案
       prevDelivery[userName] = { receiver, phone, address, method, _final: true };
@@ -1728,8 +1746,11 @@ function getRecordData_(group) {
         receiver    : receiver  || (prev ? prev.receiver : ''),
         phone       : phone     || (prev ? prev.phone    : ''),
         address     : address   || (prev ? prev.address  : ''),
-        tracking    : String(r[12] || '').trim(),  // M
-        heldGroup   : prevHeldGroup[userName] || null  // 上一團係「保留至下一團」嘅話，記錄係哪一團
+        tracking          : String(r[12] || '').trim(),  // M
+        postageCollected  : !!r[13],                    // N
+        heldGroup         : prevHeldGroup[userName] || null,
+        prevPostage       : prevHeldPostage[userName]?.postage || 0,
+        prevPostageCollected : prevHeldPostage[userName]?.postageCollected || false
       };
     });
 

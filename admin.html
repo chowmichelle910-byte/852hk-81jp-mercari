@@ -1508,6 +1508,7 @@ function renderRecordCard(r, group){
     </div>
     <button class="rec-delivery-save" onclick="saveRecordDelivery(${r.rowNum})">💾 儲存收件資料</button>
     <button class="rec-delivery-save" style="background:var(--gold);color:var(--navy);margin-top:4px;" onclick="holdToNextGroup(${r.rowNum},'${esc(arrTag)}')">⏩ 保留至下一團</button>
+    <button id="pcol-${r.rowNum}" class="rec-delivery-save" style="background:${r.postageCollected?'#059669':'#64748B'};margin-top:4px;" onclick="togglePostageCollected(${r.rowNum},${!r.postageCollected})">${r.postageCollected?'✅ 已收取運費':'💰 標記已收取運費'}</button>
     <div class="rec-track-row">
       <input class="rec-track-inp" id="trk-${r.rowNum}" placeholder="輸入 Tracking No." value="${trackVal}">
       <button class="rec-save-btn" onclick="saveTracking(${r.rowNum})">💾 儲存</button>
@@ -1518,13 +1519,21 @@ function renderRecordCard(r, group){
 
 function buildMsg(r, arrTag, receiptUrl){
   const method  = r.method || '';
-  const postage = r.postage != null ? Number(r.postage).toFixed(1) : '—';
   const trk     = r.tracking || '（未提供）';
   const weightG = Number(r.weightG) || 0;
   const urlLine = receiptUrl ? ('到貨資料: ' + receiptUrl) : '到貨資料: ';
   const shipLine = r.heldGroup
     ? `如果收件資料冇更改，我哋會連同${r.heldGroup}嘅貨品，一齊用以下運單編號寄出：`
     : `如果收件資料冇更改，我哋會用以下運單編號寄出：`;
+
+  // 上一團未收取國際運費，需要加埋
+  const addPrev = r.heldGroup && !r.prevPostageCollected && r.prevPostage > 0;
+  const basePostage = r.postage != null ? Number(r.postage) : 0;
+  const totalIntl   = addPrev ? basePostage + Number(r.prevPostage) : basePostage;
+  const postage     = totalIntl.toFixed(1);
+  const postageNote = addPrev
+    ? `（包括${r.heldGroup}HK$${Number(r.prevPostage).toFixed(1)}及本團HK$${basePostage.toFixed(1)}）`
+    : '';
 
   if(method.includes('易寄取')){
     let local = 10;
@@ -1533,12 +1542,12 @@ function buildMsg(r, arrTag, receiptUrl){
     } else if(weightG > 500){
       local = 13;
     }
-    const total = (parseFloat(postage) + local).toFixed(1);
+    const total = (totalIntl + local).toFixed(1);
     return `客人你好, ${arrTag}嘅貨品已運往香港途中~
 
 ${urlLine}
 
-請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}及易寄取郵費HK$${local}, 共HK$${total}🙏🏻
+請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}${postageNote}及易寄取郵費HK$${local}, 共HK$${(totalIntl+local).toFixed(1)}🙏🏻
 
 ${shipLine}
 ${trk}
@@ -1550,7 +1559,7 @@ ${trk}
 
 ${urlLine}
 
-請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
+請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}${postageNote}
 香港運費部分會由順豐收取
 
 ${shipLine}
@@ -1564,7 +1573,7 @@ ${trk}
 
 ${urlLine}
 
-請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}🙏🏻
+請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}${postageNote}🙏🏻
 香港平郵郵費部分會於寄出後提供寄出證明時收取
 
 ${heldLine ? heldLine + '\n\n' : ''}如果收件資料有更改，可以盡快同我哋提出
@@ -1576,7 +1585,7 @@ ${heldLine ? heldLine + '\n\n' : ''}如果收件資料有更改，可以盡快�
 
 ${urlLine}
 
-請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}
+請客人核對表格中嘅收件資料, 並可以隨時支付國際運費HK$${postage}${postageNote}
 
 謝謝!`;
   }
@@ -2194,6 +2203,24 @@ async function holdToNextGroup(rowNum, currentTag){
   }catch(e){
     alert('操作失敗：'+e.message);
     btns.forEach(b=>b.disabled=false);
+  }
+}
+
+async function togglePostageCollected(rowNum, collected){
+  const btn = document.getElementById('pcol-'+rowNum);
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 儲存中…'; }
+  try{
+    const d = await postMain({action:'markPostageCollected', password:pw, recordRow:rowNum, collected:String(collected)});
+    if(d.error) throw new Error(d.error);
+    if(btn){
+      btn.disabled=false;
+      btn.style.background = collected ? '#059669' : '#64748B';
+      btn.textContent = collected ? '✅ 已收取運費' : '💰 標記已收取運費';
+      btn.onclick = ()=>togglePostageCollected(rowNum, !collected);
+    }
+  }catch(e){
+    alert('操作失敗：'+e.message);
+    if(btn){ btn.disabled=false; btn.textContent=collected?'💰 標記已收取運費':'✅ 已收取運費'; }
   }
 }
 
