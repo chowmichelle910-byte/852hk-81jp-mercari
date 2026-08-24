@@ -1667,9 +1667,10 @@ async function showReceipt(userName, group){
         const rv = f => card.querySelectorAll('.rv')[f]?.textContent||'';
         const rowNum = card.id?.replace('rcard-','');
         recData={
-          method   : rv(0),
-          postage  : rv(1),
-          weight   : rv(2),
+          method   : (document.getElementById('rmt-'+rowNum)||{}).value||'',
+          postage  : rv(0),
+          weight   : rv(1),
+          qty      : rv(2),
           receiver : rowNum ? (document.getElementById('rcv-'+rowNum)?.value||'') : rv(6),
           phone    : rowNum ? (document.getElementById('rph-'+rowNum)?.value||'') : '',
           address  : rowNum ? (document.getElementById('rad-'+rowNum)?.value||'') : '',
@@ -1681,7 +1682,7 @@ async function showReceipt(userName, group){
     const address = recData?.address||'';
 
     // 3. 生成 HTML
-    const html = buildReceiptHtml(d.items||[], userName, group, recData, phone, address);
+    const html = buildReceiptHtml(d.items||[], userName, group, recData, phone, address, d.heldItems||[], d.heldGroup||null);
 
     // 4. 上傳到 Supabase Storage
     // Supabase key 只接受 ASCII，移除中文同特殊字符
@@ -1768,11 +1769,12 @@ function copyReceiptUrl(url, btn){
   });
 }
 
-function buildReceiptHtml(items, userName, group, recData, phone, address){
+function buildReceiptHtml(items, userName, group, recData, phone, address, heldItems=[], heldGroup=null){
   const arrTag  = group + '到貨';
   const method   = recData?.method||'—';
   const postage  = recData?.postage||'—';
   const weight   = recData?.weight||'—';
+  const qty      = recData?.qty||'—';
   const receiver = recData?.receiver||'—';
   const tracking = recData?.tracking||'';
 
@@ -1831,6 +1833,7 @@ body{font-family:'Noto Sans HK',system-ui,sans-serif;background:#F4F6F9;padding:
   ${[
     ['客戶名稱', userName],
     ['郵寄方式', method],
+    ['數量',     qty],
     ['重量',     weight],
     ['國際運費', postage],
     ['收件人',   receiver],
@@ -1842,6 +1845,21 @@ body{font-family:'Noto Sans HK',system-ui,sans-serif;background:#F4F6F9;padding:
     <span style="font-size:12px;font-weight:600;color:#0D1B2A;flex:1;word-break:break-all;">${esc(v)}</span>
   </div>`).join('')}
 </div>
+
+<!-- 上一團保留貨品 -->
+${heldItems.length ? `
+<div style="font-size:13px;font-weight:800;color:#B45309;margin-bottom:10px;">⏩ 上一團保留貨品（${esc(heldGroup||'')}）</div>
+${heldItems.map(it=>`
+  <div style="background:#FFFBEB;border:2px solid #F59E0B;border-radius:10px;padding:14px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px;">
+      <span style="font-family:monospace;font-weight:700;font-size:13px;color:#0D1B2A;">#${esc(it.code||'—')}</span>
+      <span style="font-size:11px;color:#B45309;font-weight:700;">保留自 ${esc(it.heldFrom||'上一團')}</span>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:#1A2E45;line-height:1.6;word-break:break-all;margin-bottom:6px;">${esc(it.itemName||'—')}</div>
+    <div style="font-size:11px;color:#64748B;margin-bottom:4px;">重量：${it.weightKg?it.weightKg.toFixed(3)+'kg':'—'}</div>
+    <a href="${esc(it.link||'')}" style="font-size:10px;color:#3B82F6;word-break:break-all;line-height:1.4;" target="_blank">${esc(it.link||'')}</a>
+  </div>`).join('')}
+` : ''}
 
 <!-- 已訂購商品 -->
 <div style="font-size:13px;font-weight:800;color:#0D1B2A;margin-bottom:10px;">已訂購商品</div>

@@ -1603,7 +1603,62 @@ function getCustomerReceipt_(group, userName) {
     return (parseInt(a.code) || 0) - (parseInt(b.code) || 0);
   });
 
-  return { items, group, userName };
+  // 從 Record 取得此客人是否有上一團保留貨品
+  const recordSheet = ss.getSheetByName('Record');
+  let heldItems = [];
+  let heldGroup = null;
+  if (recordSheet) {
+    const recLastRow = recordSheet.getLastRow();
+    if (recLastRow >= 2) {
+      const recData = recordSheet.getRange(2, 1, recLastRow - 1, 10).getValues();
+      const arrTag  = String(group).trim() + '到貨';
+      // Find record row for this customer in this group to get heldGroup
+      for (const rr of recData) {
+        const rUser = String(rr[0] || '').trim();
+        const rTag  = String(rr[2] || '').trim();
+        const rMeth = String(rr[8] || '').trim();
+        if (rTag !== arrTag || rUser !== userName) continue;
+        // Check previous record for heldGroup
+        break;
+      }
+      // Find the most recent previous batch where this customer had 保留至下一團
+      for (let i = recData.length - 1; i >= 0; i--) {
+        const rUser = String(recData[i][0] || '').trim();
+        const rTag  = String(recData[i][2] || '').trim();
+        const rMeth = String(recData[i][8] || '').trim();
+        if (rUser !== userName || rTag === arrTag) continue;
+        if (rMeth === '保留至下一團') {
+          heldGroup = rTag.replace('到貨', '');
+          break;
+        }
+      }
+    }
+  }
+
+  // Fetch held items from previous batch
+  if (heldGroup) {
+    for (const row of data) {
+      const rowPos     = String(row[2]  || '').trim();
+      const rowId      = String(row[3]  || '').trim();
+      const rowArrival = String(row[0]  || '').trim();
+      if (rowPos !== position || rowId !== id) continue;
+      if (rowArrival !== String(heldGroup).trim()) continue;
+      const code      = String(row[14] || '').trim();
+      const itemName  = String(row[6]  || '').trim();
+      const link      = String(row[5]  || '').trim();
+      const weightKg  = parseFloat(row[16]) || 0;
+      const arrDate   = row[15];
+      let arrivalDateStr = '';
+      if (arrDate instanceof Date) {
+        arrivalDateStr = `${arrDate.getFullYear()}/${arrDate.getMonth()+1}/${arrDate.getDate()}`;
+      } else if (arrDate) {
+        arrivalDateStr = String(arrDate).trim();
+      }
+      heldItems.push({ code, itemName, link, weightKg, arrivalDate: arrivalDateStr, heldFrom: heldGroup });
+    }
+  }
+
+  return { items, heldItems, heldGroup, group, userName };
 }
 
 // ─────────────────────────────────────────────
