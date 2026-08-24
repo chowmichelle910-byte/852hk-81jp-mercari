@@ -1807,10 +1807,7 @@ function buildReceiptHtml(items, userName, group, recData, phone, address, heldI
       </div>`;
   };
 
-  const itemsHtml = [
-    ...heldItems.map(it => renderItem(it, true)),
-    ...items.map(it => renderItem(it, false)),
-  ].join('');
+  const itemsHtml = items.map(it => renderItem(it, false)).join('');
 
   return `<!DOCTYPE html>
 <html lang="zh-HK">
