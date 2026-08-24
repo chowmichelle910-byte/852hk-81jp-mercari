@@ -1525,7 +1525,7 @@ function buildMsg(r, arrTag, receiptUrl){
   const weightG = Number(r.weightG) || 0;
   const urlLine = receiptUrl ? ('到貨資料: ' + receiptUrl) : '到貨資料: ';
   const shipLine = r.heldGroup
-    ? `如果收件資料冇更改，我哋會連同第${r.heldGroup}團嘅貨品，一齊用以下運單編號寄出：`
+    ? `如果收件資料冇更改，我哋會連同${r.heldGroup}嘅貨品，一齊用以下運單編號寄出：`
     : `如果收件資料冇更改，我哋會用以下運單編號寄出：`;
 
   if(method.includes('易寄取')){
@@ -1787,7 +1787,7 @@ function buildReceiptHtml(items, userName, group, recData, phone, address, heldI
     const imgHtml   = it.image
       ? `<img src="${esc(it.image)}" style="width:90px;height:90px;object-fit:contain;background:#F8FAFC;border-radius:6px;flex-shrink:0;">`
       : `<div style="width:90px;height:90px;background:#F1F5F9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#CBD5E1;font-size:11px;flex-shrink:0;">無圖</div>`;
-    const heldBadge = held ? `<span style="font-size:10px;background:#F59E0B;color:#fff;border-radius:4px;padding:1px 6px;font-weight:700;">第${esc(it.heldFrom||'')}團保留</span>` : '';
+    const heldBadge = held ? `<span style="font-size:10px;background:#F59E0B;color:#fff;border-radius:4px;padding:1px 6px;font-weight:700;">${esc(it.heldFrom||'')}保留</span>` : '';
     return `
       <div style="background:${bg};border:${border};border-radius:10px;padding:14px;margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px;">
