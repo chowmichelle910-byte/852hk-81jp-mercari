@@ -1627,7 +1627,7 @@ function getCustomerReceipt_(group, userName) {
         const rTag  = String(recData[i][2] || '').trim();
         const rMeth = String(recData[i][8] || '').trim();
         if (rUser !== userName || rTag === arrTag) continue;
-        if (rMeth === '保留至下一團') {
+        if (rMeth === '保留至下一團' && getGroupNum_(rTag) === getGroupNum_(group) - 1) {
           heldGroup = rTag.replace('到貨', '');
           break;
         }
