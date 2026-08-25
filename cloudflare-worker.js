@@ -177,10 +177,10 @@ async function handleUpdate(update) {
       const mShip = ref.match(/_ship:(\d+)_/);
       if (mShip) {
         const rowNum = mShip[1];
-        await gas({ action: 'writeTrackingNumber', row: rowNum, number: text });
+        const shipResult = await gas({ action: 'writeTrackingNumber', row: rowNum, number: text });
         await tg('sendMessage', {
           chat_id: chatId,
-          text: `✅ <b>已記錄</b>\n送り状番号：<b>${text}</b>`,
+          text: `✅ <b>已記錄</b>\n送り状番号：<b>${text}</b>` + (shipResult.link ? `\n${shipResult.link}` : ''),
           parse_mode: 'HTML'
         });
         return;

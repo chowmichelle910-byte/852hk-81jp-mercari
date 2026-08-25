@@ -835,7 +835,8 @@ function doPost(e) {
         const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
         const trackCol = header.indexOf('Photo/送り状番号') + 1;
         if (trackCol > 0) sheet.getRange(rowNum, trackCol).setValue('送り状番号：' + number);
-        return jsonResponse_({ success: true });
+        const link = String(sheet.getRange(rowNum, 6).getValue() || '').trim(); // F: link
+        return jsonResponse_({ success: true, link });
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
