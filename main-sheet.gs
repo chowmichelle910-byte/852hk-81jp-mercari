@@ -835,7 +835,8 @@ function doPost(e) {
         const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
         const trackCol = header.indexOf('Photo/送り状番号') + 1;
         if (trackCol > 0) sheet.getRange(rowNum, trackCol).setValue('送り状番号：' + number);
-        const link = String(sheet.getRange(rowNum, 6).getValue() || '').trim(); // F: link
+        const rawLink = String(sheet.getRange(rowNum, 6).getValue() || '').trim(); // F: link
+        const link = rawLink.includes('mercari.com/item/') ? rawLink.replace('/item/', '/transaction/') : rawLink;
         return jsonResponse_({ success: true, link });
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
