@@ -1129,8 +1129,8 @@ function getShippingNotificationPreview_(groupTitle) {
     const recipient = String(row[9]||'').trim();
     const phone     = String(row[10]||'').trim();
     const address   = String(row[11]||'').trim();
-    const tracking  = String(row[12]||'').trim();
-    const nextTag   = String(row[13]||'').trim();
+    const tracking        = String(row[12]||'').trim();
+    const postageCollected = !!row[13];
     if (!user || !method) return;
     const currMark = String(overallId || productId || '').trim();
     const prevMark = prevHeldMarkByUser.get(user) || '';
@@ -1139,17 +1139,17 @@ function getShippingNotificationPreview_(groupTitle) {
     const itemNames = [...new Set(ids.map(id => findItemName(id)).filter(Boolean))].join(', ');
 
     if (method.includes('保留至下一團')) {
-      held.push({ user, mark, itemNames, nextTag });
+      held.push({ user, mark, itemNames });
     } else if (method.includes('易寄取')) {
-      easy.push({ user, mark, method, tracking });
+      easy.push({ user, mark, method, tracking, postageCollected });
     } else if (method.toUpperCase().includes('SF')) {
       sfWeight += weight;
-      sf.push({ user, mark, method, tracking, weight, itemNames });
+      sf.push({ user, mark, method, tracking, weight, itemNames, postageCollected });
     } else if (method.includes('平郵')) {
-      plain.push({ user, mark, tracking, recipient, phone, address });
+      plain.push({ user, mark, tracking, recipient, phone, address, postageCollected });
     } else {
       homeWeight += weight;
-      home.push({ user, mark, method, weight });
+      home.push({ user, mark, method, weight, postageCollected });
     }
   });
 
