@@ -894,6 +894,7 @@ function doPost(e) {
         const url    = e.parameter.url   ? String(e.parameter.url).trim()   : '';
         const name   = e.parameter.name  ? String(e.parameter.name).trim()  : '';
         const price  = e.parameter.price ? parseFloat(e.parameter.price)    : null;
+        sheet.getRange(newRow, 2).setValue(new Date());
         if (url)                           sheet.getRange(newRow, 6).setValue(url);
         if (name)                          sheet.getRange(newRow, 7).setValue(name);
         if (price !== null && !isNaN(price)) sheet.getRange(newRow, 8).setValue(price);
