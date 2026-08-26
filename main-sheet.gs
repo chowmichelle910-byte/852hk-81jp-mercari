@@ -897,7 +897,9 @@ function doPost(e) {
         if (url)                           sheet.getRange(newRow, 6).setValue(url);
         if (name)                          sheet.getRange(newRow, 7).setValue(name);
         if (price !== null && !isNaN(price)) sheet.getRange(newRow, 8).setValue(price);
-        try { updateSerialNumberInColO(); } catch(e) {}
+        try { assignGroupByOrderDate(); }               catch(e) {}
+        try { updateSerialNumberInColO(); }              catch(e) {}
+        try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) {}
         checkNewOrdersAndNotify();
         return jsonResponse_({ success: true, row: newRow });
       } catch(err) { return jsonResponse_({ error: err.message }); }
