@@ -1,0 +1,4 @@
+name = "still-art-9869"
+main = "cloudflare-worker.js"
+compatibility_date = "2024-01-01"
+account_id = "25e941501e5e44b2e6be013fc2ca2b20"
