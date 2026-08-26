@@ -1,4 +1,4 @@
-// ─── 設定 ───────────────────────────────────────
+// ─── 設定 ──────────────────────────────────────
 const TG_TOKEN   = '8932041338:AAHRcNR1BNoLHU4sXdVSD2uZyQQ2PQN0ECI';
 const TG_CHAT_ID = '8392318130';
 const TG_API     = `https://api.telegram.org/bot${TG_TOKEN}`;
