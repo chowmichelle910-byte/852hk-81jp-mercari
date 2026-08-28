@@ -460,12 +460,21 @@ async function handleUpdate(update) {
     const name  = (msgText.match(/_non_:([^\n]*)/) || [])[1] || '';
     const price = (msgText.match(/_nop_:(\d*)/)    || [])[1] || '';
     if (!url) { await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '找不到連結資料' }); return; }
+    // 先移除按鈕防止重複點擊
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: `⏳ 新增中…\n\n商品：${name || '(未填)'}\n價格：${price ? '¥' + parseInt(price).toLocaleString() : '(未填)'}\n🔗 ${url}`,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [] }
+    });
     const result = await gas({ action: 'addNewOrder', url, name, price });
-    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: result.error ? '❌ 失敗' : '✅ 已新增！' });
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
       text: result.error
         ? `❌ 新增失敗：${result.error}`
+        : result.duplicate
+        ? `⚠️ <b>已存在（未重複新增）</b>\n\n商品：${name || '(未填)'}\n價格：${price ? '¥' + parseInt(price).toLocaleString() : '(未填)'}\n🔗 ${url}`
         : `✅ <b>新訂單已新增</b>\n\n商品：${name || '(未填)'}\n價格：${price ? '¥' + parseInt(price).toLocaleString() : '(未填)'}\n🔗 ${url}`,
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: [] }
