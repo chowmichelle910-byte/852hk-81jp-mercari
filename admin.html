@@ -2211,19 +2211,23 @@ async function holdToNextGroup(rowNum, currentTag){
 
 async function togglePostageCollected(rowNum, collected){
   const btn = document.getElementById('pcol-'+rowNum);
-  if(btn){ btn.disabled=true; btn.textContent='⏳ 儲存中…'; }
+  if(!btn || btn.disabled) return;
+  // Optimistic update — flip immediately
+  btn.disabled = true;
+  btn.style.background = collected ? '#059669' : '#64748B';
+  btn.textContent = collected ? '✅ 已收取運費' : '💰 標記已收取運費';
+  btn.onclick = ()=>togglePostageCollected(rowNum, !collected);
   try{
     const d = await postMain({action:'markPostageCollected', password:pw, recordRow:rowNum, collected:String(collected)});
     if(d.error) throw new Error(d.error);
-    if(btn){
-      btn.disabled=false;
-      btn.style.background = collected ? '#059669' : '#64748B';
-      btn.textContent = collected ? '✅ 已收取運費' : '💰 標記已收取運費';
-      btn.onclick = ()=>togglePostageCollected(rowNum, !collected);
-    }
   }catch(e){
+    // Revert on failure
+    btn.style.background = collected ? '#64748B' : '#059669';
+    btn.textContent = collected ? '💰 標記已收取運費' : '✅ 已收取運費';
+    btn.onclick = ()=>togglePostageCollected(rowNum, collected);
     alert('操作失敗：'+e.message);
-    if(btn){ btn.disabled=false; btn.textContent=collected?'💰 標記已收取運費':'✅ 已收取運費'; }
+  }finally{
+    btn.disabled = false;
   }
 }
 
