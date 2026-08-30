@@ -893,6 +893,14 @@ function doPost(e) {
         const url    = e.parameter.url   ? String(e.parameter.url).trim()   : '';
         const name   = e.parameter.name  ? String(e.parameter.name).trim()  : '';
         const price  = e.parameter.price ? parseFloat(e.parameter.price)    : null;
+        // 防重複：檢查 col F 有冇相同 URL
+        if (url) {
+          const lastRow = sheet.getLastRow();
+          if (lastRow >= 2) {
+            const urls = sheet.getRange(2, 6, lastRow - 1, 1).getValues().flat().map(v => String(v).trim());
+            if (urls.includes(url)) return jsonResponse_({ success: true, duplicate: true });
+          }
+        }
         const newRow = getNextOrderRow_(sheet);
         sheet.getRange(newRow, 2).setValue(new Date());
         if (url)                           sheet.getRange(newRow, 6).setValue(url);
