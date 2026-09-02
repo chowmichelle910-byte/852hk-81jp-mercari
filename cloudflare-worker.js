@@ -279,6 +279,7 @@ async function handleUpdate(update) {
         if (prevPos && prevId) {
           kb.unshift([{ text: `📋 同上 (${prevPos} ${prevId})`, callback_data: `copy_prev:${order.rowNum}`.substring(0, 64) }]);
         }
+        kb.push([{ text: '🗑️ 刪除訂單', callback_data: `del_order:${order.rowNum}` }]);
         await tg('sendMessage', {
           chat_id: chatId,
           text: `📋 <b>待填訂單</b>${order.code ? '  ' + order.code : ''}\n` +
@@ -452,6 +453,46 @@ async function handleUpdate(update) {
       chat_id: chatId,
       text: `✏️ 請輸入送り状番号：\n_ship:${rowNum}_`,
       reply_markup: { force_reply: true, selective: true }
+    });
+
+  } else if (action === 'del_order') {
+    const rowNum = parts[1];
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: (cb.message.text || '') + '\n\n⚠️ 確認刪除此訂單？',
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[
+        { text: '✅ 確認刪除', callback_data: `del_order_confirm:${rowNum}` },
+        { text: '❌ 取消', callback_data: `del_order_cancel:${rowNum}` }
+      ]] }
+    });
+
+  } else if (action === 'del_order_confirm') {
+    const rowNum = parts[1];
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    await tg('editMessageText', { chat_id: chatId, message_id: msgId, text: '⏳ 刪除中…', reply_markup: { inline_keyboard: [] } });
+    const result = await gas({ action: 'deleteOrder', row: rowNum });
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: result.error ? `❌ 刪除失敗：${result.error}` : `🗑️ <b>訂單已刪除</b>（第 ${rowNum} 行）`,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [] }
+    });
+
+  } else if (action === 'del_order_cancel') {
+    const rowNum = parts[1];
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '已取消' });
+    // 還原原本訊息（移除確認提示）
+    const origText = (cb.message.text || '').replace(/\n\n⚠️ 確認刪除此訂單？$/, '');
+    const data = await gas({ action: 'getPendingOrders' });
+    const positions = (data && data.positions) || ['IG', 'WTS', '其他'];
+    const kb = positions.map(p => [{ text: p, callback_data: `pos:${rowNum}:${p}`.substring(0, 64) }]);
+    kb.push([{ text: '🗑️ 刪除訂單', callback_data: `del_order:${rowNum}` }]);
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: origText, parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: kb }
     });
 
   } else if (action === 'confirm_no') {

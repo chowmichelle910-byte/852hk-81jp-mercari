@@ -656,6 +656,16 @@ function doPost(e) {
       try { return jsonResponse_(holdToNextGroup_(e.parameter.recordRow, e.parameter.nextTag)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
+    case 'deleteOrder': {
+      try {
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const rn = parseInt(e.parameter.row);
+        if (!rn || rn < 2) return jsonResponse_({ error: '無效行號' });
+        sheet.deleteRow(rn);
+        return jsonResponse_({ success: true });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     case 'markPostageCollected': {
       try {
         const recordSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Record');
