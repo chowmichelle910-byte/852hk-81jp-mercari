@@ -693,6 +693,21 @@ function doPost(e) {
       try { return jsonResponse_(findUserByIdFromPublic_(e.parameter.custId)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
 
+    case 'getAllGroups': {
+      try {
+        const dataSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Data');
+        const rows = dataSheet.getRange('H2:H').getValues();
+        const groups = rows.map(r => String(r[0]||'').trim()).filter(Boolean);
+        // 最新團排前（假設數字愈大愈新）
+        groups.sort((a, b) => {
+          const na = parseInt(a.replace(/\D/g,'')) || 0;
+          const nb = parseInt(b.replace(/\D/g,'')) || 0;
+          return nb - na;
+        });
+        return jsonResponse_({ groups });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     case 'getCustomerGroupSummary':
       try { return jsonResponse_(getCustomerGroupSummary_(e.parameter.group)); }
       catch(err) { return jsonResponse_({ error: err.message }); }

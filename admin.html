@@ -2005,7 +2005,11 @@ async function switchBuyerGroup(g){
 }
 
 async function loadBuyerTable(){
-  const groups = allGroups.length ? allGroups : [];
+  let groups = [];
+  try {
+    const d = await postMain({ action: 'getAllGroups', password: pw });
+    groups = (d.groups && d.groups.length) ? d.groups : allGroups;
+  } catch(e) { groups = allGroups; }
   if(!curBuyerGroup && groups.length) curBuyerGroup = groups[0];
   buildBuyerGroupTabs(groups);
   if(curBuyerGroup) await loadBuyerData(curBuyerGroup);
