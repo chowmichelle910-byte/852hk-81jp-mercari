@@ -147,6 +147,7 @@ function checkNewOrdersAndNotify() {
     if (prevPos && prevId) {
       posButtons.unshift([{ text: `📋 同上 (${prevPos} ${prevId})`, callback_data: ('copy_prev:' + rowNum).substring(0, 64) }]);
     }
+    posButtons.push([{ text: '🗑️ 刪除訂單', callback_data: 'del_order:' + rowNum }]);
 
     tgSend_(
       `🆕 <b>新訂單！</b>${code ? '  ' + code : ''}\n` +
