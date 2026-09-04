@@ -434,10 +434,13 @@ async function handleUpdate(update) {
   } else if (action === 'shipped_futsuu') {
     const rowNum = parts[1];
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
-    await gas({ action: 'writeShipMethod', row: rowNum, method: '普通郵便' });
+    const now = new Date();
+    const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const dateStr = `${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`;
+    await gas({ action: 'writeShipMethod', row: rowNum, method: '普通郵便', shipDate: dateStr });
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
-      text: '✅ 已記錄：普通郵便',
+      text: `✅ 已記錄：普通郵便（${dateStr}）`,
       reply_markup: { inline_keyboard: [] }
     });
 
