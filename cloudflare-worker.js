@@ -437,7 +437,7 @@ async function handleUpdate(update) {
     const now = new Date();
     const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
     const dateStr = `${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`;
-    await gas({ action: 'writeShipMethod', row: rowNum, method: '普通郵便', shipDate: dateStr });
+    await gas({ action: 'writeShipMethod', row: rowNum, method: `普通郵便 ${dateStr}` });
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
       text: `✅ 已記錄：普通郵便（${dateStr}）`,
