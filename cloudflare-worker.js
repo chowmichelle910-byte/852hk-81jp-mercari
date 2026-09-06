@@ -19,38 +19,59 @@ async function tg(method, params) {
 
 // ─── 商品資料抓取 ─────────────────────────────────
 async function scrapeProduct(url) {
-  try {
+  const fetchHtml = async (ua) => {
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'ja,en;q=0.9'
-      }
+        'User-Agent': ua,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ja-JP,ja;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Referer': 'https://www.google.co.jp/'
+      },
+      redirect: 'follow'
     });
-    const html = await res.text();
+    return res.text();
+  };
+
+  try {
+    const UA_PC = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+    const UA_SP = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
+    let html = await fetchHtml(UA_PC);
     let name = null, price = null;
 
-    // 1. Next.js __NEXT_DATA__ (Fril / PayPay FM)
+    // 1. Next.js __NEXT_DATA__ (Fril / PayPay FM / Rakuma)
     const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
     if (nd) {
       try {
         const d = JSON.parse(nd[1]);
         const pp = d?.props?.pageProps;
-        const item = pp?.item || pp?.itemData || pp?.itemDetail?.item || {};
+        const item = pp?.item || pp?.itemData || pp?.itemDetail?.item
+                  || pp?.data?.item || pp?.initialState?.item || {};
         name  = item.name  || item.title || null;
         price = item.price != null ? parseInt(item.price) : null;
+        // PayPay FM: price may be nested
+        if (!price && item.buyNowPrice != null) price = parseInt(item.buyNowPrice);
       } catch(e) {}
     }
 
     // 2. JSON-LD
-    if (!name || !price) {
+    if (!name || price == null) {
       const jlds = [...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
       for (const [, content] of jlds) {
         try {
           const obj = JSON.parse(content);
-          if (!name)  name  = obj.name  || obj.offers?.name  || null;
-          if (!price) price = obj.offers?.price != null ? parseInt(obj.offers.price) : null;
-          if (name && price) break;
+          const arr = Array.isArray(obj) ? obj : [obj];
+          for (const o of arr) {
+            if (!name)  name  = o.name || null;
+            if (price == null) {
+              const p = o.offers?.price ?? o.price ?? null;
+              if (p != null) price = parseInt(p);
+            }
+            if (name && price != null) break;
+          }
+          if (name && price != null) break;
         } catch(e) {}
       }
     }
@@ -59,14 +80,40 @@ async function scrapeProduct(url) {
     if (!name) {
       const m = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"'<>]+)["']/i)
              || html.match(/<meta[^>]+content=["']([^"'<>]+)["'][^>]+property=["']og:title["']/i);
-      if (m) name = m[1].replace(/\s*[-–|ー]\s*(フリル|Fril|ラクマ|PayPay|メルカリ|Mercari).*$/i, '').trim();
+      if (m) name = m[1].replace(/\s*[-–|ー]\s*(フリル|Fril|ラクマ|PayPay|メルカリ|Mercari|Yahoo).*$/i, '').trim();
     }
-    if (!price) {
+    if (price == null) {
       const m = html.match(/"price"\s*:\s*"?(\d+)"?/i) || html.match(/¥\s*([\d,]+)/);
       if (m) price = parseInt(m[1].replace(/,/g, ''));
     }
 
-    return { name: name || null, price: price || null };
+    // 4. SP fallback if PC fetch got no data (some sites block bots with PC UA)
+    if (!name && price == null) {
+      html = await fetchHtml(UA_SP);
+      const nd2 = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+      if (nd2) {
+        try {
+          const d = JSON.parse(nd2[1]);
+          const pp = d?.props?.pageProps;
+          const item = pp?.item || pp?.itemData || pp?.itemDetail?.item
+                    || pp?.data?.item || pp?.initialState?.item || {};
+          name  = item.name  || item.title || null;
+          price = item.price != null ? parseInt(item.price) : null;
+          if (!price && item.buyNowPrice != null) price = parseInt(item.buyNowPrice);
+        } catch(e) {}
+      }
+      if (!name || price == null) {
+        const m2 = html.match(/"price"\s*:\s*"?(\d+)"?/i) || html.match(/¥\s*([\d,]+)/);
+        if (!name) {
+          const mt = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"'<>]+)["']/i)
+                  || html.match(/<meta[^>]+content=["']([^"'<>]+)["'][^>]+property=["']og:title["']/i);
+          if (mt) name = mt[1].replace(/\s*[-–|ー]\s*(フリル|Fril|ラクマ|PayPay|メルカリ|Mercari|Yahoo).*$/i, '').trim();
+        }
+        if (price == null && m2) price = parseInt(m2[1].replace(/,/g, ''));
+      }
+    }
+
+    return { name: name || null, price: price != null ? price : null };
   } catch(e) { return { name: null, price: null }; }
 }
 
