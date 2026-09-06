@@ -158,13 +158,14 @@ function custKeyboard(ids, rowNum, pos, offset) {
 }
 
 // ─── 主邏輯 ─────────────────────────────────────
-const SPAM_KEYWORDS = ['БОТЫ', 'ПРОБИВА', 'ФИО', 'Госномеру', 'VIN', 'пробив', 'пробить', 't.me/', 'Оживи фотку', 'фотку', 'секунд'];
+const SPAM_KEYWORDS = ['t.me/'];
+const CYRILLIC_RE = /[Ѐ-ӿ]/;
 
 async function handleUpdate(update) {
-  // ── 垃圾訊息自動刪除 ──
+  // ── 垃圾訊息自動刪除（西里爾字母 or 關鍵字）──
   const msg = update.message;
   if (msg && msg.text) {
-    const isSpam = SPAM_KEYWORDS.some(kw => msg.text.includes(kw));
+    const isSpam = CYRILLIC_RE.test(msg.text) || SPAM_KEYWORDS.some(kw => msg.text.includes(kw));
     if (isSpam) {
       await tg('deleteMessage', { chat_id: String(msg.chat.id), message_id: msg.message_id });
       return;
