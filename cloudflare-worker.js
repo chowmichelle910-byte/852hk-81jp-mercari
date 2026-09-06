@@ -158,7 +158,7 @@ function custKeyboard(ids, rowNum, pos, offset) {
 }
 
 // ─── 主邏輯 ─────────────────────────────────────
-const SPAM_KEYWORDS = ['БОТЫ', 'ПРОБИВА', 'ФИО', 'Госномеру', 'VIN', 'пробив', 'пробить', 't.me/'];
+const SPAM_KEYWORDS = ['БОТЫ', 'ПРОБИВА', 'ФИО', 'Госномеру', 'VIN', 'пробив', 'пробить', 't.me/', 'Оживи фотку', 'фотку', 'секунд'];
 
 async function handleUpdate(update) {
   // ── 垃圾訊息自動刪除 ──
