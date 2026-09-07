@@ -724,7 +724,9 @@ function doPost(e) {
           const place   = get('受取場所') || get('配送先住所');
           const trackNo = get('お問い合わせ番号');
           const authNo  = get('認証番号');
-          if (name || trackNo) items.push({ name, place, trackNo, authNo });
+          const itemId  = get('商品ID');
+          const url     = itemId ? 'https://jp.mercari.com/transaction/' + itemId : null;
+          if (name || trackNo) items.push({ name, place, trackNo, authNo, url });
         }
         return jsonResponse_({ items });
       } catch(err) { return jsonResponse_({ error: err.message }); }

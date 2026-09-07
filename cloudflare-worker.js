@@ -292,8 +292,9 @@ async function handleUpdate(update) {
           `${idx}📦 ${it.name || '（名稱未知）'}`,
           `🏪 ${it.place || '（地點未知）'}`,
           `🔢 お問い合わせ：${it.trackNo || '—'}`,
-          `🔑 認証番号：${it.authNo || '—'}`
-        ].join('\n');
+          `🔑 認証番号：${it.authNo || '—'}`,
+          it.url ? `🔗 ${it.url}` : ''
+        ].filter(Boolean).join('\n');
       });
       await tg('sendMessage', { chat_id: chatId, text: lines.join('\n\n') });
       return;
