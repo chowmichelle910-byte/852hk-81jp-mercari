@@ -274,6 +274,31 @@ async function handleUpdate(update) {
       }
     }
 
+    // /lawson ローソン到着確認
+    if (text === '/lawson') {
+      const d = await gas({ action: 'getLawsonPickups' });
+      if (d.error) {
+        await tg('sendMessage', { chat_id: chatId, text: '❌ 取得失敗：' + d.error });
+        return;
+      }
+      const items = d.items || [];
+      if (!items.length) {
+        await tg('sendMessage', { chat_id: chatId, text: '📭 目前沒有「が店舗に届きました」的郵件' });
+        return;
+      }
+      const lines = items.map((it, i) => {
+        const idx = items.length > 1 ? `${i + 1}. ` : '';
+        return [
+          `${idx}📦 ${it.name || '（名稱未知）'}`,
+          `🏪 ${it.place || '（地點未知）'}`,
+          `🔢 お問い合わせ：${it.trackNo || '—'}`,
+          `🔑 認証番号：${it.authNo || '—'}`
+        ].join('\n');
+      });
+      await tg('sendMessage', { chat_id: chatId, text: lines.join('\n\n') });
+      return;
+    }
+
     // /neworder 新增訂單
     if (text.startsWith('/neworder')) {
       const urlMatch = text.match(/https?:\/\/\S+/);

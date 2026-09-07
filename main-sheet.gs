@@ -709,6 +709,27 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'getLawsonPickups': {
+      try {
+        const threads = GmailApp.search('subject:が店舗に届きました', 0, 20);
+        const items = [];
+        for (const thread of threads) {
+          const msg = thread.getMessages()[thread.getMessageCount() - 1];
+          const body = msg.getPlainBody();
+          const get = (label) => {
+            const m = body.match(new RegExp(label + '\\s*[:：]\\s*(.+)'));
+            return m ? m[1].trim() : null;
+          };
+          const name    = get('商品名');
+          const place   = get('受取場所') || get('配送先住所');
+          const trackNo = get('お問い合わせ番号');
+          const authNo  = get('認証番号');
+          if (name || trackNo) items.push({ name, place, trackNo, authNo });
+        }
+        return jsonResponse_({ items });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     case 'getCustomerGroupSummary':
       try { return jsonResponse_(getCustomerGroupSummary_(e.parameter.group)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
