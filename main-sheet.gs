@@ -304,6 +304,44 @@ function handleTelegramUpdate_(update) {
       }
     }
 
+    // /check CODE — 查詢訂單詳情
+    const checkMatch = text.match(/^\/check\s+(.+)$/i);
+    if (checkMatch) {
+      const queryCode = checkMatch[1].trim();
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+      const lastRow = sheet.getLastRow();
+      if (lastRow < 2) { tgSend_('❌ 找不到訂單', null, fromChatId); return; }
+      const data = sheet.getRange(2, 1, lastRow - 1, 15).getValues();
+      const found = [];
+      for (let i = 0; i < data.length; i++) {
+        const code = String(data[i][14] || '').trim();
+        if (code === queryCode) {
+          found.push({
+            code    : code,
+            date    : data[i][1]  ? Utilities.formatDate(new Date(data[i][1]), 'Asia/Tokyo', 'yyyy/M/d') : '—',
+            link    : String(data[i][5]  || '').trim(),
+            name    : String(data[i][6]  || '').trim(),
+            price   : data[i][7] !== '' ? Number(data[i][7]) : null
+          });
+        }
+      }
+      if (!found.length) {
+        tgSend_(`❌ 找不到 code <b>${tgEscape_(queryCode)}</b> 的訂單`, null, fromChatId);
+      } else {
+        const lines = found.map((o, idx) => {
+          const parts = [];
+          parts.push(`🔢 Code：<b>${tgEscape_(o.code)}</b>`);
+          parts.push(`📅 購買日期：${tgEscape_(o.date)}`);
+          if (o.name)  parts.push(`📦 商品名：${tgEscape_(o.name)}`);
+          if (o.price != null) parts.push(`💴 價錢：¥${o.price.toLocaleString()}`);
+          if (o.link)  parts.push(`🔗 ${o.link}`);
+          return (found.length > 1 ? `<b>${idx+1}.</b>\n` : '') + parts.join('\n');
+        });
+        tgSend_(lines.join('\n\n'), null, fromChatId);
+      }
+      return;
+    }
+
     if (text === '/pending' || text.startsWith('/pending@')) {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
       const lastRow = sheet.getLastRow();
