@@ -170,14 +170,14 @@ const SPAM_KEYWORDS = ['t.me/'];
 const CYRILLIC_RE = /[Ѐ-ӿ]/;
 
 async function handleUpdate(update) {
-  // ── 垃圾訊息自動刪除（西里爾字母 or 關鍵字）──
+  // ── 白名單：只處理來自授權 chat 的訊息 ──
   const msg = update.message;
+  if (msg && String(msg.chat.id) !== TG_CHAT_ID) return;
+
+  // ── 垃圾訊息過濾（保留作後備）──
   if (msg && msg.text) {
     const isSpam = CYRILLIC_RE.test(msg.text) || SPAM_KEYWORDS.some(kw => msg.text.includes(kw));
-    if (isSpam) {
-      await tg('deleteMessage', { chat_id: String(msg.chat.id), message_id: msg.message_id });
-      return;
-    }
+    if (isSpam) return;
   }
 
   // ── 文字訊息 ──
