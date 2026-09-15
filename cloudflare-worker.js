@@ -47,12 +47,20 @@ async function scrapeProduct(url) {
       try {
         const d = JSON.parse(nd[1]);
         const pp = d?.props?.pageProps;
-        const item = pp?.item || pp?.itemData || pp?.itemDetail?.item
-                  || pp?.data?.item || pp?.initialState?.item || {};
-        name  = item.name  || item.title || null;
-        price = item.price != null ? parseInt(item.price) : null;
-        // PayPay FM: price may be nested
-        if (!price && item.buyNowPrice != null) price = parseInt(item.buyNowPrice);
+        // Yahoo FM: item is at props.initialState.itemsState.items.item
+        const yItem = d?.props?.initialState?.itemsState?.items?.item;
+        if (yItem) {
+          name  = yItem.title || yItem.name || null;
+          price = yItem.price != null ? parseInt(yItem.price) : null;
+        }
+        if (!name || price == null) {
+          const item = pp?.item || pp?.itemData || pp?.itemDetail?.item
+                    || pp?.data?.item || pp?.initialState?.item || {};
+          if (!name)       name  = item.name  || item.title || null;
+          if (price == null) price = item.price != null ? parseInt(item.price) : null;
+          // PayPay FM: price may be nested
+          if (!price && item.buyNowPrice != null) price = parseInt(item.buyNowPrice);
+        }
       } catch(e) {}
     }
 
