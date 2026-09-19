@@ -626,11 +626,11 @@ async function handleUpdate(update) {
     });
 
   } else if (action === 'rated' || action === 'rated_all') {
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已記錄！' });
     const body = new URLSearchParams({ password: GAS_PASS, action: 'clearAllUnrated' });
     const resp = await fetch(GAS_URL, { method: 'POST', body, redirect: 'follow' });
     const text = await resp.text();
     console.log(`clearAllUnrated status=${resp.status} body=${text.substring(0, 300)}`);
-    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已記錄！' });
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
       text: (cb.message.text || '') + '\n\n✅ 已評價！',
