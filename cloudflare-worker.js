@@ -170,11 +170,8 @@ const SPAM_KEYWORDS = ['t.me/'];
 const CYRILLIC_RE = /[Ѐ-ӿ]/;
 
 async function handleUpdate(update) {
-  // ── 白名單：只處理來自授權 chat 的訊息 ──
+  // ── 垃圾訊息過濾（西里爾字母 or 關鍵字）──
   const msg = update.message;
-  if (msg && String(msg.chat.id) !== TG_CHAT_ID) return;
-
-  // ── 垃圾訊息過濾（保留作後備）──
   if (msg && msg.text) {
     const isSpam = CYRILLIC_RE.test(msg.text) || SPAM_KEYWORDS.some(kw => msg.text.includes(kw));
     if (isSpam) return;
@@ -408,6 +405,7 @@ async function handleUpdate(update) {
   } else if (action === 'pos') {
     const rowNum = parts[1];
     const pos    = parts.slice(2).join(':');
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
     const result = await gas({ action: 'getCustomersByPosition', pos });
     const ids    = result.ids || [];
 
@@ -417,7 +415,6 @@ async function handleUpdate(update) {
     const posCode  = codeM ? codeM[1] : '';
     const urlM     = origText.match(/🔗\s*(https?:\/\/\S+)/);
     const posUrl   = urlM ? urlM[1] : '';
-    await tg('answerCallbackQuery', { callback_query_id: cb.id });
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
       text: `${posCode || '訂單'}\n` +
@@ -432,10 +429,10 @@ async function handleUpdate(update) {
     const rowNum = parts[1];
     const offset = parseInt(parts[2]);
     const pos    = parts.slice(3).join(':');
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
     const result = await gas({ action: 'getCustomersByPosition', pos });
     const ids    = result.ids || [];
     const origText = cb.message.text || '';
-    await tg('answerCallbackQuery', { callback_query_id: cb.id });
     await tg('editMessageReplyMarkup', {
       chat_id: chatId, message_id: msgId,
       reply_markup: custKeyboard(ids, rowNum, pos, offset)
@@ -445,8 +442,8 @@ async function handleUpdate(update) {
     const rowNum = parts[1];
     const pos    = parts[2];
     const selId  = parts.slice(3).join(':');
-    await gas({ action: 'writePositionId', row: rowNum, pos, id: selId });
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已填入！' });
+    await gas({ action: 'writePositionId', row: rowNum, pos, id: selId });
     const origText = cb.message.text || '';
     const codeMatch = origText.match(/_code:(.+?)_/);
     const code      = codeMatch ? codeMatch[1] : '';
