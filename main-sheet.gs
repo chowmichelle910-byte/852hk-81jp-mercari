@@ -89,6 +89,22 @@ function getWebhookInfo() {
   Logger.log('This GAS exec URL: ' + ScriptApp.getService().getUrl());
 }
 
+// 執行一次：修正 allowed_updates，加入 callback_query（令按鈕生效）
+// 注意：先確保 Cloudflare Worker 路由正常（無 530 錯誤）再執行
+function fixWebhook() {
+  const WORKER_WEBHOOK_URL = 'https://tele.goldenherd.com/tg/webhook/8932041338';
+  const res = UrlFetchApp.fetch(TG_API_URL + '/setWebhook', {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify({
+      url: WORKER_WEBHOOK_URL,
+      allowed_updates: ['message', 'edited_message', 'channel_post', 'edited_channel_post', 'callback_query'],
+      drop_pending_updates: true
+    }),
+    muteHttpExceptions: true
+  });
+  Logger.log('fixWebhook → ' + res.getContentText());
+}
+
 function tgEdit_(msgId, text, replyMarkup) {
   const payload = { chat_id: TG_CHAT_ID, message_id: msgId, text: text, parse_mode: 'HTML' };
   if (replyMarkup) payload.reply_markup = replyMarkup;
