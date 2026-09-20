@@ -491,6 +491,7 @@ function handleTelegramUpdate_(update) {
     const pos    = parts[2];
     const selId  = parts.slice(3).join(':');
 
+    tgAnswer_(cb.id, '✅ 已填入！');
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
     sheet.getRange(rowNum, 3).setValue(pos);
     sheet.getRange(rowNum, 4).setValue(selId);
@@ -498,8 +499,6 @@ function handleTelegramUpdate_(update) {
     const rowData = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
     const code    = String(rowData[14] || '').trim(); // O
     const link    = String(rowData[5]  || '').trim(); // F
-
-    tgAnswer_(cb.id, '✅ 已填入！');
     tgEdit_(msgId,
       `✅ ${code ? `(${code}) ` : ''}<b>已填入</b>` +
       (link ? `\n${link}` : '') +
@@ -558,6 +557,108 @@ function handleTelegramUpdate_(update) {
     tgAnswer_(cb.id, '');
     tgEdit_(msgId, '📬 送り状番号を選択しました', { inline_keyboard: [] });
     tgForceReply_(`✏️ 請輸入送り状番号：\n_ship:${rowNum}_`, cb.message.chat && cb.message.chat.id ? String(cb.message.chat.id) : TG_CHAT_ID);
+
+  } else if (action === 'del_order') {
+    tgAnswer_(cb.id, '');
+    tgEdit_(msgId, (cb.message.text || '') + '\n\n⚠️ 確認刪除此訂單？', {
+      inline_keyboard: [[
+        { text: '✅ 確認刪除', callback_data: 'del_order_confirm:' + parts[1] },
+        { text: '❌ 取消',     callback_data: 'del_order_cancel:'  + parts[1] }
+      ]]
+    });
+
+  } else if (action === 'del_order_confirm') {
+    const rowNum = parseInt(parts[1]);
+    tgAnswer_(cb.id, '');
+    tgEdit_(msgId, '⏳ 刪除中…', { inline_keyboard: [] });
+    try {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+      if (rowNum >= 2) sheet.deleteRow(rowNum);
+      tgEdit_(msgId, `🗑️ <b>訂單已刪除</b>（第 ${rowNum} 行）`, { inline_keyboard: [] });
+    } catch(e) {
+      tgEdit_(msgId, '❌ 刪除失敗：' + e.message, { inline_keyboard: [] });
+    }
+
+  } else if (action === 'del_order_cancel') {
+    tgAnswer_(cb.id, '已取消');
+    const origText = (cb.message.text || '').replace(/\n\n⚠️ 確認刪除此訂單？$/, '');
+    tgEdit_(msgId, origText, {
+      inline_keyboard: [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: 'pos:' + parts[1] + ':' + p }))]
+    });
+
+  } else if (action === 'confirm_no') {
+    const msgText = cb.message.text || '';
+    const url   = (msgText.match(/_nou_:(\S+)/)    || [])[1] || '';
+    const name  = (msgText.match(/_non_:([^\n]*)/) || [])[1] || '';
+    const price = (msgText.match(/_nop_:(\d*)/)    || [])[1] || '';
+    if (!url) { tgAnswer_(cb.id, '找不到連結資料'); return; }
+    tgAnswer_(cb.id, '');
+    tgEdit_(msgId,
+      `⏳ 新增中…\n\n商品：${name || '(未填)'}\n價格：${price ? '¥' + parseInt(price).toLocaleString() : '(未填)'}\n🔗 ${url}`,
+      { inline_keyboard: [] }
+    );
+    try {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+      if (url) {
+        const lastRow = sheet.getLastRow();
+        if (lastRow >= 2) {
+          const urls = sheet.getRange(2, 6, lastRow - 1, 1).getValues().flat().map(v => String(v).trim());
+          if (urls.includes(url)) {
+            tgEdit_(msgId,
+              `⚠️ <b>已存在（未重複新增）</b>\n\n商品：${name || '(未填)'}\n價格：${price ? '¥' + parseInt(price).toLocaleString() : '(未填)'}\n🔗 ${url}`,
+              { inline_keyboard: [] }
+            );
+            return;
+          }
+        }
+      }
+      const newRow = getNextOrderRow_(sheet);
+      sheet.getRange(newRow, 2).setValue(new Date());
+      if (url)   sheet.getRange(newRow, 6).setValue(url);
+      if (name)  sheet.getRange(newRow, 7).setValue(name);
+      if (price) sheet.getRange(newRow, 8).setValue(parseFloat(price));
+      SpreadsheetApp.flush();
+      try { updateSerialNumberInColO(); } catch(e2) {}
+      checkNewOrdersAndNotify();
+      tgEdit_(msgId,
+        `✅ <b>新訂單已新增</b>\n\n商品：${name || '(未填)'}\n價格：${price ? '¥' + parseInt(price).toLocaleString() : '(未填)'}\n🔗 ${url}`,
+        { inline_keyboard: [] }
+      );
+    } catch(e) {
+      tgEdit_(msgId, '❌ 新增失敗：' + e.message, { inline_keyboard: [] });
+    }
+
+  } else if (action === 'edit_no_name') {
+    const msgText = cb.message.text || '';
+    const url   = (msgText.match(/_nou_:(\S+)/)   || [])[1] || '';
+    const price = (msgText.match(/_nop_:(\d*)/)   || [])[1] || '';
+    tgAnswer_(cb.id, '');
+    tgForceReply_(`✏️ 請輸入商品名稱：\n_no_edit_name_\n_nou_:${url}\n_nop_:${price}`, String(cb.message.chat.id));
+
+  } else if (action === 'edit_no_price') {
+    const msgText = cb.message.text || '';
+    const url  = (msgText.match(/_nou_:(\S+)/)    || [])[1] || '';
+    const name = (msgText.match(/_non_:([^\n]*)/) || [])[1] || '';
+    tgAnswer_(cb.id, '');
+    tgForceReply_(`✏️ 請輸入商品價格（日圓數字）：\n_no_edit_price_\n_nou_:${url}\n_non_:${name}`, String(cb.message.chat.id));
+
+  } else if (action === 'rated' || action === 'rated_all') {
+    tgAnswer_(cb.id, '✅ 已記錄！');
+    try {
+      const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+      const lastRow = sheet.getLastRow();
+      if (lastRow >= 2) {
+        const col29 = sheet.getRange(2, 29, lastRow - 1, 1).getValues();
+        for (let i = 0; i < col29.length; i++) {
+          if (String(col29[i][0] || '').trim() === '未評價') sheet.getRange(i + 2, 29).setValue('');
+        }
+      }
+    } catch(e) {}
+    tgEdit_(msgId, (cb.message.text || '') + '\n\n✅ 已評價！');
+
+  } else if (action === 'charge_skip') {
+    tgAnswer_(cb.id, '好的');
+    tgEdit_(msgId, (cb.message.text || '') + '\n\n❌ 跳過', { inline_keyboard: [] });
   }
 }
 
