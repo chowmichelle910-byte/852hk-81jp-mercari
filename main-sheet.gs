@@ -994,7 +994,7 @@ function doPost(e) {
         if (name)                          sheet.getRange(newRow, 7).setValue(name);
         if (price !== null && !isNaN(price)) sheet.getRange(newRow, 8).setValue(price);
         SpreadsheetApp.flush();
-        // 重型函數由時間觸發器每分鐘自動執行，唔需要喺新增時同步跑
+        try { updateSerialNumberInColO(); } catch(e) {}
         checkNewOrdersAndNotify();
         return jsonResponse_({ success: true, row: newRow });
       } catch(err) { return jsonResponse_({ error: err.message }); }
