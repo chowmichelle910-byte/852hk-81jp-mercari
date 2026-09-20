@@ -571,8 +571,8 @@ function handleTelegramUpdate_(update) {
   } else if (action === 'shipped_track') {
     const rowNum = parseInt(parts[1]);
     tgAnswer_(cb.id, '');
-    tgEdit_(msgId, '📬 送り状番号を選択しました', { inline_keyboard: [] });
-    tgForceReply_(`✏️ 請輸入送り状番号：\n_ship:${rowNum}_`, cb.message.chat && cb.message.chat.id ? String(cb.message.chat.id) : TG_CHAT_ID);
+    const origText = (cb.message.text || '').replace(/\n\n✏️ 請輸入送り状番号：\n_ship:\d+_$/, '');
+    tgEdit_(msgId, origText + `\n\n✏️ 請輸入送り状番号：\n_ship:${rowNum}_`, { inline_keyboard: [] });
 
   } else if (action === 'del_order') {
     tgAnswer_(cb.id, '');

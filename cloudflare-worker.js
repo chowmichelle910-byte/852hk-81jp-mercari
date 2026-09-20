@@ -526,15 +526,12 @@ async function handleUpdate(update) {
   } else if (action === 'shipped_track') {
     const rowNum = parts[1];
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    const origText = (cb.message.text || '').replace(/\n\n✏️ 請輸入送り状番号：\n_ship:\d+_$/, '');
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
-      text: '📬 送り状番号を選択しました',
+      text: origText + `\n\n✏️ 請輸入送り状番号：\n_ship:${rowNum}_`,
+      parse_mode: 'HTML',
       reply_markup: { inline_keyboard: [] }
-    });
-    await tg('sendMessage', {
-      chat_id: chatId,
-      text: `✏️ 請輸入送り状番号：\n_ship:${rowNum}_`,
-      reply_markup: { force_reply: true, selective: true }
     });
 
   } else if (action === 'del_order') {
