@@ -72,6 +72,17 @@ function tgSend_(text, replyMarkup, chatId) {
   Logger.log('tgSend_ cid=' + cid + ' resp=' + res.getContentText());
 }
 
+// 診斷用：測試 doPost 是否正常（模擬 Worker 的按鈕呼叫）
+function testDoPost() {
+  const e = { parameter: { password: '4916', action: 'getPendingOrders' } };
+  try {
+    const result = doPost(e);
+    Logger.log('testDoPost OK: ' + result.getContent());
+  } catch(err) {
+    Logger.log('testDoPost ERROR: ' + err.message + '\n' + err.stack);
+  }
+}
+
 // 診斷用：在 GAS 編輯器手動執行此函數測試能否發送訊息
 function testTgSend() {
   const res = UrlFetchApp.fetch(TG_API_URL + '/sendMessage', {
@@ -3013,6 +3024,36 @@ function updateOrdersFromGmail() {
             Logger.log('PayPay 新訂單：' + itemId + ' ¥' + price);
           }
         }
+      }
+
+      // ── 類型 H：PayPay フリマ 取消交易 ──
+      else if (msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
+               (subj.includes('キャンセル') || plainBody.includes('キャンセル') || plainBody.includes('キャンセルされました'))) {
+        labeledPayPay = true;
+        const idMatch   = plainBody.match(/商品ID[\s　]*[：:]\s*(z[A-Za-z0-9]+)/) ||
+                          subj.match(/\((z[A-Za-z0-9]+)\)$/);
+        const nameMatch = plainBody.match(/商品名[\s　]*[：:]\s*([^\n\r>]+)/);
+        const emailName = nameMatch ? nameMatch[1].trim() : '';
+        let codeStr = '';
+        let itemUrl = '';
+        if (idMatch) {
+          const itemId = idMatch[1].trim();
+          itemUrl = 'https://paypayfleamarket.yahoo.co.jp/item/' + itemId;
+          if (linkCol !== -1) {
+            for (let r = 1; r < data.length; r++) {
+              if (String(data[r][linkCol]).trim() === itemUrl) {
+                const code = String(data[r][14] || '').trim();
+                if (code) codeStr = code + ' ';
+                break;
+              }
+            }
+          }
+        }
+        tgSend_(
+          `❌ <b>取消交易！</b>\n${codeStr}${emailName ? tgEscape_(emailName) : ''}` +
+          (itemUrl ? '\n' + itemUrl : '') +
+          '\n已取消交易'
+        );
       }
 
       // ── 類型 G：PayPay フリマ 発送通知 ──
