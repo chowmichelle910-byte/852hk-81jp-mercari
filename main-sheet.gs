@@ -1861,7 +1861,7 @@ function getCustomerReceipt_(group, userName) {
     const link        = String(row[5]  || '').trim(); // F
     const itemName    = String(row[6]  || '').trim(); // G
     const code        = String(row[14] || '').trim(); // O
-    const weightKg    = parseFloat(row[16]) || 0;     // Q
+    const weightKg    = effectiveArrivalDate ? (parseFloat(row[16]) || 0) : 0; // Q: 未到貨不顯示重量
     const image       = isFutureGrp ? '' : String(row[18] || '').trim(); // S: 未來團不顯示到貨圖
 
     let orderedDateStr = '';
