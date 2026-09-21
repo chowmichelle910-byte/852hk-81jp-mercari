@@ -3014,7 +3014,7 @@ function updateOrdersFromGmail() {
             const name    = nameMatch  ? nameMatch[1].trim() : '';
             const nextRow = getNextOrderRow_(orderSheet);
             orderSheet.getRange(nextRow, 2).setValue(dateStr);
-            orderSheet.getRange(nextRow, 5).setValue('PayPay');
+            orderSheet.getRange(nextRow, 5).setValue('Paypayfleamarket');
             orderSheet.getRange(nextRow, 6).setValue(itemUrl);
             if (name)  orderSheet.getRange(nextRow, 7).setValue(name);
             if (price) orderSheet.getRange(nextRow, 8).setValue(price);
