@@ -2851,8 +2851,10 @@ function updateOrdersFromGmail() {
       }
 
       // ── 類型 E：発送されました（必須在 B 之前，否則被寬鬆的 B 條件捕獲）──
-      else if (subj.includes('が発送されました') || subj.includes('からご購入された商品が発送されました') ||
-               (msg.getFrom().includes('mercari.jp') && plainBody.includes('が発送されました'))) {
+      else if (!msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
+               (subj.includes('が発送されました') || subj.includes('からご購入された商品が発送されました') ||
+               (msg.getFrom().includes('mercari.jp') && plainBody.includes('が発送されました')))) {
+        labeledShipped = true;  // 最先設定，確保例外不影響標籤
         const emailNameMatch = plainBody.match(/商品名\s*[：: ]\s*(.+)/);
         const emailItemName  = emailNameMatch ? emailNameMatch[1].trim() : '';
         const idMatch    = plainBody.match(/商品ID\s*[：: ]\s*(m\d+)/);
@@ -2906,7 +2908,7 @@ function updateOrdersFromGmail() {
           Logger.log('[TypeE] 無linkToFind，發fallback TG');
           tgSend_(`📦 <b>商品已發送</b>${emailItemName ? '\n' + tgEscape_(emailItemName) : '\n（無法提取商品資料）'}`);
         }
-        labeledShipped = true;
+        labeledShipped = true;  // 必須在所有處理前設定，避免例外導致標籤未加
       }
 
       // ── 類型 B：Mercari Shops 訂單 ──
@@ -2988,6 +2990,7 @@ function updateOrdersFromGmail() {
       // ── 類型 F：PayPay フリマ 支払い完了（新訂單）──
       else if (msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
                (subj.includes('かんたん決済') || subj.includes('支払い') || plainBody.includes('支払い手続完了') || plainBody.includes('支払い手続き完了'))) {
+        labeledPayPay = true;
         // 商品ID（含全形空白及轉寄 > 前綴）：匹配緊跟 z/l 開頭的 ID
         const idMatch    = plainBody.match(/商品ID[\s　]*[：:]\s*(z[A-Za-z0-9]+)/);
         const priceMatch = plainBody.match(/支払い手続き[（(]合計[）)]\s*[：:]\s*([\d,]+)\s*円/);
@@ -3010,12 +3013,12 @@ function updateOrdersFromGmail() {
             Logger.log('PayPay 新訂單：' + itemId + ' ¥' + price);
           }
         }
-        labeledPayPay = true;
       }
 
       // ── 類型 G：PayPay フリマ 発送通知 ──
       else if (msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
                (plainBody.includes('発送') || subj.includes('発送'))) {
+        labeledPayPay = true;
         const idMatch = plainBody.match(/商品ID[\s　]*[：:]\s*(z[A-Za-z0-9]+)/);
         if (idMatch && linkCol !== -1 && trackCol !== -1) {
           const itemId     = idMatch[1].trim();
@@ -3047,7 +3050,6 @@ function updateOrdersFromGmail() {
             tgSend_(`📦 <b>PayPay 商品已發送（未在訂單表）</b>${emailName ? '\n' + tgEscape_(emailName) : ''}\n${itemUrl}`);
           }
         }
-        labeledPayPay = true;
       }
 
     }

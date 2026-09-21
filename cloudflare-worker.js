@@ -147,7 +147,13 @@ async function sendNewOrderPreview(chatId, url, name, price) {
 async function gas(params) {
   const body = new URLSearchParams({ password: GAS_PASS, ...params });
   const res  = await fetch(GAS_URL, { method: 'POST', body, redirect: 'follow' });
-  return res.json();
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch(e) {
+    console.error('gas() JSON parse error. Status:', res.status, 'Body:', text.substring(0, 200));
+    throw new Error('GAS returned non-JSON (status ' + res.status + '): ' + text.substring(0, 100));
+  }
 }
 
 // ─── 顯示客人分頁 ─────────────────────────────────
@@ -381,6 +387,8 @@ async function handleUpdate(update) {
   const data   = cb.data || '';
   const parts  = data.split(':');
   const action = parts[0];
+  try {
+  // ── callback body start ──
 
   if (action === 'copy_prev') {
     const rowNum = parts[1];
@@ -633,6 +641,11 @@ async function handleUpdate(update) {
       text: (cb.message.text || '') + '\n\n✅ 已評價！',
       parse_mode: 'HTML'
     });
+  }
+  // ── callback body end ──
+  } catch(cbErr) {
+    console.error('callback error:', cbErr.message);
+    await tg('sendMessage', { chat_id: chatId, text: '❌ 錯誤：' + cbErr.message });
   }
 }
 
