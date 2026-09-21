@@ -1656,7 +1656,6 @@ async function saveTracking(rowNum){
 async function showReceipt(userName, group){
   if(!userName||!group){alert('請先選擇團次並載入客人資料');return;}
 
-  // 搵按鈕並顯示 loading
   const btn = [...document.querySelectorAll('.rec-copy-btn')].find(b=>
     b.textContent.includes('到貨圖') &&
     b.closest('.rec-card')?.querySelector('.rec-username')?.textContent?.trim()===userName
@@ -1664,74 +1663,83 @@ async function showReceipt(userName, group){
   const origText = btn?.textContent||'🖼️ 到貨圖';
   if(btn){btn.disabled=true;btn.textContent='⏳ 生成中…';}
 
-  try{
-    // 1. 取資料
-    const d = await postMain({action:'getCustomerReceipt',password:pw,group,userName});
-    if(d.error) throw new Error(d.error);
-
-    // 2. 取 Record 卡片資料
-    let recData = null;
-    document.querySelectorAll('.rec-card').forEach(card=>{
-      const uname=card.querySelector('.rec-username');
-      if(uname&&uname.textContent.trim()===userName){
-        const rv = f => card.querySelectorAll('.rv')[f]?.textContent||'';
-        const rowNum = card.id?.replace('rcard-','');
-        recData={
-          method   : (document.getElementById('rmt-'+rowNum)||{}).value||'',
-          postage  : rv(0),
-          weight   : rv(1),
-          qty      : rv(2),
-          receiver : rowNum ? (document.getElementById('rcv-'+rowNum)?.value||'') : rv(6),
-          phone    : rowNum ? (document.getElementById('rph-'+rowNum)?.value||'') : '',
-          address  : rowNum ? (document.getElementById('rad-'+rowNum)?.value||'') : '',
-          tracking : rowNum ? (document.getElementById('trk-'+rowNum)?.value||'') : '',
-        };
+  const MAX_ATTEMPTS = 3;
+  let lastErr;
+  for(let attempt=1; attempt<=MAX_ATTEMPTS; attempt++){
+    try{
+      if(attempt>1){
+        if(btn) btn.textContent=`⏳ 重試 ${attempt}/${MAX_ATTEMPTS}…`;
+        await new Promise(r=>setTimeout(r, 1500*(attempt-1)));
       }
-    });
-    const phone   = recData?.phone||'';
-    const address = recData?.address||'';
 
-    // 3. 生成 HTML
-    const html = buildReceiptHtml(d.items||[], userName, group, recData, phone, address, d.heldItems||[], d.heldGroup||null);
+      // 1. 取資料（加 timeout 15s）
+      const ctrl = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 15000);
+      let d;
+      try{
+        const res = await fetch(MAIN_API,{method:'POST',body:new URLSearchParams({action:'getCustomerReceipt',password:pw,group,userName}),signal:ctrl.signal});
+        d = await res.json();
+      }finally{ clearTimeout(timer); }
+      if(d.error) throw new Error(d.error);
 
-    // 4. 上傳到 Supabase Storage
-    // Supabase key 只接受 ASCII，移除中文同特殊字符
-  const safeUser  = userName.replace(/[^a-zA-Z0-9_\-]/g, '_');
-  const safeGroup = group.replace(/[^a-zA-Z0-9_\-]/g, '_');
-  const filename  = `receipt_${safeUser}_${safeGroup}_${Date.now()}.html`;
-    // 用 x-upsert:true 自動處理新增/更新，確保 UTF-8 encoding
-    const htmlBytes = new TextEncoder().encode(html);
-    const uploadRes = await fetch(`${SB_URL}/storage/v1/object/receipts/${filename}`, {
-      method : 'POST',
-      headers: {
-        'apikey'        : SB_KEY,
-        'Authorization' : 'Bearer ' + SB_KEY,
-        'Content-Type'  : 'text/html; charset=utf-8',
-        'x-upsert'      : 'true',
-        'Content-Length': String(htmlBytes.length),
-      },
-      body: new Blob([htmlBytes], {type:'text/html; charset=utf-8'})
-    });
+      // 2. 取 Record 卡片資料
+      let recData = null;
+      document.querySelectorAll('.rec-card').forEach(card=>{
+        const uname=card.querySelector('.rec-username');
+        if(uname&&uname.textContent.trim()===userName){
+          const rv = f => card.querySelectorAll('.rv')[f]?.textContent||'';
+          const rowNum = card.id?.replace('rcard-','');
+          recData={
+            method   : (document.getElementById('rmt-'+rowNum)||{}).value||'',
+            postage  : rv(0),
+            weight   : rv(1),
+            qty      : rv(2),
+            receiver : rowNum ? (document.getElementById('rcv-'+rowNum)?.value||'') : rv(6),
+            phone    : rowNum ? (document.getElementById('rph-'+rowNum)?.value||'') : '',
+            address  : rowNum ? (document.getElementById('rad-'+rowNum)?.value||'') : '',
+            tracking : rowNum ? (document.getElementById('trk-'+rowNum)?.value||'') : '',
+          };
+        }
+      });
 
-    if(!uploadRes.ok){
-      const errText = await uploadRes.text();
-      throw new Error('上傳失敗：'+uploadRes.status+' — '+errText);
+      // 3. 生成 HTML
+      const html = buildReceiptHtml(d.items||[], userName, group, recData, recData?.phone||'', recData?.address||'', d.heldItems||[], d.heldGroup||null);
+
+      // 4. 上傳到 Supabase Storage
+      const safeUser  = userName.replace(/[^a-zA-Z0-9_\-]/g, '_');
+      const safeGroup = group.replace(/[^a-zA-Z0-9_\-]/g, '_');
+      const filename  = `receipt_${safeUser}_${safeGroup}_${Date.now()}.html`;
+      const htmlBytes = new TextEncoder().encode(html);
+      const uploadRes = await fetch(`${SB_URL}/storage/v1/object/receipts/${filename}`, {
+        method : 'POST',
+        headers: {
+          'apikey'        : SB_KEY,
+          'Authorization' : 'Bearer ' + SB_KEY,
+          'Content-Type'  : 'text/html; charset=utf-8',
+          'x-upsert'      : 'true',
+          'Content-Length': String(htmlBytes.length),
+        },
+        body: new Blob([htmlBytes], {type:'text/html; charset=utf-8'})
+      });
+      if(!uploadRes.ok){
+        const errText = await uploadRes.text();
+        throw new Error('上傳失敗：'+uploadRes.status+' — '+errText);
+      }
+
+      // 5. 顯示 URL
+      const publicUrl = `${SB_URL}/storage/v1/object/public/receipts/${filename}`;
+      const VIEWER_BASE = 'https://852hk-81jp-mercari.vercel.app/viewer.html';
+      const proxySrc = `https://852hk-81jp-mercari.vercel.app/api/proxy?src=${encodeURIComponent(publicUrl)}`;
+      showReceiptUrl(userName, `${VIEWER_BASE}?src=${encodeURIComponent(proxySrc)}`);
+      if(btn){btn.disabled=false;btn.textContent=origText;}
+      return; // 成功，退出重試迴圈
+
+    }catch(e){
+      lastErr = e;
     }
-
-    // 5. 公開 URL
-    const publicUrl = `${SB_URL}/storage/v1/object/public/receipts/${filename}`;
-
-    // 6. 顯示 URL + 複製
-    const VIEWER_BASE = 'https://852hk-81jp-mercari.vercel.app/viewer.html';
-    const proxySrc = `https://852hk-81jp-mercari.vercel.app/api/proxy?src=${encodeURIComponent(publicUrl)}`;
-    const viewerUrl = `${VIEWER_BASE}?src=${encodeURIComponent(proxySrc)}`;
-showReceiptUrl(userName, viewerUrl);
-
-  }catch(e){
-    alert('生成失敗：'+e.message);
-  }finally{
-    if(btn){btn.disabled=false;btn.textContent=origText;}
   }
+  alert('生成失敗：'+lastErr.message);
+  if(btn){btn.disabled=false;btn.textContent=origText;}
 }
 
 function showReceiptUrl(userName, url){
