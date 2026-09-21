@@ -2988,11 +2988,10 @@ function updateOrdersFromGmail() {
       // ── 類型 F：PayPay フリマ 支払い完了（新訂單）──
       else if (msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
                (subj.includes('かんたん決済') || subj.includes('支払い') || plainBody.includes('支払い手続完了') || plainBody.includes('支払い手続き完了'))) {
-        // 商品ID　：z669029864 → item URL
-        const idMatch    = plainBody.match(/商品(?:ID|Id)\s*[：:＊\s]+([A-Za-z][A-Za-z0-9]+)/);
+        // 商品ID（含全形空白及轉寄 > 前綴）：匹配緊跟 z/l 開頭的 ID
+        const idMatch    = plainBody.match(/商品ID[\s　]*[：:]\s*(z[A-Za-z0-9]+)/);
         const priceMatch = plainBody.match(/支払い手続き[（(]合計[）)]\s*[：:]\s*([\d,]+)\s*円/);
-        // 商品名：直接在 body 找「商品名」欄
-        const nameMatch  = plainBody.match(/商品名\s*[：:]\s*(.+)/);
+        const nameMatch  = plainBody.match(/商品名[\s　]*[：:]\s*([^\n\r>]+)/);
         if (idMatch) {
           const itemId  = idMatch[1].trim();
           const itemUrl = 'https://paypayfleamarket.yahoo.co.jp/item/' + itemId;
@@ -3017,7 +3016,7 @@ function updateOrdersFromGmail() {
       // ── 類型 G：PayPay フリマ 発送通知 ──
       else if (msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
                (plainBody.includes('発送') || subj.includes('発送'))) {
-        const idMatch = plainBody.match(/商品(?:ID|Id)\s*[：:＊\s]+([A-Za-z][A-Za-z0-9]+)/);
+        const idMatch = plainBody.match(/商品ID[\s　]*[：:]\s*(z[A-Za-z0-9]+)/);
         if (idMatch && linkCol !== -1 && trackCol !== -1) {
           const itemId     = idMatch[1].trim();
           const itemUrl    = 'https://paypayfleamarket.yahoo.co.jp/item/' + itemId;
