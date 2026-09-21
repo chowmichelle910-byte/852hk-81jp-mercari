@@ -548,6 +548,17 @@ async function handleUpdate(update) {
       reply_markup: { force_reply: true, selective: true }
     });
 
+  } else if (action === 'cancelled_notified') {
+    const rowNum = parts[1];
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已記錄' });
+    await gas({ action: 'markCancelled', row: rowNum });
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: (cb.message.text || '') + '\n✅ 已通知客人',
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [] }
+    });
+
   } else if (action === 'del_order') {
     const rowNum = parts[1];
     await tg('answerCallbackQuery', { callback_query_id: cb.id });

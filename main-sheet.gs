@@ -1170,6 +1170,19 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'markCancelled': {
+      try {
+        const rowNum = parseInt(e.parameter.row);
+        if (isNaN(rowNum) || rowNum < 2) return jsonResponse_({ error: 'invalid row' });
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        sheet.getRange(rowNum, 5).setValue('已取消');   // E: 平台
+        sheet.getRange(rowNum, 16).setValue('已取消');  // P: Arrival date（取消標記）
+        sheet.getRange(rowNum, 3).clearContent();       // C: Position
+        sheet.getRange(rowNum, 4).clearContent();       // D: ID
+        return jsonResponse_({ success: true });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     default:
       return jsonResponse_({ error: '未知 action: ' + action });
   }
@@ -3012,16 +3025,24 @@ function updateOrdersFromGmail() {
           if (!existingUrls.includes(itemUrl) && !isUrlBlacklisted_(itemUrl)) {
             const price   = priceMatch ? priceMatch[1].replace(/,/g, '') : '';
             const name    = nameMatch  ? nameMatch[1].trim() : '';
-            const nextRow = getNextOrderRow_(orderSheet);
+            // 優先重用「已取消+已通知客人」行（P欄 = "已取消"）
+            let nextRow = -1;
+            for (let r = 1; r < data.length; r++) {
+              if (String(data[r][15] || '').trim() === '已取消') { nextRow = r + 1; break; }
+            }
+            if (nextRow === -1) nextRow = getNextOrderRow_(orderSheet);
             orderSheet.getRange(nextRow, 2).setValue(dateStr);
+            orderSheet.getRange(nextRow, 3).clearContent();
+            orderSheet.getRange(nextRow, 4).clearContent();
             orderSheet.getRange(nextRow, 5).setValue('Paypayfleamarket');
             orderSheet.getRange(nextRow, 6).setValue(itemUrl);
-            if (name)  orderSheet.getRange(nextRow, 7).setValue(name);
-            if (price) orderSheet.getRange(nextRow, 8).setValue(price);
+            orderSheet.getRange(nextRow, 7).setValue(name || '');
+            orderSheet.getRange(nextRow, 8).setValue(price || '');
+            orderSheet.getRange(nextRow, 16).clearContent();  // 清除 P 欄取消標記
             existingUrls.push(itemUrl);
             blacklistUrl_(itemUrl);
             anyNewOrder = true;
-            Logger.log('PayPay 新訂單：' + itemId + ' ¥' + price);
+            Logger.log('PayPay 新訂單：' + itemId + ' ¥' + price + ' row=' + nextRow);
           }
         }
       }
@@ -3049,10 +3070,17 @@ function updateOrdersFromGmail() {
             }
           }
         }
+        let cancelRowNum = 0;
+        if (itemUrl && linkCol !== -1) {
+          for (let r = 1; r < data.length; r++) {
+            if (String(data[r][linkCol]).trim() === itemUrl) { cancelRowNum = r + 1; break; }
+          }
+        }
         tgSend_(
           `❌ <b>取消交易！</b>\n${codeStr}${emailName ? tgEscape_(emailName) : ''}` +
           (itemUrl ? '\n' + itemUrl : '') +
-          '\n已取消交易'
+          '\n已取消交易',
+          cancelRowNum ? { inline_keyboard: [[{ text: '✅ 已通知客人', callback_data: 'cancelled_notified:' + cancelRowNum }]] } : null
         );
       }
 
