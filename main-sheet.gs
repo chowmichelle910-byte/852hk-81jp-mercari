@@ -887,6 +887,48 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'getPayPaySales': {
+      try {
+        // Search for PayPay Flea Market sale/shipping emails (newer_than:60d to limit scope)
+        const q = 'from:pzktc04471@yahoo.co.jp newer_than:60d';
+        const threads = GmailApp.search(q, 0, 30);
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        // Build URL→rowNum map from col F (index 5, col 6)
+        const urlToRow = {};
+        if (lastRow >= 2) {
+          const urls = sheet.getRange(2, 6, lastRow - 1, 1).getValues();
+          for (let i = 0; i < urls.length; i++) {
+            const u = String(urls[i][0] || '').trim();
+            if (u) urlToRow[u] = i + 2;
+          }
+        }
+        const items = [];
+        const seen = new Set();
+        for (const thread of threads) {
+          const msg = thread.getMessages()[thread.getMessageCount() - 1];
+          const body = msg.getPlainBody();
+          // Extract PayPay Flea Market item URL
+          const urlMatch = body.match(/https:\/\/paypayfleamarket\.yahoo\.co\.jp\/item\/([A-Za-z0-9]+)/);
+          if (!urlMatch) continue;
+          const itemId = urlMatch[1];
+          const itemUrl = 'https://paypayfleamarket.yahoo.co.jp/item/' + itemId;
+          if (seen.has(itemId)) continue;
+          seen.add(itemId);
+          // Extract name from email body
+          const nameMatch = body.match(/商品名[^\n]*[\n\s]*([^\n]+)/) || body.match(/「([^」]+)」/);
+          const name = nameMatch ? nameMatch[1].trim() : null;
+          // Match row in sheet
+          let rowNum = null;
+          for (const [u, r] of Object.entries(urlToRow)) {
+            if (u.includes(itemId)) { rowNum = r; break; }
+          }
+          items.push({ itemId, itemUrl, name, rowNum });
+        }
+        return jsonResponse_({ items });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     case 'getCustomerGroupSummary':
       try { return jsonResponse_(getCustomerGroupSummary_(e.parameter.group)); }
       catch(err) { return jsonResponse_({ error: err.message }); }
@@ -2729,6 +2771,7 @@ function updateOrdersFromGmail() {
   const LABEL_MERCARI       = 'Processed-Mercari';
   const LABEL_SHOPS         = 'Processed-MercariShops';
   const LABEL_SHIPPED       = 'Processed-Shipped';
+  const LABEL_PAYPAY        = 'Processed-PayPay';
 
   // ── 1 次 search 涵蓋 A-D 類型（排除已處理 label）──
   const q = `label:inbox -label:${LABEL_MERCARI} -label:${LABEL_SHOPS} -label:${LABEL_SHIPPED} newer_than:14d ` +
@@ -2741,8 +2784,11 @@ function updateOrdersFromGmail() {
   // ── 発送 email：不加 label:inbox，因 Gmail filter 可能已 archive；只排 Processed-Shipped ──
   const qShipped = `-label:${LABEL_MERCARI} -label:${LABEL_SHOPS} -label:${LABEL_SHIPPED} newer_than:14d from:no-reply@mercari.jp`;
 
+  // ── PayPay フリマ：支払い完了 + 発送通知（from:pzktc04471@yahoo.co.jp）──
+  const qPayPay = `-label:${LABEL_PAYPAY} newer_than:30d from:pzktc04471@yahoo.co.jp`;
+
   const seenIds  = new Set();
-  const threads  = [...GmailApp.search(q), ...GmailApp.search(qShipped)]
+  const threads  = [...GmailApp.search(q), ...GmailApp.search(qShipped), ...GmailApp.search(qPayPay)]
     .filter(t => { if (seenIds.has(t.getId())) return false; seenIds.add(t.getId()); return true; });
 
   const ss         = SpreadsheetApp.getActiveSpreadsheet();
@@ -2761,6 +2807,7 @@ function updateOrdersFromGmail() {
   const labelMercari  = GmailApp.createLabel(LABEL_MERCARI);
   const labelShops    = GmailApp.createLabel(LABEL_SHOPS);
   const labelShipped  = GmailApp.createLabel(LABEL_SHIPPED);
+  const labelPayPay   = GmailApp.createLabel(LABEL_PAYPAY);
 
   let anyNewOrder = false;
 
@@ -2773,6 +2820,7 @@ function updateOrdersFromGmail() {
     let labeledMercari  = false;
     let labeledShops    = false;
     let labeledShipped  = false;
+    let labeledPayPay   = false;
     let archiveThread   = false;
 
     for (const msg of thread.getMessages()) {
@@ -2937,11 +2985,78 @@ function updateOrdersFromGmail() {
         archiveThread = true;
       }
 
+      // ── 類型 F：PayPay フリマ 支払い完了（新訂單）──
+      else if (msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
+               (subj.includes('かんたん決済') || subj.includes('支払い') || plainBody.includes('支払い手続完了') || plainBody.includes('支払い手続き完了'))) {
+        // 商品ID　：z669029864 → item URL
+        const idMatch    = plainBody.match(/商品(?:ID|Id)\s*[：:＊\s]+([A-Za-z][A-Za-z0-9]+)/);
+        const priceMatch = plainBody.match(/支払い手続き[（(]合計[）)]\s*[：:]\s*([\d,]+)\s*円/);
+        // 商品名：直接在 body 找「商品名」欄
+        const nameMatch  = plainBody.match(/商品名\s*[：:]\s*(.+)/);
+        if (idMatch) {
+          const itemId  = idMatch[1].trim();
+          const itemUrl = 'https://paypayfleamarket.yahoo.co.jp/item/' + itemId;
+          if (!existingUrls.includes(itemUrl) && !isUrlBlacklisted_(itemUrl)) {
+            const price   = priceMatch ? priceMatch[1].replace(/,/g, '') : '';
+            const name    = nameMatch  ? nameMatch[1].trim() : '';
+            const nextRow = getNextOrderRow_(orderSheet);
+            orderSheet.getRange(nextRow, 2).setValue(dateStr);
+            orderSheet.getRange(nextRow, 5).setValue('PayPay');
+            orderSheet.getRange(nextRow, 6).setValue(itemUrl);
+            if (name)  orderSheet.getRange(nextRow, 7).setValue(name);
+            if (price) orderSheet.getRange(nextRow, 8).setValue(price);
+            existingUrls.push(itemUrl);
+            blacklistUrl_(itemUrl);
+            anyNewOrder = true;
+            Logger.log('PayPay 新訂單：' + itemId + ' ¥' + price);
+          }
+        }
+        labeledPayPay = true;
+      }
+
+      // ── 類型 G：PayPay フリマ 発送通知 ──
+      else if (msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
+               (plainBody.includes('発送') || subj.includes('発送'))) {
+        const idMatch = plainBody.match(/商品(?:ID|Id)\s*[：:＊\s]+([A-Za-z][A-Za-z0-9]+)/);
+        if (idMatch && linkCol !== -1 && trackCol !== -1) {
+          const itemId     = idMatch[1].trim();
+          const itemUrl    = 'https://paypayfleamarket.yahoo.co.jp/item/' + itemId;
+          const nameMatch  = plainBody.match(/商品名\s*[：:]\s*(.+)/);
+          const emailName  = nameMatch ? nameMatch[1].trim() : '';
+          let found = false;
+          for (let r = 1; r < data.length; r++) {
+            if (String(data[r][linkCol]).trim() === itemUrl) {
+              found = true;
+              const rowNum   = r + 1;
+              const itemName = String(data[r][6] || '').trim() || emailName;
+              const nVal     = String(data[r][trackCol]).trim();
+              if (nVal === '') {
+                orderSheet.getRange(rowNum, trackCol + 1).setValue('已發送');
+                SpreadsheetApp.flush();
+                tgSend_(
+                  `📦 <b>PayPay 商品已發送！</b>${itemName ? '\n' + tgEscape_(itemName) : ''}\n${itemUrl}\n\n請選擇郵寄方式：`,
+                  { inline_keyboard: [[
+                    { text: '📮 普通郵便', callback_data: 'shipped_futsuu:' + rowNum },
+                    { text: '📬 送り状番号', callback_data: 'shipped_track:' + rowNum }
+                  ]] }
+                );
+              }
+              break;
+            }
+          }
+          if (!found) {
+            tgSend_(`📦 <b>PayPay 商品已發送（未在訂單表）</b>${emailName ? '\n' + tgEscape_(emailName) : ''}\n${itemUrl}`);
+          }
+        }
+        labeledPayPay = true;
+      }
+
     }
 
     if (labeledMercari) thread.addLabel(labelMercari);
     if (labeledShops)   thread.addLabel(labelShops);
     if (labeledShipped) thread.addLabel(labelShipped);
+    if (labeledPayPay)  thread.addLabel(labelPayPay);
     if (archiveThread)  thread.moveToArchive();
   }
 
