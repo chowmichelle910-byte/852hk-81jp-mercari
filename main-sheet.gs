@@ -100,6 +100,26 @@ function getWebhookInfo() {
   Logger.log('This GAS exec URL: ' + ScriptApp.getService().getUrl());
 }
 
+// 時間驅動 Trigger（每小時）— 自動確保 webhook 指向 Cloudflare Worker
+// 設定方法：GAS Triggers → 時間驅動 → 小時計時器 → 每 1 小時 → ensureWebhook
+function ensureWebhook() {
+  const WORKER_URL = 'https://still-art-9869.852hk81jp.workers.dev';
+  const info = JSON.parse(UrlFetchApp.fetch(TG_API_URL + '/getWebhookInfo', { muteHttpExceptions: true }).getContentText());
+  const currentUrl = info.result && info.result.url || '';
+  const hasCallbackQuery = info.result && (info.result.allowed_updates || []).includes('callback_query');
+  if (currentUrl === WORKER_URL && hasCallbackQuery) return; // 正常，無需修復
+  Logger.log('ensureWebhook: 修復 webhook（當前=' + currentUrl + '）');
+  UrlFetchApp.fetch(TG_API_URL + '/setWebhook', {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify({
+      url: WORKER_URL,
+      allowed_updates: ['message', 'edited_message', 'channel_post', 'edited_channel_post', 'callback_query'],
+      drop_pending_updates: false
+    }),
+    muteHttpExceptions: true
+  });
+}
+
 // 執行一次：修正 allowed_updates，加入 callback_query（令按鈕生效）
 // ⚠️ 必須在主 GAS（AKfycbwT9_K4m0Uv...）執行，不要在 GAS_API2 執行
 function fixWebhook() {
