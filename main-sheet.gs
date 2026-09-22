@@ -101,7 +101,7 @@ function getWebhookInfo() {
 }
 
 // 執行一次：修正 allowed_updates，加入 callback_query（令按鈕生效）
-// 注意：先確保 Cloudflare Worker 路由正常（無 530 錯誤）再執行
+// ⚠️ 必須在主 GAS（AKfycbwT9_K4m0Uv...）執行，不要在 GAS_API2 執行
 function fixWebhook() {
   const WORKER_WEBHOOK_URL = 'https://still-art-9869.852hk81jp.workers.dev';
   const res = UrlFetchApp.fetch(TG_API_URL + '/setWebhook', {
@@ -109,11 +109,17 @@ function fixWebhook() {
     payload: JSON.stringify({
       url: WORKER_WEBHOOK_URL,
       allowed_updates: ['message', 'edited_message', 'channel_post', 'edited_channel_post', 'callback_query'],
-      drop_pending_updates: true
+      drop_pending_updates: false
     }),
     muteHttpExceptions: true
   });
-  Logger.log('fixWebhook → ' + res.getContentText());
+  const result = JSON.parse(res.getContentText());
+  Logger.log('fixWebhook → ' + JSON.stringify(result));
+  // 立即驗證
+  const check = UrlFetchApp.fetch(TG_API_URL + '/getWebhookInfo', { muteHttpExceptions: true });
+  const info = JSON.parse(check.getContentText());
+  Logger.log('驗證 webhook URL: ' + (info.result && info.result.url || '(空)'));
+  Logger.log('驗證 allowed_updates: ' + JSON.stringify(info.result && info.result.allowed_updates));
 }
 
 function tgEdit_(msgId, text, replyMarkup) {
