@@ -25,26 +25,6 @@ function deleteWebhookAndUsePoll() {
   throw new Error('此函數會清除 webhook，如確認要清除請直接修改代碼');
 }
 
-// 時間驅動 Trigger（每分鐘）— 在 GAS Triggers 設定：
-//   函數: pollTelegramUpdates / 時間驅動 / 分鐘計時器 / 每 1 分鐘
-function pollTelegramUpdates() {
-  const props  = PropertiesService.getScriptProperties();
-  const offset = parseInt(props.getProperty('tg_offset') || '0');
-
-  const res  = UrlFetchApp.fetch(
-    TG_API_URL + '/getUpdates?timeout=0&limit=20&offset=' + offset,
-    { muteHttpExceptions: true }
-  );
-  const json = JSON.parse(res.getContentText());
-  if (!json.ok || !json.result.length) return;
-
-  let nextOffset = offset;
-  for (const update of json.result) {
-    nextOffset = Math.max(nextOffset, update.update_id + 1);
-    try { handleTelegramUpdate_(update); } catch(err) { Logger.log('poll err: ' + err.message); }
-  }
-  props.setProperty('tg_offset', String(nextOffset));
-}
 
 function tgEscape_(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
