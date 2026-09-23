@@ -14,26 +14,15 @@ const TG_API_URL = 'https://api.telegram.org/bot' + TG_TOKEN;
 // 執行一次：設定 webhook（令 TG 按鈕即時回應）
 // 步驟：1. 部署 GAS 為 Web App（執行者=我，存取=任何人）
 //       2. 在 GAS 編輯器執行 setWebhook() 一次
+// ⚠️ 已棄用 — 請改用 fixWebhook()
+// 此函數在時間觸發器下會回傳空 URL 並清除 webhook，勿執行
 function setWebhook() {
-  // getUrl() from editor returns /dev (auth-required); force /exec for public webhook
-  const rawUrl = ScriptApp.getService().getUrl();
-  const url = rawUrl.replace(/\/dev$/, '/exec');
-  const res = UrlFetchApp.fetch(TG_API_URL + '/setWebhook', {
-    method: 'post', contentType: 'application/json',
-    payload: JSON.stringify({ url: url, drop_pending_updates: true }),
-    muteHttpExceptions: true
-  });
-  Logger.log('setWebhook → ' + url);
-  Logger.log(res.getContentText());
+  throw new Error('請改用 fixWebhook()，此函數已棄用');
 }
 
-// 執行一次：清除 webhook，改用 polling 模式
+// ⚠️ 已棄用 — 執行此函數會清除 webhook，令 TG 按鈕失效
 function deleteWebhookAndUsePoll() {
-  const res = UrlFetchApp.fetch(TG_API_URL + '/deleteWebhook', {
-    method: 'post', contentType: 'application/json',
-    payload: JSON.stringify({ drop_pending_updates: true }), muteHttpExceptions: true
-  });
-  Logger.log(res.getContentText());
+  throw new Error('此函數會清除 webhook，如確認要清除請直接修改代碼');
 }
 
 // 時間驅動 Trigger（每分鐘）— 在 GAS Triggers 設定：
