@@ -1303,6 +1303,15 @@ function renderShipSummary(d){
     </div>`;
   }
 
+  // 拎翻屋企 row: mark + weight, no tracking warning
+  function homeRow(it){
+    return `<div style="padding:14px 0;border-bottom:1px solid var(--border);text-align:center;">
+      <div style="font-size:17px;font-weight:900;color:#DC2626;letter-spacing:.02em;margin-bottom:6px;">${esc(it.mark||'—')}</div>
+      <div style="font-size:12px;color:#D97706;font-weight:700;margin-bottom:4px;">🏠 拎翻屋企</div>
+      ${it.sub ? `<div style="font-size:11px;color:#94A3B8;">${esc(it.sub)}</div>` : ''}
+    </div>`;
+  }
+
   // 平郵 row: mark(red large) → 收件者 → 地址
   function plainRow(it){
     return `<div style="padding:14px 0;border-bottom:1px solid var(--border);">
@@ -1339,7 +1348,7 @@ function renderShipSummary(d){
   html+=section('📮','平郵 '+plain.length+' 件','#7C3AED',
     plain.map(i=>plainRow(i)), plainText);
   html+=section('🏠','拎翻屋企 '+home.length+' 件','#D97706',
-    home.map(i=>normalRow({mark:i.mark,tracking:'',sub:i.weight?i.weight+'g':''})), homeText);
+    home.map(i=>homeRow({mark:i.mark,sub:i.weight?i.weight+'g':''})), homeText);
   if(held.length){
     const heldText=held.map(i=>`⏩ 保留：${i.mark}　→ ${i.nextTag||'下一團'}`).join('\n');
     html+=`<div style="background:var(--white);border-radius:var(--r-md);margin-bottom:10px;overflow:hidden;box-shadow:var(--sh-sm);border-left:4px solid #EF4444;">
@@ -1420,6 +1429,13 @@ function buildShipPageHtml(d){
       </div>
     </div>`;
   }
+  function homeRowHtml(it){
+    return `<div style="background:#fff;border-radius:12px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center;">
+      <div style="font-size:30px;font-weight:900;color:#DC2626;margin-bottom:8px;">${esc(it.mark||'—')}</div>
+      <div style="font-size:22px;color:#D97706;font-weight:700;margin-bottom:6px;">🏠 拎翻屋企</div>
+      ${it.sub?`<div style="font-size:22px;color:#94A3B8;">${esc(it.sub)}</div>`:''}
+    </div>`;
+  }
   function section(emoji,title,color,rows){
     if(!rows.length)return '';
     return `<div style="margin-bottom:20px;">
@@ -1440,7 +1456,7 @@ function buildShipPageHtml(d){
 ${section('📬','易寄取 '+easy.length+' 件','#2563EB',easy.map(i=>row({mark:i.mark,tracking:i.tracking,sub:''})).join(''))}
 ${section('📦','順豐 '+sf.length+' 件（共'+sfWeight+'g）','#059669',sf.map(i=>row({mark:i.mark,tracking:i.tracking,sub:i.itemNames||''})).join(''))}
 ${section('📮','平郵 '+plain.length+' 件','#7C3AED',plain.map(i=>plainRowHtml(i)).join(''))}
-${section('🏠','拎翻屋企 '+home.length+' 件','#D97706',home.map(i=>row({mark:i.mark,tracking:'',sub:i.weight?i.weight+'g':''})).join(''))}
+${section('🏠','拎翻屋企 '+home.length+' 件','#D97706',home.map(i=>homeRowHtml({mark:i.mark,sub:i.weight?i.weight+'g':''})).join(''))}
 ${held.length?`<div style="margin-bottom:20px;">
   <div style="font-size:24px;font-weight:800;color:#0D1B2A;border-left:4px solid #EF4444;padding-left:10px;margin-bottom:10px;">⚠️ 保留至下一團 ${held.length} 件</div>
   ${held.map(i=>`<div style="background:#FEF2F2;border:2px solid #FECACA;border-radius:12px;padding:18px;margin-bottom:12px;">
