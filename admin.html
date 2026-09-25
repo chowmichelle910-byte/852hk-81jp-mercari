@@ -2512,7 +2512,7 @@ async function igUploadAndSaveToSheet(){
     const preview=await postMain({action:'getGroupEmailPreview',password:pw,group});
     if(preview.error) throw new Error(preview.error);
     const content=(preview.html||'')
-      .replace(/<br\s*\/?>/gi,'\n')
+      .replace(/<br\s*\/?>\n?/gi,'\n')
       .replace(/<[^>]+>/g,'')
       .replace(/\n{3,}/g,'\n\n')
       .trim();
