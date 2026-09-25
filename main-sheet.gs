@@ -3039,7 +3039,11 @@ function updateOrdersFromGmail() {
         Logger.log('[TypeI] idMatch=' + (idMatch && idMatch[1]) + ' name=' + (nameMatch && nameMatch[1]) + ' price=' + (priceMatch && priceMatch[1]));
         if (idMatch) {
           const itemId  = idMatch[1].trim();
-          const itemUrl = 'https://page.auctions.yahoo.co.jp/jp/auction/' + itemId;
+          const isAuction = plainBody.includes('オークション') && !plainBody.includes('フリマ');
+          const itemUrl = isAuction
+            ? 'https://page.auctions.yahoo.co.jp/jp/auction/' + itemId
+            : 'https://paypayfleamarket.yahoo.co.jp/item/' + itemId;
+          const platformVal = isAuction ? 'Yahoo Auction' : 'Paypayfleamarket';
           if (!existingUrls.includes(itemUrl) && !isUrlBlacklisted_(itemUrl)) {
             const name  = nameMatch  ? nameMatch[1].trim()              : '';
             const price = priceMatch ? priceMatch[1].replace(/,/g, '') : '';
@@ -3051,7 +3055,7 @@ function updateOrdersFromGmail() {
             orderSheet.getRange(nextRow, 2).setValue(dateStr);
             orderSheet.getRange(nextRow, 3).clearContent();
             orderSheet.getRange(nextRow, 4).clearContent();
-            orderSheet.getRange(nextRow, 5).setValue('Yahoo Auction');
+            try { orderSheet.getRange(nextRow, 5).setValue(platformVal); } catch(e) { Logger.log('[TypeI] E欄 validation: ' + e.message); }
             orderSheet.getRange(nextRow, 6).setValue(itemUrl);
             orderSheet.getRange(nextRow, 7).setValue(name);
             if (price) orderSheet.getRange(nextRow, 8).setValue(price);
@@ -3059,7 +3063,7 @@ function updateOrdersFromGmail() {
             existingUrls.push(itemUrl);
             blacklistUrl_(itemUrl);
             anyNewOrder = true;
-            Logger.log('Yahoo Auction 新訂單：' + itemId + ' ¥' + price);
+            Logger.log('[TypeI] 新訂單：' + platformVal + ' ' + itemId + ' ¥' + price);
           }
         }
       }
