@@ -52,6 +52,15 @@ function testDoPost() {
   }
 }
 
+function tgSendPhoto_(photoUrl, caption, replyMarkup) {
+  const payload = { chat_id: TG_CHAT_ID, photo: photoUrl, caption: caption, parse_mode: 'HTML' };
+  if (replyMarkup) payload.reply_markup = replyMarkup;
+  UrlFetchApp.fetch(TG_API_URL + '/sendPhoto', {
+    method: 'post', contentType: 'application/json',
+    payload: JSON.stringify(payload), muteHttpExceptions: true
+  });
+}
+
 // 診斷用：在 GAS 編輯器手動執行此函數測試能否發送訊息
 function testTgSend() {
   const res = UrlFetchApp.fetch(TG_API_URL + '/sendMessage', {
@@ -190,16 +199,20 @@ function checkNewOrdersAndNotify() {
     const unrated  = String(data29[i][28] || '').trim(); // AC: 未評價
     const itemName = String(data29[i][6]  || '').trim(); // G: 商品名
     const code     = String(data29[i][14] || '').trim(); // O: Code
+    const image    = String(data29[i][18] || '').trim(); // S: 到貨圖片
 
     if (!weight || !link.includes('mercari.com/item/') || unrated !== '未評價') continue;
     if (props.getProperty('tg_unrated_' + rowNum)) continue;
 
     const tUrl = link.replace('/item/', '/transaction/');
-    tgSend_(
-      `⭐ <b>待評價商品</b>${code ? '  ' + tgEscape_(code) : ''}` +
-      `${itemName ? '\n' + tgEscape_(itemName) : ''}\n${tUrl}`,
-      { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]] }
-    );
+    const caption = `⭐ <b>待評價商品</b>${code ? '  ' + tgEscape_(code) : ''}` +
+                    `${itemName ? '\n' + tgEscape_(itemName) : ''}\n${tUrl}`;
+    const markup  = { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]] };
+    if (image) {
+      tgSendPhoto_(image, caption, markup);
+    } else {
+      tgSend_(caption, markup);
+    }
     props.setProperty('tg_unrated_' + rowNum, '1');
   }
 }
