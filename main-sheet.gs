@@ -2817,8 +2817,8 @@ function updateOrdersFromGmail() {
   // ── 発送 email：不加 label:inbox，因 Gmail filter 可能已 archive；只排 Processed-Shipped ──
   const qShipped = `-label:${LABEL_MERCARI} -label:${LABEL_SHOPS} -label:${LABEL_SHIPPED} newer_than:14d from:no-reply@mercari.jp`;
 
-  // ── PayPay フリマ：支払い完了 + 発送通知（from:pzktc04471@yahoo.co.jp）──
-  const qPayPay = `-label:${LABEL_PAYPAY} newer_than:30d from:pzktc04471@yahoo.co.jp`;
+  // ── PayPay フリマ：支払い完了 + 発送通知 + キャンセル ──
+  const qPayPay = `-label:${LABEL_PAYPAY} newer_than:30d subject:PayPayフリマ`;
 
   // ── Yahoo! かんたん決済：落札支払い完了通知 ──
   const qYahoo = `-label:${LABEL_YAHOO} newer_than:30d subject:"Yahoo! かんたん決済"`;
@@ -3025,9 +3025,42 @@ function updateOrdersFromGmail() {
         archiveThread = true;
       }
 
+      // ── 類型 I：Yahoo! かんたん決済 落札支払い完了（必須在 F 之前）──
+      else if (subj.includes('Yahoo! かんたん決済') || subj.includes('Yahoo!かんたん決済')) {
+        labeledYahoo = true;
+        const idMatch    = plainBody.match(/商品(?:ID|id)[\s　]*[：:]\s*([A-Za-z0-9]+)/);
+        const nameMatch  = plainBody.match(/商品(?:タイトル|名)[\s　]*[：:]\s*([^\n\r]+)/);
+        const priceMatch = plainBody.match(/支払い(?:金額|手続き)[^：:\n]*[：:]\s*([\d,]+)\s*円/);
+        if (idMatch) {
+          const itemId  = idMatch[1].trim();
+          const itemUrl = 'https://page.auctions.yahoo.co.jp/jp/auction/' + itemId;
+          if (!existingUrls.includes(itemUrl) && !isUrlBlacklisted_(itemUrl)) {
+            const name  = nameMatch  ? nameMatch[1].trim()              : '';
+            const price = priceMatch ? priceMatch[1].replace(/,/g, '') : '';
+            let nextRow = -1;
+            for (let r = 1; r < data.length; r++) {
+              if (String(data[r][15] || '').trim() === '已取消') { nextRow = r + 1; break; }
+            }
+            if (nextRow === -1) nextRow = getNextOrderRow_(orderSheet);
+            orderSheet.getRange(nextRow, 2).setValue(dateStr);
+            orderSheet.getRange(nextRow, 3).clearContent();
+            orderSheet.getRange(nextRow, 4).clearContent();
+            orderSheet.getRange(nextRow, 5).setValue('Yahoo Auction');
+            orderSheet.getRange(nextRow, 6).setValue(itemUrl);
+            orderSheet.getRange(nextRow, 7).setValue(name);
+            if (price) orderSheet.getRange(nextRow, 8).setValue(price);
+            orderSheet.getRange(nextRow, 16).clearContent();
+            existingUrls.push(itemUrl);
+            blacklistUrl_(itemUrl);
+            anyNewOrder = true;
+            Logger.log('Yahoo Auction 新訂單：' + itemId + ' ¥' + price);
+          }
+        }
+      }
+
       // ── 類型 F：PayPay フリマ 支払い完了（新訂單）──
-      else if (msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
-               (subj.includes('かんたん決済') || subj.includes('支払い') || plainBody.includes('支払い手続完了') || plainBody.includes('支払い手続き完了'))) {
+      else if (subj.includes('PayPayフリマ') &&
+               (subj.includes('支払い') || plainBody.includes('支払い手続完了') || plainBody.includes('支払い手続き完了'))) {
         labeledPayPay = true;
         // 商品ID（含全形空白及轉寄 > 前綴）：匹配緊跟 z/l 開頭的 ID
         const idMatch    = plainBody.match(/商品ID[\s　]*[：:]\s*(z[A-Za-z0-9]+)/);
@@ -3062,7 +3095,7 @@ function updateOrdersFromGmail() {
       }
 
       // ── 類型 H：PayPay フリマ 取消交易 ──
-      else if (msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
+      else if (subj.includes('PayPayフリマ') &&
                (subj.includes('キャンセル') || plainBody.includes('キャンセル') || plainBody.includes('キャンセルされました'))) {
         labeledPayPay = true;
         const idMatch   = plainBody.match(/商品ID[\s　]*[：:]\s*(z[A-Za-z0-9]+)/) ||
@@ -3098,42 +3131,9 @@ function updateOrdersFromGmail() {
         );
       }
 
-      // ── 類型 I：Yahoo! かんたん決済 落札支払い完了 ──
-      else if (subj.includes('Yahoo! かんたん決済') || subj.includes('Yahoo!かんたん決済')) {
-        labeledYahoo = true;
-        const idMatch    = plainBody.match(/商品(?:ID|id)[\s　]*[：:]\s*([A-Za-z0-9]+)/);
-        const nameMatch  = plainBody.match(/商品(?:タイトル|名)[\s　]*[：:]\s*([^\n\r]+)/);
-        const priceMatch = plainBody.match(/支払い(?:金額|手続き)[^：:\n]*[：:]\s*([\d,]+)\s*円/);
-        if (idMatch) {
-          const itemId  = idMatch[1].trim();
-          const itemUrl = 'https://page.auctions.yahoo.co.jp/jp/auction/' + itemId;
-          if (!existingUrls.includes(itemUrl) && !isUrlBlacklisted_(itemUrl)) {
-            const name  = nameMatch  ? nameMatch[1].trim()              : '';
-            const price = priceMatch ? priceMatch[1].replace(/,/g, '') : '';
-            let nextRow = -1;
-            for (let r = 1; r < data.length; r++) {
-              if (String(data[r][15] || '').trim() === '已取消') { nextRow = r + 1; break; }
-            }
-            if (nextRow === -1) nextRow = getNextOrderRow_(orderSheet);
-            orderSheet.getRange(nextRow, 2).setValue(dateStr);
-            orderSheet.getRange(nextRow, 3).clearContent();
-            orderSheet.getRange(nextRow, 4).clearContent();
-            orderSheet.getRange(nextRow, 5).setValue('Yahoo Auction');
-            orderSheet.getRange(nextRow, 6).setValue(itemUrl);
-            orderSheet.getRange(nextRow, 7).setValue(name);
-            if (price) orderSheet.getRange(nextRow, 8).setValue(price);
-            orderSheet.getRange(nextRow, 16).clearContent();
-            existingUrls.push(itemUrl);
-            blacklistUrl_(itemUrl);
-            anyNewOrder = true;
-            Logger.log('Yahoo Auction 新訂單：' + itemId + ' ¥' + price);
-          }
-        }
-      }
-
       // ── 類型 G：PayPay フリマ 発送通知 ──
-      else if (msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
-               (plainBody.includes('発送') || subj.includes('発送'))) {
+      else if (subj.includes('PayPayフリマ') &&
+               (subj.includes('発送') || plainBody.includes('発送'))) {
         labeledPayPay = true;
         const idMatch = plainBody.match(/商品ID[\s　]*[：:]\s*(z[A-Za-z0-9]+)/);
         if (idMatch && linkCol !== -1 && trackCol !== -1) {
