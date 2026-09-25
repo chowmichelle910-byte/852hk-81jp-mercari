@@ -3055,6 +3055,7 @@ function updateOrdersFromGmail() {
             orderSheet.getRange(nextRow, 2).setValue(dateStr);
             orderSheet.getRange(nextRow, 3).clearContent();
             orderSheet.getRange(nextRow, 4).clearContent();
+            if (isAuction) ensurePlatformInValidation_(orderSheet, 'Yahoo Auction');
             try { orderSheet.getRange(nextRow, 5).setValue(platformVal); } catch(e) { Logger.log('[TypeI] E欄 validation: ' + e.message); }
             orderSheet.getRange(nextRow, 6).setValue(itemUrl);
             orderSheet.getRange(nextRow, 7).setValue(name);
@@ -3265,6 +3266,23 @@ function syncDailyColumns() {
 //  輔助函數
 // ─────────────────────────────────────────────
 // ── 永久黑名單：URL 一旦寫入過，即使行被 delete 都唔會再寫 ──
+function ensurePlatformInValidation_(sheet, newValue) {
+  const eCol = sheet.getRange('E2:E' + sheet.getMaxRows());
+  const rule = eCol.getDataValidation();
+  if (!rule) return;
+  const criteria = rule.getCriteriaValues();
+  if (!criteria || !criteria[0]) return;
+  const values = criteria[0];
+  if (values.includes(newValue)) return;
+  values.push(newValue);
+  const newRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(values, true)
+    .setAllowInvalid(false)
+    .build();
+  eCol.setDataValidation(newRule);
+  Logger.log('[ensurePlatformInValidation_] added: ' + newValue);
+}
+
 function isUrlBlacklisted_(url) {
   const key = 'bl_' + url.replace(/[^A-Za-z0-9]/g, '_').substring(0, 230);
   return !!PropertiesService.getScriptProperties().getProperty(key);
