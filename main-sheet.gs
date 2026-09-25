@@ -169,8 +169,10 @@ function checkNewOrdersAndNotify() {
     if (pos || id || !hasContent) continue;
     if (props.getProperty('tg_r' + rowNum)) continue;
 
-    const code    = String(data[i][14] || '').trim(); // O: Code
-    const itemUrl = String(data[i][5]  || '').trim(); // F: Link
+    const code     = String(data[i][14] || '').trim(); // O: Code
+    const itemUrl  = String(data[i][5]  || '').trim(); // F: Link
+    const itemName = String(data[i][6]  || '').trim(); // G: 商品名
+    const platform = String(data[i][4]  || '').trim(); // E: Platform
 
     const posButtons = positions.length
       ? positions.map(p => [{ text: p, callback_data: ('pos:' + rowNum + ':' + p).substring(0, 64) }])
@@ -181,7 +183,8 @@ function checkNewOrdersAndNotify() {
     posButtons.push([{ text: '🗑️ 刪除訂單', callback_data: 'del_order:' + rowNum }]);
 
     tgSend_(
-      `🆕 <b>新訂單！</b>${code ? '  ' + code : ''}\n` +
+      `🆕 <b>新訂單！</b>${code ? '  ' + code : ''}${platform ? '  【' + tgEscape_(platform) + '】' : ''}\n` +
+      (itemName ? tgEscape_(itemName) + '\n' : '') +
       (itemUrl ? `🔗 ${itemUrl}\n` : '') +
       `\n係哪個 <b>Position</b>？` +
       (code ? `\n<tg-spoiler>_code:${code}_</tg-spoiler>` : ''),
