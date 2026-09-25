@@ -3031,9 +3031,12 @@ function updateOrdersFromGmail() {
       // ── 類型 I：Yahoo! かんたん決済 落札支払い完了（必須在 F 之前）──
       else if (subj.includes('Yahoo! かんたん決済') || subj.includes('Yahoo!かんたん決済')) {
         labeledYahoo = true;
-        const idMatch    = plainBody.match(/商品(?:ID|id)[\s　]*[：:]\s*([A-Za-z0-9]+)/);
-        const nameMatch  = plainBody.match(/商品(?:タイトル|名)[\s　]*[：:]\s*([^\n\r]+)/);
-        const priceMatch = plainBody.match(/支払い(?:金額|手続き)[^：:\n]*[：:]\s*([\d,]+)\s*円/);
+        Logger.log('[TypeI] subj=' + subj);
+        Logger.log('[TypeI] body snippet=' + plainBody.substring(0, 500));
+        const idMatch    = plainBody.match(/商品\s*ID\s*[：: ]\s*(z?[A-Za-z0-9]+)/i);
+        const nameMatch  = plainBody.match(/商品(?:タイトル|名)\s*[：: ]\s*([^\n\r]+)/);
+        const priceMatch = plainBody.match(/支払い[^\n]*?[：: ]\s*([\d,]+)\s*円/);
+        Logger.log('[TypeI] idMatch=' + (idMatch && idMatch[1]) + ' name=' + (nameMatch && nameMatch[1]) + ' price=' + (priceMatch && priceMatch[1]));
         if (idMatch) {
           const itemId  = idMatch[1].trim();
           const itemUrl = 'https://page.auctions.yahoo.co.jp/jp/auction/' + itemId;
