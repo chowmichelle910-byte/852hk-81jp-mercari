@@ -2804,6 +2804,7 @@ function updateOrdersFromGmail() {
   const LABEL_SHOPS         = 'Processed-MercariShops';
   const LABEL_SHIPPED       = 'Processed-Shipped';
   const LABEL_PAYPAY        = 'Processed-PayPay';
+  const LABEL_YAHOO         = 'Processed-Yahoo';
 
   // ── 1 次 search 涵蓋 A-D 類型（排除已處理 label）──
   const q = `label:inbox -label:${LABEL_MERCARI} -label:${LABEL_SHOPS} -label:${LABEL_SHIPPED} newer_than:14d ` +
@@ -2819,8 +2820,11 @@ function updateOrdersFromGmail() {
   // ── PayPay フリマ：支払い完了 + 発送通知（from:pzktc04471@yahoo.co.jp）──
   const qPayPay = `-label:${LABEL_PAYPAY} newer_than:30d from:pzktc04471@yahoo.co.jp`;
 
+  // ── Yahoo! かんたん決済：落札支払い完了通知 ──
+  const qYahoo = `-label:${LABEL_YAHOO} newer_than:30d subject:"Yahoo! かんたん決済"`;
+
   const seenIds  = new Set();
-  const threads  = [...GmailApp.search(q), ...GmailApp.search(qShipped), ...GmailApp.search(qPayPay)]
+  const threads  = [...GmailApp.search(q), ...GmailApp.search(qShipped), ...GmailApp.search(qPayPay), ...GmailApp.search(qYahoo)]
     .filter(t => { if (seenIds.has(t.getId())) return false; seenIds.add(t.getId()); return true; });
 
   const ss         = SpreadsheetApp.getActiveSpreadsheet();
@@ -2840,6 +2844,7 @@ function updateOrdersFromGmail() {
   const labelShops    = GmailApp.createLabel(LABEL_SHOPS);
   const labelShipped  = GmailApp.createLabel(LABEL_SHIPPED);
   const labelPayPay   = GmailApp.createLabel(LABEL_PAYPAY);
+  const labelYahoo    = GmailApp.createLabel(LABEL_YAHOO);
 
   let anyNewOrder = false;
 
@@ -2853,6 +2858,7 @@ function updateOrdersFromGmail() {
     let labeledShops    = false;
     let labeledShipped  = false;
     let labeledPayPay   = false;
+    let labeledYahoo    = false;
     let archiveThread   = false;
 
     for (const msg of thread.getMessages()) {
@@ -3092,6 +3098,39 @@ function updateOrdersFromGmail() {
         );
       }
 
+      // ── 類型 I：Yahoo! かんたん決済 落札支払い完了 ──
+      else if (subj.includes('Yahoo! かんたん決済') || subj.includes('Yahoo!かんたん決済')) {
+        labeledYahoo = true;
+        const idMatch    = plainBody.match(/商品(?:ID|id)[\s　]*[：:]\s*([A-Za-z0-9]+)/);
+        const nameMatch  = plainBody.match(/商品(?:タイトル|名)[\s　]*[：:]\s*([^\n\r]+)/);
+        const priceMatch = plainBody.match(/支払い(?:金額|手続き)[^：:\n]*[：:]\s*([\d,]+)\s*円/);
+        if (idMatch) {
+          const itemId  = idMatch[1].trim();
+          const itemUrl = 'https://page.auctions.yahoo.co.jp/jp/auction/' + itemId;
+          if (!existingUrls.includes(itemUrl) && !isUrlBlacklisted_(itemUrl)) {
+            const name  = nameMatch  ? nameMatch[1].trim()              : '';
+            const price = priceMatch ? priceMatch[1].replace(/,/g, '') : '';
+            let nextRow = -1;
+            for (let r = 1; r < data.length; r++) {
+              if (String(data[r][15] || '').trim() === '已取消') { nextRow = r + 1; break; }
+            }
+            if (nextRow === -1) nextRow = getNextOrderRow_(orderSheet);
+            orderSheet.getRange(nextRow, 2).setValue(dateStr);
+            orderSheet.getRange(nextRow, 3).clearContent();
+            orderSheet.getRange(nextRow, 4).clearContent();
+            orderSheet.getRange(nextRow, 5).setValue('Yahoo Auction');
+            orderSheet.getRange(nextRow, 6).setValue(itemUrl);
+            orderSheet.getRange(nextRow, 7).setValue(name);
+            if (price) orderSheet.getRange(nextRow, 8).setValue(price);
+            orderSheet.getRange(nextRow, 16).clearContent();
+            existingUrls.push(itemUrl);
+            blacklistUrl_(itemUrl);
+            anyNewOrder = true;
+            Logger.log('Yahoo Auction 新訂單：' + itemId + ' ¥' + price);
+          }
+        }
+      }
+
       // ── 類型 G：PayPay フリマ 発送通知 ──
       else if (msg.getFrom().includes('pzktc04471@yahoo.co.jp') &&
                (plainBody.includes('発送') || subj.includes('発送'))) {
@@ -3135,6 +3174,7 @@ function updateOrdersFromGmail() {
     if (labeledShops)   thread.addLabel(labelShops);
     if (labeledShipped) thread.addLabel(labelShipped);
     if (labeledPayPay)  thread.addLabel(labelPayPay);
+    if (labeledYahoo)   thread.addLabel(labelYahoo);
     if (archiveThread)  thread.moveToArchive();
   }
 
