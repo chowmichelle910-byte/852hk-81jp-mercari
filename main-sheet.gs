@@ -356,7 +356,9 @@ function handleTelegramUpdate_(update) {
           const trackCol = header.indexOf('Photo/送り状番号') + 1;
           if (trackCol > 0) {
             sheet.getRange(rowNum, trackCol).setValue('送り状番号：' + text);
-            tgSend_(`✅ 已記錄\n送り状番号：${text}`, null, fromChatId);
+            const itemLink_ = String(sheet.getRange(rowNum, 6).getValue() || '').trim();
+            const txLink_ = itemLink_.replace('/item/', '/transaction/');
+            tgSend_(`✅ 已記錄\n送り状番号：${text}` + (txLink_ ? '\n' + txLink_ : ''), null, fromChatId);
           }
         }
         return;
@@ -665,7 +667,8 @@ function handleTelegramUpdate_(update) {
       if (trackCol > 0) sheet.getRange(rowNum, trackCol).setValue('普通郵便');
       const rowVals = sheet.getRange(rowNum, 1, 1, 6).getValues()[0];
       const itemLink = String(rowVals[5] || '').trim(); // F欄
-      tgEdit_(msgId, '✅ 已記錄：普通郵便' + (itemLink ? '\n' + itemLink : ''), { inline_keyboard: [] });
+      const txLink = itemLink.replace('/item/', '/transaction/');
+      tgEdit_(msgId, '✅ 已記錄：普通郵便' + (txLink ? '\n' + txLink : ''), { inline_keyboard: [] });
     }
 
   } else if (action === 'shipped_track') {
