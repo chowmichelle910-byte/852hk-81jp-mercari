@@ -2727,13 +2727,23 @@ function assignGroupByOrderDate() {
     else skippedNoMatch++;
   }
   Logger.log('assignGroupByOrderDate: filled='+filled+' skippedExisting='+skippedExisting+' skippedNoDate='+skippedNoDate+' skippedNoMatch='+skippedNoMatch);
-  // 診斷：印出第一行冇 match 嘅訂單日期
-  for(let i=0;i<Math.min(orderData.length,5);i++){
+  // 診斷：印出所有 noMatch 行的詳情
+  let noMatchCount=0;
+  for(let i=0;i<orderData.length;i++){
     const row=orderData[i];
     if(String(row[26]||'').trim()) continue;
-    Logger.log('sample order B='+String(row[1])+' type='+typeof row[1]+' toDate='+toDate(row[1]));
-    break;
+    const od=toDate(row[1]);
+    if(!od) continue;
+    noMatchCount++;
+    Logger.log('noMatch row'+(i+2)+' B='+String(row[1])+' parsed='+od.toISOString());
+    if(noMatchCount>=15) break;
   }
+  // 診斷：印出 dataRows 最後 5 個 (最新的團)
+  const tail=dataRows.slice(-5);
+  tail.forEach((r,idx)=>{
+    const s=toDate(r[1]),e=toDate(r[2]);
+    Logger.log('dataRow tail['+(dataRows.length-5+idx)+']: group='+String(r[0])+' start='+String(r[1])+(s?' iso='+s.toISOString():' FAIL')+' end='+String(r[2])+(e?' iso='+e.toISOString():' FAIL'));
+  });
 }
 
 // ─────────────────────────────────────────────
