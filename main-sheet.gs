@@ -663,7 +663,9 @@ function handleTelegramUpdate_(update) {
       const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       const trackCol = header.indexOf('Photo/送り状番号') + 1;
       if (trackCol > 0) sheet.getRange(rowNum, trackCol).setValue('普通郵便');
-      tgEdit_(msgId, '✅ 已記錄：普通郵便', { inline_keyboard: [] });
+      const rowVals = sheet.getRange(rowNum, 1, 1, 6).getValues()[0];
+      const itemLink = String(rowVals[5] || '').trim(); // F欄
+      tgEdit_(msgId, '✅ 已記錄：普通郵便' + (itemLink ? '\n' + itemLink : ''), { inline_keyboard: [] });
     }
 
   } else if (action === 'shipped_track') {
