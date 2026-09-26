@@ -137,6 +137,34 @@ function tgAnswer_(cbId, text) {
   });
 }
 
+// 收集最近 n 個唯一 pos+id 組合（由最新排前）
+function buildRecentCombos_(data, n) {
+  const seen = new Set();
+  const result = [];
+  for (let i = data.length - 1; i >= 0 && result.length < n; i--) {
+    const p = String(data[i][2] || '').trim();
+    const d = String(data[i][3] || '').trim();
+    if (p && d) {
+      const key = p + '\x00' + d;
+      if (!seen.has(key)) { seen.add(key); result.push({ p, d }); }
+    }
+  }
+  return result;
+}
+
+// 建立新訂單 inline keyboard：最近5個 pos+id + [Position] [刪除]
+function buildOrderButtons_(rowNum, recentCombos) {
+  const rows = recentCombos.map(({ p, d }) => [{
+    text: `${p}  ${d}`,
+    callback_data: ('cp2:' + rowNum + ':' + p + ':' + d).substring(0, 64)
+  }]);
+  rows.push([
+    { text: '📍 Position', callback_data: 'show_pos:' + rowNum },
+    { text: '🗑️ 刪除訂單', callback_data: 'del_order:' + rowNum }
+  ]);
+  return rows;
+}
+
 // onChange trigger 觸發 — Sheet 有新行加入時即時執行
 // 設定方法：GAS Triggers → From spreadsheet → On change → checkNewOrdersAndNotify
 function checkNewOrdersAndNotify() {
@@ -148,16 +176,8 @@ function checkNewOrdersAndNotify() {
 
   const data = sheet.getRange(2, 1, lastRow - 1, 28).getValues();
 
-  // 收集現有 Position 種類（由最新排前）+ 上一個有 pos+id 的訂單
-  const posSet = new Set();
-  let prevPos = '', prevId = '';
-  for (let i = data.length - 1; i >= 0; i--) {
-    const p = String(data[i][2] || '').trim();
-    const d = String(data[i][3] || '').trim();
-    if (p) posSet.add(p);
-    if (!prevPos && p && d) { prevPos = p; prevId = d; }
-  }
-  const positions = [...posSet];
+  // 收集最近5個 pos+id 組合 + 所有 position 種類
+  const recentCombos = buildRecentCombos_(data, 5);
 
   for (let i = 0; i < data.length; i++) {
     const rowNum = i + 2;
@@ -174,13 +194,7 @@ function checkNewOrdersAndNotify() {
     const itemName = String(data[i][6]  || '').trim(); // G: 商品名
     const platform = String(data[i][4]  || '').trim(); // E: Platform
 
-    const posButtons = positions.length
-      ? positions.map(p => [{ text: p, callback_data: ('pos:' + rowNum + ':' + p).substring(0, 64) }])
-      : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: 'pos:' + rowNum + ':' + p }))];
-    if (prevPos && prevId) {
-      posButtons.unshift([{ text: `📋 同上 (${prevPos} ${prevId})`, callback_data: ('copy_prev:' + rowNum).substring(0, 64) }]);
-    }
-    posButtons.push([{ text: '🗑️ 刪除訂單', callback_data: 'del_order:' + rowNum }]);
+    const posButtons = buildOrderButtons_(rowNum, recentCombos);
 
     tgSend_(
       `🆕 <b>新訂單！</b>${code ? '  ' + code : ''}${platform ? '  【' + tgEscape_(platform) + '】' : ''}\n` +
@@ -464,17 +478,7 @@ function handleTelegramUpdate_(update) {
       if (lastRow < 2) { tgSend_('✅ 沒有待處理訂單', null, fromChatId); return; }
 
       const data = sheet.getRange(2, 1, lastRow - 1, 28).getValues();
-
-      // 收集現有 Position 種類（最新排前）+ 上一個有 pos+id 的訂單
-      const posSet2 = new Set();
-      let prevPos2 = '', prevId2 = '';
-      for (let i = data.length - 1; i >= 0; i--) {
-        const p = String(data[i][2] || '').trim();
-        const d = String(data[i][3] || '').trim();
-        if (p) posSet2.add(p);
-        if (!prevPos2 && p && d) { prevPos2 = p; prevId2 = d; }
-      }
-      const positions = [...posSet2];
+      const recentCombos2 = buildRecentCombos_(data, 5);
 
       let count = 0;
       for (let i = 0; i < data.length; i++) {
@@ -486,18 +490,12 @@ function handleTelegramUpdate_(update) {
           const rowNum  = i + 2;
           const code    = String(data[i][14] || '').trim(); // O: Code
           const itemUrl = String(data[i][5]  || '').trim(); // F: Link
-          const posButtons = positions.length
-            ? positions.map(p => [{ text: p, callback_data: ('pos:' + rowNum + ':' + p).substring(0, 64) }])
-            : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: 'pos:' + rowNum + ':' + p }))];
-          if (prevPos2 && prevId2) {
-            posButtons.unshift([{ text: `📋 同上 (${prevPos2} ${prevId2})`, callback_data: ('copy_prev:' + rowNum).substring(0, 64) }]);
-          }
           tgSend_(
             `📋 <b>待填訂單</b>${code ? '  ' + code : ''}\n` +
             (itemUrl ? `🔗 ${itemUrl}\n` : '') +
             `\n係哪個 <b>Position</b>？` +
             (code ? `\n<tg-spoiler>_code:${code}_</tg-spoiler>` : ''),
-            { inline_keyboard: posButtons },
+            { inline_keyboard: buildOrderButtons_(rowNum, recentCombos2) },
             fromChatId
           );
         }
@@ -543,6 +541,55 @@ function handleTelegramUpdate_(update) {
     } else {
       tgEdit_(msgId, (cb.message.text || '') + '\n\n❌ 找不到上一筆紀錄');
     }
+
+  } else if (action === 'cp2') {
+    // 快速填入：cp2:rowNum:pos:id
+    const rowNum = parseInt(parts[1]);
+    const pos    = parts[2];
+    const id     = parts.slice(3).join(':');
+    tgAnswer_(cb.id, pos && id ? '✅ 已填入' : '資料不足');
+    if (pos && id && !isNaN(rowNum) && rowNum >= 2) {
+      const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+      sheet.getRange(rowNum, 3).setValue(pos);
+      sheet.getRange(rowNum, 4).setValue(id);
+      const rowData = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
+      const code    = String(rowData[14] || '').trim();
+      const link    = String(rowData[5]  || '').trim();
+      const txLink  = link.replace('/item/', '/transaction/');
+      tgEdit_(msgId,
+        `✅${code ? ' (' + code + ')' : ''} <b>已填入</b>` +
+        (txLink ? '\n' + txLink : '') +
+        `\nPosition：<b>${tgEscape_(pos)}</b>\n客人 ID：<b>${tgEscape_(id)}</b>`,
+        { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: 'shipped_track:' + rowNum }]] }
+      );
+    }
+
+  } else if (action === 'show_pos') {
+    // 展開所有 Position 選項
+    const rowNum = parseInt(parts[1]);
+    tgAnswer_(cb.id, '');
+    const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+    const lastRow = sheet.getLastRow();
+    const data    = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 3).getValues() : [];
+    const posSet  = new Set();
+    for (let i = data.length - 1; i >= 0; i--) {
+      const p = String(data[i][2] || '').trim();
+      if (p) posSet.add(p);
+    }
+    const allPos = posSet.size ? [...posSet] : ['IG', 'WTS', '其他'];
+    const posRows = allPos.map(p => [{ text: p, callback_data: ('pos:' + rowNum + ':' + p).substring(0, 64) }]);
+    posRows.push([{ text: '↩️ 返回', callback_data: 'back_order:' + rowNum }]);
+    tgEdit_(msgId, cb.message.text, { inline_keyboard: posRows });
+
+  } else if (action === 'back_order') {
+    // 返回新訂單原始按鈕
+    const rowNum = parseInt(parts[1]);
+    tgAnswer_(cb.id, '');
+    const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+    const lastRow = sheet.getLastRow();
+    const data    = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 4).getValues() : [];
+    const recentCombos = buildRecentCombos_(data, 5);
+    tgEdit_(msgId, cb.message.text, { inline_keyboard: buildOrderButtons_(rowNum, recentCombos) });
 
   } else if (action === 'pos') {
     // 第一步：選好 Position → 顯示歷史客人列表（最新6個）
