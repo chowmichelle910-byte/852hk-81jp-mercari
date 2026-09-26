@@ -227,28 +227,41 @@ function checkSpendingMilestones_() {
   const ss            = SpreadsheetApp.getActiveSpreadsheet();
   const orderSheet    = ss.getSheetByName('訂單');
   const currencySheet = ss.getSheetByName('Currency');
+  const dataSheet     = ss.getSheetByName('Data');
   const props         = PropertiesService.getScriptProperties();
 
   const lastRow = orderSheet.getLastRow();
   if (lastRow < 2) return;
 
+  // 只處理近 90 天內結束的團（過去的團唔重發）
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+  const toDate = v => { if (!v) return null; if (v instanceof Date) return v; const d = new Date(String(v)); return isNaN(d) ? null : d; };
+  const recentGroups = new Set();
+  dataSheet.getRange('H2:J').getValues().forEach(r => {
+    const g = String(r[0]).trim();
+    const endDate = toDate(r[2]);
+    if (g && endDate && endDate >= cutoff) recentGroups.add(g);
+  });
+
   // 讀訂單：B=日期(1) C=position(2) D=user(3) H=price(7) AA=group(26)
   const data = orderSheet.getRange(2, 1, lastRow - 1, 27).getValues();
 
-  // 讀匯率：A=團號 E=rate1(4) G=rate2(6) H=rate3(7)
+  // 讀匯率：A=團號 E=rate1(4) G=rate2(6) H=rate3(7)；值如5.9代表0.059，除100換算
   const rateMap = {};
   currencySheet.getRange('A2:H').getValues().forEach(r => {
     const g = String(r[0]).trim();
-    if (g) rateMap[g] = { rate1: Number(r[4]), rate2: Number(r[6]), rate3: Number(r[7]) };
+    if (g) rateMap[g] = { rate1: Number(r[4]) / 100, rate2: Number(r[6]) / 100, rate3: Number(r[7]) / 100,
+                          raw1:  Number(r[4]),         raw2:  Number(r[6]),         raw3:  Number(r[7]) };
   });
 
-  // 加總每（團+客人）消費
+  // 加總每（團+客人）消費（只計近期團）
   const totals = {};
   for (const row of data) {
     const group = String(row[26] || '').trim();
     const user  = String(row[3]  || '').trim();
     const price = parseFloat(row[7]) || 0;
-    if (!group || !user || !price) continue;
+    if (!group || !user || !price || !recentGroups.has(group)) continue;
     const k = group + '\x00' + user;
     totals[k] = (totals[k] || 0) + price;
   }
@@ -261,23 +274,22 @@ function checkSpendingMilestones_() {
     if (!rates) continue;
 
     const milestones = [
-      { threshold: 10000, stage: '10k', r1: rates.rate1, r2: rates.rate2 },
-      { threshold: 50000, stage: '50k', r1: rates.rate2, r2: rates.rate3 },
+      { threshold: 10000, stage: '10k', r: rates.rate1, r2: rates.rate2, raw: rates.raw1, raw2: rates.raw2 },
+      { threshold: 50000, stage: '50k', r: rates.rate2, r2: rates.rate3, raw: rates.raw2, raw2: rates.raw3 },
     ];
 
-    for (const { threshold, stage, r1, r2 } of milestones) {
+    for (const { threshold, stage, r, r2, raw, raw2 } of milestones) {
       if (total <= threshold) continue;
-      // propKey 截短至 200 chars 避免超限
       const propKey = ('ms_' + stage + '_' + group + '_' + user).substring(0, 200);
       if (props.getProperty(propKey)) continue;
       props.setProperty(propKey, '1');
 
-      const discount  = Math.round(total * r1 * 10 - total * r2 * 10) / 10;
-      const totalInt  = Math.round(total);
+      const totalInt = Math.round(total);
+      const discount = Math.round((total * r - total * r2) * 10) / 10;
       const msg =
-        `🎉 <b>${tgEscape_(user)}</b> 第${tgEscape_(group)}團消費 <b>${totalInt}円</b>\n\n` +
+        `🎉 <b>${tgEscape_(user)}</b> ${tgEscape_(group)}消費 <b>${totalInt}円</b>\n\n` +
         `可獲得折扣：\n` +
-        `${totalInt}×${r1} − ${totalInt}×${r2} = <b>HK$${discount.toFixed(1)}</b>\n\n` +
+        `${totalInt}×${raw/100} − ${totalInt}×${raw2/100} = <b>HK$${discount.toFixed(1)}</b>\n\n` +
         `可於下次消費或郵費使用\n⋆⸜ᵀᴴᴬᴺᴷ ᵞᴼᵁ⸝⋆`;
       tgSend_(msg);
     }
