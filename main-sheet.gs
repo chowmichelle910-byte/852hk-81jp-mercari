@@ -218,6 +218,70 @@ function checkNewOrdersAndNotify() {
     }
     props.setProperty('tg_unrated_' + rowNum, '1');
   }
+
+  // ── 消費里程碑通知 ──
+  try { checkSpendingMilestones_(); } catch(e) { console.error('[milestones]', e); }
+}
+
+function checkSpendingMilestones_() {
+  const ss            = SpreadsheetApp.getActiveSpreadsheet();
+  const orderSheet    = ss.getSheetByName('訂單');
+  const currencySheet = ss.getSheetByName('Currency');
+  const props         = PropertiesService.getScriptProperties();
+
+  const lastRow = orderSheet.getLastRow();
+  if (lastRow < 2) return;
+
+  // 讀訂單：B=日期(1) C=position(2) D=user(3) H=price(7) AA=group(26)
+  const data = orderSheet.getRange(2, 1, lastRow - 1, 27).getValues();
+
+  // 讀匯率：A=團號 E=rate1(4) G=rate2(6) H=rate3(7)
+  const rateMap = {};
+  currencySheet.getRange('A2:H').getValues().forEach(r => {
+    const g = String(r[0]).trim();
+    if (g) rateMap[g] = { rate1: Number(r[4]), rate2: Number(r[6]), rate3: Number(r[7]) };
+  });
+
+  // 加總每（團+客人）消費
+  const totals = {};
+  for (const row of data) {
+    const group = String(row[26] || '').trim();
+    const user  = String(row[3]  || '').trim();
+    const price = parseFloat(row[7]) || 0;
+    if (!group || !user || !price) continue;
+    const k = group + '\x00' + user;
+    totals[k] = (totals[k] || 0) + price;
+  }
+
+  for (const [k, total] of Object.entries(totals)) {
+    const sep   = k.indexOf('\x00');
+    const group = k.substring(0, sep);
+    const user  = k.substring(sep + 1);
+    const rates = rateMap[group];
+    if (!rates) continue;
+
+    const milestones = [
+      { threshold: 10000, stage: '10k', r1: rates.rate1, r2: rates.rate2 },
+      { threshold: 50000, stage: '50k', r1: rates.rate2, r2: rates.rate3 },
+    ];
+
+    for (const { threshold, stage, r1, r2 } of milestones) {
+      if (total <= threshold) continue;
+      // propKey 截短至 200 chars 避免超限
+      const propKey = ('ms_' + stage + '_' + group + '_' + user).substring(0, 200);
+      if (props.getProperty(propKey)) continue;
+      props.setProperty(propKey, '1');
+
+      const discount  = Math.round(total * r1 * 10 - total * r2 * 10) / 10;
+      const totalInt  = Math.round(total);
+      const msg =
+        `🎉 <b>${tgEscape_(user)}</b> 第${tgEscape_(group)}團消費 <b>${totalInt}円</b>\n\n` +
+        `可獲得折扣：\n` +
+        `${totalInt}×${r1} − ${totalInt}×${r2} = <b>HK$${discount.toFixed(1)}</b>\n\n` +
+        `可於下次消費或郵費使用\n⋆⸜ᵀᴴᴬᴺᴷ ᵞᴼᵁ⸝⋆`;
+      tgSend_(msg);
+    }
+  }
 }
 
 function tgShowCustPage_(msgId, rowNum, pos, code, itemUrl, ids, offset) {
