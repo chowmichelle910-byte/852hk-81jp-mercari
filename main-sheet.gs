@@ -2707,43 +2707,36 @@ function assignGroupByOrderDate() {
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   const orderSheet=ss.getSheetByName("訂單"),dataSheet=ss.getSheetByName("Data");
   const orderData=orderSheet.getRange(2,1,orderSheet.getLastRow()-1,27).getValues();
-  const dataRows=dataSheet.getRange(2,8,dataSheet.getLastRow()-1,3).getValues();
-  const toDate=v=>{if(!v)return null;if(v instanceof Date)return v;const d=new Date(String(v).replace(/\//g,'-'));return isNaN(d)?null:d;};
-  // 診斷：印出頭3個 dataRows 的日期
-  Logger.log('dataRows sample: ' + JSON.stringify(dataRows.slice(0,3).map(r=>[String(r[0]),String(r[1]),String(r[2])])));
+  // 用 YYYY-MM-DD 字串比較，消除時區問題
+  const toYMD=v=>{
+    if(!v) return null;
+    const d=v instanceof Date ? v : new Date(String(v).replace(/\//g,'-'));
+    if(isNaN(d)) return null;
+    // 以 HKT (UTC+8) 計算日期
+    const ms=d.getTime()+8*3600000;
+    const dd=new Date(ms);
+    return dd.getUTCFullYear()+'-'+String(dd.getUTCMonth()+1).padStart(2,'0')+'-'+String(dd.getUTCDate()).padStart(2,'0');
+  };
+  // 只取 H/I/J 非空行
+  const allDataRows=dataSheet.getRange(2,8,dataSheet.getLastRow()-1,3).getValues();
+  const dataRows=allDataRows.filter(r=>String(r[0]).trim()&&r[1]&&r[2]);
+  Logger.log('dataRows count='+dataRows.length+' last='+JSON.stringify(dataRows.slice(-3).map(r=>[String(r[0]),toYMD(r[1]),toYMD(r[2])])));
   let filled=0, skippedExisting=0, skippedNoDate=0, skippedNoMatch=0;
   for(let i=0;i<orderData.length;i++){
     const orderRow=orderData[i];
     const existingGroup=String(orderRow[26]||'').trim();
     if(existingGroup){skippedExisting++;continue;}
-    const orderDate=toDate(orderRow[1]);
-    if(!orderDate){skippedNoDate++;continue;}
+    const orderYMD=toYMD(orderRow[1]);
+    if(!orderYMD){skippedNoDate++;continue;}
     let groupId='';
     for(const[group,start,end]of dataRows){
-      const s=toDate(start),e=toDate(end);
-      if(s&&e&&orderDate>=s&&orderDate<=e){groupId=String(group).trim();break;}
+      const s=toYMD(start),e=toYMD(end);
+      if(s&&e&&orderYMD>=s&&orderYMD<=e){groupId=String(group).trim();break;}
     }
     if(groupId){orderSheet.getRange(i+2,27).setValue(groupId);filled++;}
     else skippedNoMatch++;
   }
   Logger.log('assignGroupByOrderDate: filled='+filled+' skippedExisting='+skippedExisting+' skippedNoDate='+skippedNoDate+' skippedNoMatch='+skippedNoMatch);
-  // 診斷：印出所有 noMatch 行的詳情
-  let noMatchCount=0;
-  for(let i=0;i<orderData.length;i++){
-    const row=orderData[i];
-    if(String(row[26]||'').trim()) continue;
-    const od=toDate(row[1]);
-    if(!od) continue;
-    noMatchCount++;
-    Logger.log('noMatch row'+(i+2)+' B='+String(row[1])+' parsed='+od.toISOString());
-    if(noMatchCount>=15) break;
-  }
-  // 診斷：印出 dataRows 最後 5 個 (最新的團)
-  const tail=dataRows.slice(-5);
-  tail.forEach((r,idx)=>{
-    const s=toDate(r[1]),e=toDate(r[2]);
-    Logger.log('dataRow tail['+(dataRows.length-5+idx)+']: group='+String(r[0])+' start='+String(r[1])+(s?' iso='+s.toISOString():' FAIL')+' end='+String(r[2])+(e?' iso='+e.toISOString():' FAIL'));
-  });
 }
 
 // ─────────────────────────────────────────────
