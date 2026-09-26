@@ -2708,22 +2708,32 @@ function assignGroupByOrderDate() {
   const orderSheet=ss.getSheetByName("訂單"),dataSheet=ss.getSheetByName("Data");
   const orderData=orderSheet.getRange(2,1,orderSheet.getLastRow()-1,27).getValues();
   const dataRows=dataSheet.getRange(2,8,dataSheet.getLastRow()-1,3).getValues();
-  const toDate=v=>{if(!v)return null;if(v instanceof Date)return v;const d=new Date(String(v));return isNaN(d)?null:d;};
-  let filled=0;
+  const toDate=v=>{if(!v)return null;if(v instanceof Date)return v;const d=new Date(String(v).replace(/\//g,'-'));return isNaN(d)?null:d;};
+  // 診斷：印出頭3個 dataRows 的日期
+  Logger.log('dataRows sample: ' + JSON.stringify(dataRows.slice(0,3).map(r=>[String(r[0]),String(r[1]),String(r[2])])));
+  let filled=0, skippedExisting=0, skippedNoDate=0, skippedNoMatch=0;
   for(let i=0;i<orderData.length;i++){
     const orderRow=orderData[i];
     const existingGroup=String(orderRow[26]||'').trim();
-    if(existingGroup) continue;
+    if(existingGroup){skippedExisting++;continue;}
     const orderDate=toDate(orderRow[1]);
-    if(!orderDate) continue;
+    if(!orderDate){skippedNoDate++;continue;}
     let groupId='';
     for(const[group,start,end]of dataRows){
       const s=toDate(start),e=toDate(end);
       if(s&&e&&orderDate>=s&&orderDate<=e){groupId=String(group).trim();break;}
     }
     if(groupId){orderSheet.getRange(i+2,27).setValue(groupId);filled++;}
+    else skippedNoMatch++;
   }
-  Logger.log('assignGroupByOrderDate: filled ' + filled + ' rows');
+  Logger.log('assignGroupByOrderDate: filled='+filled+' skippedExisting='+skippedExisting+' skippedNoDate='+skippedNoDate+' skippedNoMatch='+skippedNoMatch);
+  // 診斷：印出第一行冇 match 嘅訂單日期
+  for(let i=0;i<Math.min(orderData.length,5);i++){
+    const row=orderData[i];
+    if(String(row[26]||'').trim()) continue;
+    Logger.log('sample order B='+String(row[1])+' type='+typeof row[1]+' toDate='+toDate(row[1]));
+    break;
+  }
 }
 
 // ─────────────────────────────────────────────
