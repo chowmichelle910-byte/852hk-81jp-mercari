@@ -2696,13 +2696,18 @@ function assignGroupByOrderDate() {
   const orderSheet=ss.getSheetByName("訂單"),dataSheet=ss.getSheetByName("Data");
   const orderData=orderSheet.getRange(2,1,orderSheet.getLastRow()-1,27).getValues();
   const dataRows=dataSheet.getRange(2,8,dataSheet.getLastRow()-1,3).getValues();
-  const result=[];
-  for(const orderRow of orderData){
-    const orderDate=orderRow[1];let groupId="";
-    if(orderDate instanceof Date){for(const[group,start,end]of dataRows){if(start instanceof Date&&end instanceof Date&&orderDate>=start&&orderDate<=end){groupId=group;break;}}}
-    result.push([groupId]);
+  for(let i=0;i<orderData.length;i++){
+    const orderRow=orderData[i];
+    const orderDate=orderRow[1];
+    const existingGroup=String(orderRow[26]||'').trim();
+    if(existingGroup) continue;           // AA 已有值 → 跳過
+    if(!(orderDate instanceof Date)) continue; // B 冇日期 → 跳過
+    let groupId='';
+    for(const[group,start,end]of dataRows){
+      if(start instanceof Date&&end instanceof Date&&orderDate>=start&&orderDate<=end){groupId=group;break;}
+    }
+    if(groupId) orderSheet.getRange(i+2,27).setValue(groupId);
   }
-  orderSheet.getRange(2,27,result.length,1).setValues(result);
 }
 
 // ─────────────────────────────────────────────
