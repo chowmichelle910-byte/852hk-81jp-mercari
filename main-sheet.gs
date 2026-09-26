@@ -2696,18 +2696,22 @@ function assignGroupByOrderDate() {
   const orderSheet=ss.getSheetByName("訂單"),dataSheet=ss.getSheetByName("Data");
   const orderData=orderSheet.getRange(2,1,orderSheet.getLastRow()-1,27).getValues();
   const dataRows=dataSheet.getRange(2,8,dataSheet.getLastRow()-1,3).getValues();
+  const toDate=v=>{if(!v)return null;if(v instanceof Date)return v;const d=new Date(String(v));return isNaN(d)?null:d;};
+  let filled=0;
   for(let i=0;i<orderData.length;i++){
     const orderRow=orderData[i];
-    const orderDate=orderRow[1];
     const existingGroup=String(orderRow[26]||'').trim();
-    if(existingGroup) continue;           // AA 已有值 → 跳過
-    if(!(orderDate instanceof Date)) continue; // B 冇日期 → 跳過
+    if(existingGroup) continue;
+    const orderDate=toDate(orderRow[1]);
+    if(!orderDate) continue;
     let groupId='';
     for(const[group,start,end]of dataRows){
-      if(start instanceof Date&&end instanceof Date&&orderDate>=start&&orderDate<=end){groupId=group;break;}
+      const s=toDate(start),e=toDate(end);
+      if(s&&e&&orderDate>=s&&orderDate<=e){groupId=String(group).trim();break;}
     }
-    if(groupId) orderSheet.getRange(i+2,27).setValue(groupId);
+    if(groupId){orderSheet.getRange(i+2,27).setValue(groupId);filled++;}
   }
+  Logger.log('assignGroupByOrderDate: filled ' + filled + ' rows');
 }
 
 // ─────────────────────────────────────────────
