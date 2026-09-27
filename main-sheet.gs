@@ -820,7 +820,7 @@ function handleTelegramUpdate_(update) {
         }
       }
     } catch(e) {}
-    tgEdit_(msgId, (cb.message.text || '') + '\n\n✅ 已評價！');
+    tgEdit_(msgId, (cb.message.text || '') + '\n\n✅ 已評價！', { inline_keyboard: [] });
 
   } else if (action === 'charge_skip') {
     tgAnswer_(cb.id, '好的');
