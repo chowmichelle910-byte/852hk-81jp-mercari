@@ -303,7 +303,7 @@ function checkSpendingMilestones_() {
       const msg =
         `🎉 <b>${tgEscape_(user)}</b> ${tgEscape_(group)}消費 <b>${totalInt}円</b>\n\n` +
         `可獲得折扣：\n` +
-        `${totalInt}×${raw/100} − ${totalInt}×${raw2/100} = <b>HK$${discount.toFixed(1)}</b>\n\n` +
+        `${totalInt}×${parseFloat((raw/100).toFixed(4))} − ${totalInt}×${parseFloat((raw2/100).toFixed(4))} = <b>HK$${discount.toFixed(1)}</b>\n\n` +
         `可於下次消費或郵費使用\n⋆⸜ᵀᴴᴬᴺᴷ ᵞᴼᵁ⸝⋆`;
       tgSend_(msg);
     }
