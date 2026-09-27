@@ -820,7 +820,17 @@ function handleTelegramUpdate_(update) {
         }
       }
     } catch(e) {}
-    tgEdit_(msgId, (cb.message.text || '') + '\n\n✅ 已評價！', { inline_keyboard: [] });
+    const isPhoto = !!(cb.message.photo || cb.message.document);
+    const newText = (isPhoto ? (cb.message.caption || '') : (cb.message.text || '')) + '\n\n✅ 已評價！';
+    if (isPhoto) {
+      UrlFetchApp.fetch(TG_API_URL + '/editMessageCaption', {
+        method: 'post', contentType: 'application/json',
+        payload: JSON.stringify({ chat_id: TG_CHAT_ID, message_id: msgId, caption: newText, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }),
+        muteHttpExceptions: true
+      });
+    } else {
+      tgEdit_(msgId, newText, { inline_keyboard: [] });
+    }
 
   } else if (action === 'charge_skip') {
     tgAnswer_(cb.id, '好的');
