@@ -1192,10 +1192,10 @@ function doPost(e) {
         for (let i = 0; i < data.length; i++) {
           if (String(data[i][28] || '').trim() !== '未評價') continue;
           const link = String(data[i][5] || '').trim();
-          if (!link.includes('mercari.com/item/')) continue;
+          const tUrl = link.includes('mercari.com/item/') ? link.replace('/item/', '/transaction/') : link;
           items.push({
             rowNum  : i + 2,
-            tUrl    : link.replace('/item/', '/transaction/'),
+            tUrl,
             code    : String(data[i][14] || '').trim(),
             name    : String(data[i][6]  || '').trim()
           });
