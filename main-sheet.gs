@@ -821,13 +821,15 @@ function handleTelegramUpdate_(update) {
       }
     } catch(e) {}
     const isPhoto = !!(cb.message.photo || cb.message.document);
+    Logger.log('rated_all: isPhoto=' + isPhoto + ' hasCaption=' + !!(cb.message.caption) + ' hasText=' + !!(cb.message.text) + ' msgKeys=' + Object.keys(cb.message).join(','));
     const newText = (isPhoto ? (cb.message.caption || '') : (cb.message.text || '')) + '\n\n✅ 已評價！';
     if (isPhoto) {
-      UrlFetchApp.fetch(TG_API_URL + '/editMessageCaption', {
+      const res = UrlFetchApp.fetch(TG_API_URL + '/editMessageCaption', {
         method: 'post', contentType: 'application/json',
         payload: JSON.stringify({ chat_id: TG_CHAT_ID, message_id: msgId, caption: newText, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }),
         muteHttpExceptions: true
       });
+      Logger.log('editMessageCaption result: ' + res.getContentText().substring(0, 200));
     } else {
       tgEdit_(msgId, newText, { inline_keyboard: [] });
     }
