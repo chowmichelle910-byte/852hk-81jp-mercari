@@ -368,7 +368,10 @@ button{font-family:var(--font);}
 
     <!-- ═══ PICK LIST ═══ -->
     <div id="panel-pick" class="panel">
-      <div id="pickGrpTabs" class="atabs" style="margin-bottom:13px;"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:13px;">
+        <div id="pickGrpTabs" class="atabs" style="margin-bottom:0;flex:1;"></div>
+        <button class="fb" onclick="reloadPick(this)" style="flex-shrink:0;">🔄</button>
+      </div>
       <div id="pickContent"><div class="empty">切換到此分頁即自動載入</div></div>
     </div>
 
@@ -1206,27 +1209,56 @@ function updUI(){const c=pending.size;document.getElementById('pbar').style.disp
 function clearPending(){if(confirm('確定清除？')){pending.clear();editRows.clear();render();updUI();}}
 
 // ════════ PICK LIST ════════
+const PICK_CACHE_KEY='pickListCache', PICK_CACHE_TTL=10*60*1000;
 function loadPick(){
   pickLoaded=true;
+  // 有 cache 且未過期 → 即刻顯示，背景靜默更新
+  try {
+    const raw=localStorage.getItem(PICK_CACHE_KEY);
+    if(raw){
+      const {ts,data}=JSON.parse(raw);
+      if(Date.now()-ts<PICK_CACHE_TTL){
+        renderPickData(data);
+        fetchPickInBackground();
+        return;
+      }
+    }
+  } catch(e){ localStorage.removeItem(PICK_CACHE_KEY); }
   document.getElementById('pickContent').innerHTML='<div class="empty"><div class="spin"></div>載入中…</div>';
-  // 改用 MAIN_API，直接由「訂單」分頁計算執貨清單
-  postMain({action:'getPickListFromOrders',password:pw}).then(d=>{
-    if(d.error){
-      document.getElementById('pickContent').innerHTML='<div class="empty">❌ '+d.error+'</div>';
+  fetchPickWithRetry(true);
+}
+function fetchPickInBackground(){
+  fetchPickWithRetry(false).catch(()=>{});
+}
+async function fetchPickWithRetry(showErr){
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      const d=await postMain({action:'getPickListFromOrders',password:pw});
+      if(d.error){if(showErr)document.getElementById('pickContent').innerHTML='<div class="empty">❌ '+d.error+'</div>';return;}
+      try{localStorage.setItem(PICK_CACHE_KEY,JSON.stringify({ts:Date.now(),data:d}));}catch(e){}
+      renderPickData(d);
       return;
+    }catch(e){
+      if(attempt===0){await new Promise(r=>setTimeout(r,2000));continue;}
+      if(showErr)document.getElementById('pickContent').innerHTML='<div class="empty">❌ 連線失敗，請重試</div>';
     }
-    if(!d.allGroups||!Object.keys(d.allGroups).length){
-      document.getElementById('pickContent').innerHTML='<div class="empty">目前沒有需要執貨的訂單</div>';
-      return;
-    }
-    // 按數字降序排列，搵最新一團
-    const sorted=Object.keys(d.allGroups).sort((a,b)=>gn(b)-gn(a));
-    const latest=d.latestGroup||sorted[0];
-    renderPick(d.allGroups,latest);
-  }).catch(e=>{
-    console.error('loadPick error:',e);
-    document.getElementById('pickContent').innerHTML='<div class="empty">❌ 連線失敗，請重試</div>';
-  });
+  }
+}
+function renderPickData(d){
+  if(!d.allGroups||!Object.keys(d.allGroups).length){
+    document.getElementById('pickContent').innerHTML='<div class="empty">目前沒有需要執貨的訂單</div>';
+    return;
+  }
+  const sorted=Object.keys(d.allGroups).sort((a,b)=>gn(b)-gn(a));
+  const latest=d.latestGroup||sorted[0];
+  renderPick(d.allGroups,latest);
+}
+function reloadPick(btn){
+  localStorage.removeItem(PICK_CACHE_KEY);
+  pickLoaded=false;
+  const o=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='⏳';}
+  fetchPickWithRetry(true).finally(()=>{if(btn){btn.disabled=false;btn.textContent=o;}});
 }
 let pickData={},curPick='';
 function renderPick(all,latest){
