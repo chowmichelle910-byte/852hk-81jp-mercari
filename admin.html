@@ -747,10 +747,23 @@ window.onload=()=>{
   document.getElementById('chargeDate').value=new Date().toISOString().split('T')[0];
 };
 
-function doLogin(){
+async function doLogin(){
   pw=document.getElementById('pw').value.trim();if(!pw)return;
-  document.getElementById('loginStatus').textContent='驗證中…';
-  callAdmin().catch(()=>{document.getElementById('loginStatus').textContent='密碼錯誤或連線失敗';localStorage.removeItem('adminPassword');pw='';});
+  const sts=document.getElementById('loginStatus');
+  sts.textContent='驗證中…';
+  for(let attempt=1;attempt<=2;attempt++){
+    try{
+      await callAdmin();
+      return;
+    }catch(e){
+      const msg=String(e?.message||e||'');
+      if(msg.includes('密碼')||msg.includes('password')){
+        sts.textContent='❌ 密碼錯誤';localStorage.removeItem('adminPassword');pw='';return;
+      }
+      if(attempt<2){sts.textContent='連線中，重試…';await new Promise(r=>setTimeout(r,2000));continue;}
+      sts.textContent='❌ 連線失敗，請重試';localStorage.removeItem('adminPassword');pw='';
+    }
+  }
 }
 
 async function callAdmin(){
