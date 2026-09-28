@@ -768,38 +768,36 @@ async function doLogin(){
 
 async function callAdmin(){
   showLoader('載入訂單資料…');
-  try {
-    // 有 cache 就即刻顯示，背景再刷新
-    const cached=localStorage.getItem('adminItemsCache');
-    if(cached){
-      try{
-        const c=JSON.parse(cached);
-        localStorage.setItem('adminPassword',pw);
-        processItems(c);
-        document.getElementById('loginWrap').style.display='none';
-        document.getElementById('adminUI').style.display='block';
-        igLoadTemplateFromSheet();
-        hideLoader();
-        // 背景靜默更新 + auto-refresh arrival on login
-        post({action:'getAdminItems',password:pw}).then(d=>{
-          if(!d.error){localStorage.setItem('adminItemsCache',JSON.stringify(d));processItems(d);}
-        }).catch(()=>{});
-        refreshArrival(null);
-        return;
-      }catch(e){localStorage.removeItem('adminItemsCache');}
-    }
-    const d=await post({action:'getAdminItems',password:pw});
-    if(d.error)throw new Error(d.error);
-    localStorage.setItem('adminPassword',pw);
-    localStorage.setItem('adminItemsCache',JSON.stringify(d));
+  // Step 1: fetch/auth — only this step propagates errors to doLogin
+  let d;
+  const cached=localStorage.getItem('adminItemsCache');
+  if(cached){
+    try{
+      d=JSON.parse(cached);
+      // background silent refresh
+      post({action:'getAdminItems',password:pw}).then(r=>{
+        if(!r.error){localStorage.setItem('adminItemsCache',JSON.stringify(r));processItems(r);}
+      }).catch(()=>{});
+    }catch(e){localStorage.removeItem('adminItemsCache');}
+  }
+  if(!d){
+    let r;
+    try{ r=await post({action:'getAdminItems',password:pw}); }
+    catch(e){ hideLoader(); throw e; }
+    if(r.error){ hideLoader(); throw new Error(r.error); }
+    localStorage.setItem('adminItemsCache',JSON.stringify(r));
+    d=r;
+  }
+  localStorage.setItem('adminPassword',pw);
+  // Step 2: render UI — errors here do NOT propagate (auth already succeeded)
+  hideLoader();
+  try{
     processItems(d);
     document.getElementById('loginWrap').style.display='none';
     document.getElementById('adminUI').style.display='block';
     igLoadTemplateFromSheet();
-    hideLoader();
-    // Auto-refresh arrival panel once on login
     refreshArrival(null);
-  } catch(e) { hideLoader(); throw e; }
+  }catch(e){ console.error('UI init error:', e); }
 }
 
 function processItems(d){
