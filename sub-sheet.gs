@@ -109,9 +109,10 @@ function doPost(e){
       const records = JSON.parse(p.records || '[]');
       const ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
       const sh = ss.getSheetByName(MAIN_ORDER_SHEET);
-      let count = 0;
-      for (const r of records) {
-        const row = Number(r.row);
+      var count = 0;
+      for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        var row = Number(r.row);
         if (!row || row < 2) continue;
         if (r.image) sh.getRange(row, MAIN_IMAGE_COL).setValue(r.image);
         if (r.arrivalDate) sh.getRange(row, MAIN_DATE_COL).setValue(r.arrivalDate);
