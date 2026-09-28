@@ -1365,14 +1365,17 @@ function getNextShipDate_() {
 
   let targetGroup = '', targetDate = null;
 
-  // Find the EARLIEST date >= today (handles sheets sorted newest-first)
+  // C = End date (收單截止). Ship date = End+1.
+  // Show the batch whose SHIP DATE hasn't passed yet (ship >= today), pick earliest.
   for (let i = 0; i < data.length; i++) {
     const groupName = String(data[i][0] || '').trim();
     const dateVal   = data[i][2];
     if (!dateVal || !(dateVal instanceof Date)) continue;
     const d = new Date(dateVal);
     d.setHours(0, 0, 0, 0);
-    if (d >= today && (!targetDate || d < targetDate)) {
+    // ship date = d+1; include if ship date >= today (i.e. d >= yesterday)
+    const yesterday = new Date(today.getTime() - 86400000);
+    if (d >= yesterday && (!targetDate || d < targetDate)) {
       targetGroup = groupName;
       targetDate  = d;
     }
