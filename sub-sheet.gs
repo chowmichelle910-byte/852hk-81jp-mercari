@@ -524,7 +524,7 @@ function onOrderSheetEdit(e) {
 
 // ── V2: 將 adminItems 同步寫入 Supabase admin_items table ──
 // 聽日填入 service_role key 後先生效
-const SB_SERVICE_KEY = 'PASTE_SERVICE_ROLE_KEY_HERE';  // ← 聽日換
+const SB_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmpheHBncm52amVzYm9lbHJhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjQwNTY5MCwiZXhwIjoyMDk3OTgxNjkwfQ.4CdxnLRiYIxg-ag1e9wSOVk_HLVxS6JoHtLMRpGQWho';
 const SB_ADMIN_URL   = 'https://ifrjaxpgrnvjesboelra.supabase.co/rest/v1/admin_items';
 
 function syncToSupabase() {
