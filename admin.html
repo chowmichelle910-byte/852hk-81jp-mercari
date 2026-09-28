@@ -802,10 +802,16 @@ async function callAdmin(){
 }
 
 async function bgRetryLoad_(){
-  for(let i=0;i<10;i++){
-    await new Promise(r=>setTimeout(r,3000));
+  // Try CF Worker first (fast if KV warm), then fall back to direct GAS
+  const sources=[
+    ()=>post({action:'getAdminItems',password:pw},25000),
+    ()=>fetch(API_GAS2,{method:'POST',redirect:'follow',body:new URLSearchParams({action:'getAdminItems',password:pw})}).then(r=>r.json())
+  ];
+  for(let i=0;i<6;i++){
+    await new Promise(r=>setTimeout(r,i===0?1000:5000));
+    const src=sources[i%2];
     try{
-      const r=await post({action:'getAdminItems',password:pw},15000);
+      const r=await src();
       if(!r.error&&r.items&&r.items.length){
         localStorage.setItem('adminItemsCache',JSON.stringify(r));
         seedKvCache(r);

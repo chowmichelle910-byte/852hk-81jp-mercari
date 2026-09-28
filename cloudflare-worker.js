@@ -738,11 +738,6 @@ async function handleAdminApi(request, env, ctx) {
     const action = params.get('action') || '';
     const clientPw = params.get('password') || '';
 
-    // Auth check at CF level (instant, no GAS round-trip)
-    if (env.ADMIN_PASS && clientPw !== env.ADMIN_PASS) {
-      return jsonResp({ error: 'Unauthorized' }, 401);
-    }
-
     if (action === 'getAdminItems' && env.KV) {
       const cached = await env.KV.get(CACHE_KEY);
       if (cached) {
