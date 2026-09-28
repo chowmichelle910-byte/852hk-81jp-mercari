@@ -340,6 +340,7 @@ button{font-family:var(--font);}
         <div class="pbar-bot">
           <span id="pMsg" class="pcount">📝 0 項待儲存</span>
           <button class="save-btn" onclick="saveBatch()">💾 儲存全部</button>
+          <button class="save-btn" style="background:#6366f1;margin-left:6px;" onclick="syncImgsToSheet()">🔄 同步圖片到Sheet</button>
         </div>
       </div>
       <div class="filter-bar">
@@ -654,6 +655,44 @@ function fireGAS(params) {
     redirect: 'follow',
     body    : new URLSearchParams(params)
   }).catch(() => {});
+}
+
+async function syncImgsToSheet() {
+  if (!confirm('由 Supabase 讀出所有圖片網址，逐條寫回 Google Sheet S欄。繼續？')) return;
+  const btn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('同步圖片到Sheet'));
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 同步中…'; }
+  try {
+    // 讀 Supabase arrivals，只要有 image_url 的記錄
+    let all = [], offset = 0;
+    while (true) {
+      const res = await fetch(`${SB_URL}/rest/v1/arrivals?select=sheet_row,image_url&image_url=neq.&limit=1000&offset=${offset}`, {
+        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+      });
+      if (!res.ok) throw new Error('Supabase 讀取失敗 ' + res.status);
+      const rows = await res.json();
+      all = all.concat(rows);
+      if (rows.length < 1000) break;
+      offset += 1000;
+    }
+    // 過濾有效記錄
+    const valid = all.filter(r => r.sheet_row && r.image_url && r.image_url.trim());
+    if (!valid.length) { alert('Supabase 沒有圖片記錄'); return; }
+    // 逐條寫回 GAS（每條等 200ms 避免太快）
+    let ok = 0, fail = 0;
+    for (const r of valid) {
+      try {
+        const d = await postGas2({ action: 'saveArrivalData', password: pw, row: r.sheet_row, image: r.image_url });
+        if (d && d.success) ok++; else fail++;
+      } catch { fail++; }
+      await new Promise(re => setTimeout(re, 150));
+    }
+    alert(`同步完成！成功 ${ok} 條，失敗 ${fail} 條`);
+    invalidateCache();
+  } catch (e) {
+    alert('同步失敗：' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 同步圖片到Sheet'; }
+  }
 }
 
 let pw='', allItems=[], allGroups=[], curFilter='todo', curArr='未到貨';
