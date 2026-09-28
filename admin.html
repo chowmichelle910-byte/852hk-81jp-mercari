@@ -658,7 +658,9 @@ async function sbUpsert(record) {
 
 // ── 背景 fire GAS 寫回 Sheet（唔等回應，唔阻塞用戶）──
 function fireGAS(params) {
-  fetch(API_GAS2, {
+  // Arrival saves go to MAIN_API so TG "新到貨" notification fires
+  const url = params.arrivalDate ? MAIN_API : API_GAS2;
+  fetch(url, {
     method  : 'POST',
     redirect: 'follow',
     body    : new URLSearchParams(params)
