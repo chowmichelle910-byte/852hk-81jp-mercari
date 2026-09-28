@@ -445,7 +445,7 @@ const CF_SEED_URL       = 'https://still-art-9869.852hk81jp.workers.dev/api/admi
 const CF_SEED_SECRET    = ADMIN_PASSWORD; // reuse same password
 
 // Push fresh data directly into CF KV (GAS → CF, avoids CF pulling from GAS)
-function seedCfKvCache_() {
+function seedCfKvCache() {
   try {
     var raw = getAdminItems_();
     // getAdminItems_ returns ContentService output; re-run the logic to get object
@@ -499,7 +499,7 @@ function seedCfKvCache_() {
       muteHttpExceptions: true
     });
     Logger.log('KV seeded: ' + items.length + ' items');
-  } catch(err) { Logger.log('seedCfKvCache_ failed: ' + err); }
+  } catch(err) { Logger.log('seedCfKvCache failed: ' + err); }
 }
 
 // Called by installable onEdit trigger — seeds CF KV with fresh data
@@ -509,7 +509,7 @@ function onOrderSheetEdit(e) {
       var sheet = e.source.getActiveSheet();
       if (sheet.getName() !== MAIN_ORDER_SHEET) return;
     }
-    seedCfKvCache_();
+    seedCfKvCache();
   } catch(err) { Logger.log('CF seed on edit failed: ' + err); }
 }
 
@@ -518,14 +518,14 @@ function installTriggers() {
   var ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
   ScriptApp.getProjectTriggers().forEach(function(t) {
     var fn = t.getHandlerFunction();
-    if (fn === 'onOrderSheetEdit' || fn === 'seedCfKvCache_') ScriptApp.deleteTrigger(t);
+    if (fn === 'onOrderSheetEdit' || fn === 'seedCfKvCache') ScriptApp.deleteTrigger(t);
   });
   // onEdit: seed KV whenever 訂單 sheet changes
   ScriptApp.newTrigger('onOrderSheetEdit').forSpreadsheet(ss).onEdit().create();
   // Time-based: seed KV every 4 minutes (keeps CF warm even without edits)
-  ScriptApp.newTrigger('seedCfKvCache_').timeBased().everyMinutes(4).create();
+  ScriptApp.newTrigger('seedCfKvCache').timeBased().everyMinutes(5).create();
   // Seed immediately
-  seedCfKvCache_();
+  seedCfKvCache();
   Logger.log('Triggers installed + KV seeded');
 }
 
