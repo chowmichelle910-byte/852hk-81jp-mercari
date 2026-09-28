@@ -679,7 +679,7 @@ function jsonResp(data, status = 200) {
 const CACHE_KEY = 'adminItems';
 const CACHE_TTL = 300; // 5 minutes
 
-async function handleAdminApi(request, env) {
+async function handleAdminApi(request, env, ctx) {
   const url = new URL(request.url);
 
   // OPTIONS preflight
@@ -687,33 +687,43 @@ async function handleAdminApi(request, env) {
     return new Response(null, { headers: corsHeaders() });
   }
 
-  // POST /api/admin  →  proxy to GAS_API2 with KV cache
+  // POST /api/admin  →  auth at CF, KV cache, background GAS refresh
   if (url.pathname === '/api/admin' && request.method === 'POST') {
     const body = await request.text();
     const params = new URLSearchParams(body);
     const action = params.get('action') || '';
+    const clientPw = params.get('password') || '';
 
-    // Only cache getAdminItems reads
+    // Auth check at CF level (instant, no GAS round-trip)
+    if (env.ADMIN_PASS && clientPw !== env.ADMIN_PASS) {
+      return jsonResp({ error: 'Unauthorized' }, 401);
+    }
+
     if (action === 'getAdminItems' && env.KV) {
       const cached = await env.KV.get(CACHE_KEY);
       if (cached) {
+        // Serve cache immediately; refresh GAS in background
+        ctx.waitUntil(
+          fetch(GAS_API2, { method: 'POST', body, redirect: 'follow' })
+            .then(r => r.json())
+            .then(d => { if (!d.error) return env.KV.put(CACHE_KEY, JSON.stringify(d), { expirationTtl: CACHE_TTL }); })
+            .catch(() => {})
+        );
         const data = JSON.parse(cached);
         data._cached = true;
         return jsonResp(data);
       }
     }
 
-    // Forward to GAS_API2
+    // Cache miss or write action — forward to GAS synchronously
     const res = await fetch(GAS_API2, { method: 'POST', body, redirect: 'follow' });
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch { return new Response(text, { headers: corsHeaders() }); }
 
-    // Store cache for getAdminItems
     if (action === 'getAdminItems' && env.KV && !data.error) {
       await env.KV.put(CACHE_KEY, JSON.stringify(data), { expirationTtl: CACHE_TTL });
     }
-    // Invalidate cache on writes
     if (['saveArrival', 'saveWeight', 'savePackItem', 'updateArrival', 'saveShipDate'].includes(action) && env.KV) {
       await env.KV.delete(CACHE_KEY);
     }
@@ -732,12 +742,12 @@ async function handleAdminApi(request, env) {
 
 // ─── Cloudflare Worker Entry Point ───────────────
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // Admin API routes
     if (url.pathname.startsWith('/api/admin')) {
-      return handleAdminApi(request, env);
+      return handleAdminApi(request, env, ctx);
     }
 
     // OPTIONS preflight for other routes
