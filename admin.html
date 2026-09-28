@@ -298,6 +298,11 @@ button{font-family:var(--font);}
 <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
 </head>
 <body>
+<div id="pageLoader" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:14px;">
+  <div style="width:48px;height:48px;border:5px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;"></div>
+  <div id="pageLoaderMsg" style="color:#fff;font-size:13px;font-weight:600;letter-spacing:.03em;">載入中…</div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg);}}</style>
 <datalist id="idList"></datalist>
 
 <!-- LOGIN -->
@@ -695,6 +700,9 @@ async function syncImgsToSheet() {
   }
 }
 
+function showLoader(msg){const el=document.getElementById('pageLoader');el.style.display='flex';document.getElementById('pageLoaderMsg').textContent=msg||'載入中…';}
+function hideLoader(){document.getElementById('pageLoader').style.display='none';}
+
 let pw='', allItems=[], allGroups=[], curFilter='todo', curArr='未到貨';
 let pending=new Map(), editRows=new Set(), pickLoaded=false;
 let imgCache=new Map();
@@ -716,34 +724,39 @@ function doLogin(){
 }
 
 async function callAdmin(){
-  // 有 cache 就即刻顯示，背景再刷新
-  const cached=localStorage.getItem('adminItemsCache');
-  if(cached){
-    try{
-      const c=JSON.parse(cached);
-      localStorage.setItem('adminPassword',pw);
-      processItems(c);
-      document.getElementById('loginWrap').style.display='none';
-      document.getElementById('adminUI').style.display='block';
-      igLoadTemplateFromSheet();
-      // 背景靜默更新 + auto-refresh arrival on login
-      post({action:'getAdminItems',password:pw}).then(d=>{
-        if(!d.error){localStorage.setItem('adminItemsCache',JSON.stringify(d));processItems(d);}
-      }).catch(()=>{});
-      refreshArrival(null);
-      return;
-    }catch(e){localStorage.removeItem('adminItemsCache');}
-  }
-  const d=await post({action:'getAdminItems',password:pw});
-  if(d.error)throw new Error(d.error);
-  localStorage.setItem('adminPassword',pw);
-  localStorage.setItem('adminItemsCache',JSON.stringify(d));
-  processItems(d);
-  document.getElementById('loginWrap').style.display='none';
-  document.getElementById('adminUI').style.display='block';
-  igLoadTemplateFromSheet();
-  // Auto-refresh arrival panel once on login
-  refreshArrival(null);
+  showLoader('載入訂單資料…');
+  try {
+    // 有 cache 就即刻顯示，背景再刷新
+    const cached=localStorage.getItem('adminItemsCache');
+    if(cached){
+      try{
+        const c=JSON.parse(cached);
+        localStorage.setItem('adminPassword',pw);
+        processItems(c);
+        document.getElementById('loginWrap').style.display='none';
+        document.getElementById('adminUI').style.display='block';
+        igLoadTemplateFromSheet();
+        hideLoader();
+        // 背景靜默更新 + auto-refresh arrival on login
+        post({action:'getAdminItems',password:pw}).then(d=>{
+          if(!d.error){localStorage.setItem('adminItemsCache',JSON.stringify(d));processItems(d);}
+        }).catch(()=>{});
+        refreshArrival(null);
+        return;
+      }catch(e){localStorage.removeItem('adminItemsCache');}
+    }
+    const d=await post({action:'getAdminItems',password:pw});
+    if(d.error)throw new Error(d.error);
+    localStorage.setItem('adminPassword',pw);
+    localStorage.setItem('adminItemsCache',JSON.stringify(d));
+    processItems(d);
+    document.getElementById('loginWrap').style.display='none';
+    document.getElementById('adminUI').style.display='block';
+    igLoadTemplateFromSheet();
+    hideLoader();
+    // Auto-refresh arrival panel once on login
+    refreshArrival(null);
+  } catch(e) { hideLoader(); throw e; }
 }
 
 function processItems(d){
@@ -913,11 +926,12 @@ function switchToolTab(t){
 async function refreshArrival(btn){
   const o=btn?btn.textContent:'';
   if(btn){btn.textContent='⏳';btn.disabled=true;}
+  else showLoader('重新整理…');
   try{
     const d=await post({action:'getAdminItems',password:pw});
     if(d.items)processItems(d);
   }catch(e){}
-  finally{if(btn){btn.textContent=o;btn.disabled=false;}}
+  finally{if(btn){btn.textContent=o;btn.disabled=false;}else hideLoader();}
 }
 function setFilter(t){
   curFilter=t;
