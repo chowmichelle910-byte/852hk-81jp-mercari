@@ -728,10 +728,11 @@ async function callAdmin(){
       document.getElementById('loginWrap').style.display='none';
       document.getElementById('adminUI').style.display='block';
       igLoadTemplateFromSheet();
-      // 背景靜默更新
+      // 背景靜默更新 + auto-refresh arrival on login
       post({action:'getAdminItems',password:pw}).then(d=>{
         if(!d.error){localStorage.setItem('adminItemsCache',JSON.stringify(d));processItems(d);}
       }).catch(()=>{});
+      refreshArrival(null);
       return;
     }catch(e){localStorage.removeItem('adminItemsCache');}
   }
@@ -743,6 +744,8 @@ async function callAdmin(){
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('adminUI').style.display='block';
   igLoadTemplateFromSheet();
+  // Auto-refresh arrival panel once on login
+  refreshArrival(null);
 }
 
 function processItems(d){
@@ -788,12 +791,23 @@ function switchNav(n){
 }
 
 // 切回瀏覽器 tab 時自動靜默更新
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible'&&pw){
-    const isArrival=document.getElementById('panel-arrival')?.classList.contains('active');
-    if(isArrival)refreshArrival(null);
-  }
-});
+// Auto-logout at JST 06:00 daily
+function scheduleJstLogout(){
+  const now=new Date();
+  const jstNow=new Date(now.getTime()+9*3600000);
+  const next=new Date(Date.UTC(jstNow.getUTCFullYear(),jstNow.getUTCMonth(),jstNow.getUTCDate(),21,0,0,0)); // UTC 21:00 = JST 06:00
+  if(next<=now)next.setUTCDate(next.getUTCDate()+1);
+  setTimeout(()=>{
+    localStorage.removeItem('adminPassword');
+    localStorage.removeItem('adminItemsCache');
+    pw='';
+    document.getElementById('adminUI').style.display='none';
+    document.getElementById('loginWrap').style.display='flex';
+    document.getElementById('loginStatus').textContent='已自動登出（每日 JST 06:00）';
+    scheduleJstLogout();
+  },next-now);
+}
+scheduleJstLogout();
 
 // ── Tool sub-tabs ──
 // ── Tool group tabs ──
