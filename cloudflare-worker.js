@@ -660,9 +660,91 @@ async function handleUpdate(update) {
   }
 }
 
+// ─── CORS helper ─────────────────────────────────
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+}
+function jsonResp(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders() }
+  });
+}
+
+// ─── Admin API via KV cache ───────────────────────
+const CACHE_KEY = 'adminItems';
+const CACHE_TTL = 300; // 5 minutes
+
+async function handleAdminApi(request, env) {
+  const url = new URL(request.url);
+
+  // OPTIONS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders() });
+  }
+
+  // POST /api/admin  →  proxy to GAS_API2 with KV cache
+  if (url.pathname === '/api/admin' && request.method === 'POST') {
+    const body = await request.text();
+    const params = new URLSearchParams(body);
+    const action = params.get('action') || '';
+
+    // Only cache getAdminItems reads
+    if (action === 'getAdminItems' && env.KV) {
+      const cached = await env.KV.get(CACHE_KEY);
+      if (cached) {
+        const data = JSON.parse(cached);
+        data._cached = true;
+        return jsonResp(data);
+      }
+    }
+
+    // Forward to GAS_API2
+    const res = await fetch(GAS_API2, { method: 'POST', body, redirect: 'follow' });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { return new Response(text, { headers: corsHeaders() }); }
+
+    // Store cache for getAdminItems
+    if (action === 'getAdminItems' && env.KV && !data.error) {
+      await env.KV.put(CACHE_KEY, JSON.stringify(data), { expirationTtl: CACHE_TTL });
+    }
+    // Invalidate cache on writes
+    if (['saveArrival', 'saveWeight', 'savePackItem', 'updateArrival', 'saveShipDate'].includes(action) && env.KV) {
+      await env.KV.delete(CACHE_KEY);
+    }
+
+    return jsonResp(data);
+  }
+
+  // POST /api/admin/invalidate  →  clear cache
+  if (url.pathname === '/api/admin/invalidate' && request.method === 'POST') {
+    if (env.KV) await env.KV.delete(CACHE_KEY);
+    return jsonResp({ ok: true });
+  }
+
+  return jsonResp({ error: 'not found' }, 404);
+}
+
 // ─── Cloudflare Worker Entry Point ───────────────
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
+
+    // Admin API routes
+    if (url.pathname.startsWith('/api/admin')) {
+      return handleAdminApi(request, env);
+    }
+
+    // OPTIONS preflight for other routes
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders() });
+    }
+
     if (request.method !== 'POST') return new Response('OK');
     try {
       const update = await request.json();
