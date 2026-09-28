@@ -1244,6 +1244,7 @@ async function doSaveBatch(){
 }
 function tUpload(row,mode){const i=document.getElementById('fi-'+row);if(mode==='cam')i.setAttribute('capture','environment');else i.removeAttribute('capture');i.onchange=async()=>{if(!i.files[0])return;document.getElementById('st-'+row).textContent='上傳中…';try{const u=await compUp(i.files[0]);upd(row,'image',u);}catch{document.getElementById('st-'+row).textContent='❌ 失敗';};};i.click();}
 function updUI(){const c=pending.size;document.getElementById('pbar').style.display=c?'block':'none';const fs=document.getElementById('floatSave');fs.style.display=c?'flex':'none';document.getElementById('pMsg').textContent=`📝 ${c} 項待儲存`;}
+window.addEventListener('beforeunload',e=>{if(pending.size){e.preventDefault();e.returnValue='';}});
 function clearPending(){if(confirm('確定清除？')){pending.clear();editRows.clear();render();updUI();}}
 
 // ════════ PICK LIST ════════
