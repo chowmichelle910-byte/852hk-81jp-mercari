@@ -328,6 +328,7 @@ button{font-family:var(--font);}
         <button class="nb" id="nb-tools" onclick="switchNav('tools')"><span class="ni">🛠️</span>出單工具</button>
         <button class="nb" id="nb-finance" onclick="switchNav('finance')"><span class="ni">💰</span>財務</button>
         <button class="nb" id="nb-idsearch" onclick="switchNav('idsearch')"><span class="ni">🔍</span>查詢ID</button>
+        <button class="nb" onclick="doLogout()" style="margin-left:auto;color:rgba(255,255,255,.5);"><span class="ni">🚪</span>登出</button>
       </div>
     </div>
   </nav>
@@ -719,6 +720,16 @@ async function syncImgsToSheet() {
   }
 }
 
+function doLogout(){
+  if(pending.size&&!confirm('有未儲存的資料，確定登出？'))return;
+  localStorage.removeItem('adminPassword');
+  localStorage.removeItem('adminItemsCache');
+  pw='';
+  document.getElementById('adminUI').style.display='none';
+  document.getElementById('loginWrap').style.display='flex';
+  document.getElementById('loginStatus').textContent='';
+  document.getElementById('pw').value='';
+}
 function showLoader(msg){const el=document.getElementById('pageLoader');el.style.display='flex';document.getElementById('pageLoaderMsg').textContent=msg||'載入中…';}
 function hideLoader(){document.getElementById('pageLoader').style.display='none';}
 
