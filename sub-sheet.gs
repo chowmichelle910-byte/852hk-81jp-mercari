@@ -104,6 +104,25 @@ function doPost(e){
     );
   }
 
+  if (action === 'syncImagesBatch') {
+    try {
+      const records = JSON.parse(p.records || '[]');
+      const ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+      const sh = ss.getSheetByName(MAIN_ORDER_SHEET);
+      let count = 0;
+      for (const r of records) {
+        const row = Number(r.row);
+        if (!row || row < 2) continue;
+        if (r.image) sh.getRange(row, MAIN_IMAGE_COL).setValue(r.image);
+        if (r.arrivalDate) sh.getRange(row, MAIN_DATE_COL).setValue(r.arrivalDate);
+        count++;
+      }
+      SpreadsheetApp.flush();
+      assignGroupByArrivalDateRemote(ss);
+      return json({ success: true, count });
+    } catch(e) { return json({ error: e.toString() }); }
+  }
+
   if (action === 'getCustomerIds') return getCustomerIds_();
 
   if (action === 'clearAllUnrated') {
