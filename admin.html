@@ -769,40 +769,52 @@ async function doLogin(){
 async function callAdmin(){
   showLoader('載入訂單資料…');
   let d=null;
-  // Try cache first
+  // Try localStorage cache first (instant)
   const cached=localStorage.getItem('adminItemsCache');
   if(cached){
-    try{
-      d=JSON.parse(cached);
-      // background silent refresh
-      post({action:'getAdminItems',password:pw}).then(r=>{
-        if(!r.error){localStorage.setItem('adminItemsCache',JSON.stringify(r));processItems(r);}
-      }).catch(()=>{});
-    }catch(e){localStorage.removeItem('adminItemsCache');d=null;}
+    try{ d=JSON.parse(cached); }
+    catch(e){ localStorage.removeItem('adminItemsCache'); }
   }
-  // No cache — fetch from GAS; only explicit auth error blocks login
+  // Try CF KV (fast, <200ms when warm)
   if(!d){
     try{
-      const r=await post({action:'getAdminItems',password:pw});
-      const isAuth=r.error&&(r.error.includes('Unauthorized')||r.error.includes('密碼')||r.error.includes('password'));
-      if(isAuth){hideLoader();throw new Error(r.error);}
-      if(!r.error){localStorage.setItem('adminItemsCache',JSON.stringify(r));d=r;}
+      const r=await post({action:'getAdminItems',password:pw},8000);
+      const isAuth=r.error&&/Unauthorized|密碼|password/i.test(r.error);
+      if(isAuth){ hideLoader(); throw new Error(r.error); }
+      if(!r.error && r.items){ localStorage.setItem('adminItemsCache',JSON.stringify(r)); d=r; }
     }catch(e){
-      const isAuth=String(e?.message||'').match(/Unauthorized|密碼|password/i);
-      if(isAuth){hideLoader();throw e;}
-      // Network/timeout — enter UI with empty data; refreshArrival will retry
-      d={items:[],latestShipDate:''};
+      if(/Unauthorized|密碼|password/i.test(String(e?.message||''))){ hideLoader(); throw e; }
+      // timeout/network — proceed with empty, retry below
     }
   }
   localStorage.setItem('adminPassword',pw);
   hideLoader();
+  // Show UI regardless (auth passed)
   try{
     processItems(d||{items:[],latestShipDate:''});
     document.getElementById('loginWrap').style.display='none';
     document.getElementById('adminUI').style.display='block';
     igLoadTemplateFromSheet();
-    refreshArrival(null);
-  }catch(e){ console.error('UI init error:', e); }
+  }catch(e){ console.error('UI init error:',e); }
+  // Background: keep retrying until data loads
+  if(!d||!d.items||!d.items.length) bgRetryLoad_();
+  else{ post({action:'getAdminItems',password:pw}).then(r=>{if(!r.error&&r.items){localStorage.setItem('adminItemsCache',JSON.stringify(r));processItems(r);}}).catch(()=>{}); }
+}
+
+async function bgRetryLoad_(){
+  for(let i=0;i<10;i++){
+    await new Promise(r=>setTimeout(r,3000));
+    try{
+      const r=await post({action:'getAdminItems',password:pw},15000);
+      if(!r.error&&r.items&&r.items.length){
+        localStorage.setItem('adminItemsCache',JSON.stringify(r));
+        processItems(r);
+        // also trigger arrival refresh now that we have data
+        refreshArrival(null);
+        return;
+      }
+    }catch(e){}
+  }
 }
 
 function processItems(d){
@@ -2373,7 +2385,7 @@ async function submitNewItem(){
 }
 
 // ════════ UTILS ════════
-function post(obj){return fetch(API,{method:'POST',body:new URLSearchParams(obj)}).then(r=>r.json());}
+function post(obj,ms=10000){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);return fetch(API,{method:'POST',body:new URLSearchParams(obj),signal:c.signal}).then(r=>{clearTimeout(t);return r.json();}).catch(e=>{clearTimeout(t);throw e;});}
 function postGas2(obj){return fetch(API_GAS2,{method:'POST',body:new URLSearchParams(obj)}).then(r=>r.json());}
 function postMain(obj){return fetch(MAIN_API,{method:'POST',body:new URLSearchParams(obj)}).then(r=>r.json());}
 function invalidateCache(){return fetch('https://still-art-9869.852hk81jp.workers.dev/api/admin/invalidate',{method:'POST'}).catch(()=>{});}
