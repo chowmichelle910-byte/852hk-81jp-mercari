@@ -626,6 +626,21 @@ button{font-family:var(--font);}
   </div>
 </div>
 
+<div id="saveConfirmModal" class="modal">
+  <div class="mbox" style="max-width:360px;width:92%;">
+    <h3 class="mtitle">💾 確認儲存</h3>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:11px;font-weight:700;color:var(--slate);display:block;margin-bottom:4px;">到貨日期</label>
+      <input type="date" id="saveConfirmDate" class="minp" style="margin-bottom:0;">
+    </div>
+    <div id="saveConfirmList" style="font-size:13px;line-height:1.8;color:var(--text);max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:14px;background:var(--bg);"></div>
+    <div class="mact">
+      <button class="mcancel" onclick="document.getElementById('saveConfirmModal').classList.remove('open')">取消</button>
+      <button class="mok" id="saveConfirmOk" onclick="doSaveBatch()">確定儲存</button>
+    </div>
+  </div>
+</div>
+
 <button id="floatSave" class="fsave" onclick="saveBatch()">💾</button>
 
 
@@ -1142,11 +1157,31 @@ function upIW(row,src){const w=document.getElementById(`iw-${row}`);if(w)w.inner
 function ep(row,f,old){const v=prompt(`修改${f==='track'?'運單編號':'連結'}:`,old);if(v!==null)upd(row,f,v);}
 function upd(row,f,v,typing=false){let d=pending.get(row)||{};d[f]=v;pending.set(row,d);editRows.add(row);if(typing){updUI();const s=document.getElementById('st-'+row);if(s)s.textContent='⏳ 待儲存';}else{render();updUI();}}
 
-async function saveBatch(){
-  if(!pending.size)return;if(!confirm('確定儲存全部修改？'))return;
+function saveBatch(){
+  if(!pending.size)return;
+  // Build preview list
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('saveConfirmDate').value=today;
+  let idx=1, lines='';
+  pending.forEach((data,row)=>{
+    const it=allItems.find(i=>i.row===row);
+    const code=it?.code||('行'+row);
+    const hw=data.weight!==undefined&&String(data.weight).trim()!=='';
+    const hasImg=data.image!==undefined&&data.image!=='';
+    if(hw||hasImg){
+      lines+=`<div>${idx++}. <b>${esc(code)}</b>${hw?' — '+String(data.weight).trim()+'kg':''}</div>`;
+    } else {
+      lines+=`<div>${idx++}. <b>${esc(code)}</b> (更新資料)</div>`;
+    }
+  });
+  document.getElementById('saveConfirmList').innerHTML=lines||'<div style="color:var(--slate)">無待儲存項目</div>';
+  document.getElementById('saveConfirmModal').classList.add('open');
+}
+async function doSaveBatch(){
+  document.getElementById('saveConfirmModal').classList.remove('open');
   const sb=document.querySelector('.save-btn'),fb=document.getElementById('floatSave');
   if(sb){sb.disabled=true;sb.textContent='儲存中…';}if(fb)fb.disabled=true;
-  const dv=document.getElementById('arrDateInp').value.replace(/-/g,'/');
+  const dv=document.getElementById('saveConfirmDate').value.replace(/-/g,'/');
 
   // 分兩類：有圖片或重量（磅重類）→ Supabase 優先；其他（position/custId/track）→ 直接 GAS
   const sbTasks=[], gasTasks=[];

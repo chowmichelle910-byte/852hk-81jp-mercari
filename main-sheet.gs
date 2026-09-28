@@ -1276,17 +1276,19 @@ function doPost(e) {
           // 只有到貨日期存在時才寫「未評價」到 AC 欄（col 29）
           sheet.getRange(rowNum, 29).setValue('未評價');
           try { assignGroupByArrivalDate(); } catch(err) {}
-          const url  = String(sheet.getRange(rowNum, 6).getValue() || '').trim();
-          const code = String(sheet.getRange(rowNum, 15).getValue() || '').trim();
-          const tUrl = url.includes('mercari.com/item/') ? url.replace('/item/', '/transaction/') : url;
-          if (tUrl) {
-            try {
-              tgSend_(
-                `⭐ <b>新到貨，請評價</b>\n\n${code ? code + '. ' : ''}${tUrl}`,
-                { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]] }
-              );
-            } catch(err) { Logger.log('TG 評價通知失敗: ' + err); }
-          }
+          const url    = String(sheet.getRange(rowNum, 6).getValue() || '').trim();
+          const code   = String(sheet.getRange(rowNum, 15).getValue() || '').trim();
+          const imgUrl = image || String(sheet.getRange(rowNum, 19).getValue() || '').trim();
+          const tUrl   = url.includes('mercari.com/item/') ? url.replace('/item/', '/transaction/') : url;
+          const caption = `⭐ <b>新到貨，請評價</b>\n\n${code ? code + '. ' : ''}${tUrl}`;
+          const markup  = { inline_keyboard: [[{ text: '⭐ 已評價', callback_data: 'rated_all' }]] };
+          try {
+            if (imgUrl) {
+              tgSendPhoto_(imgUrl, caption, markup);
+            } else if (tUrl) {
+              tgSend_(caption, markup);
+            }
+          } catch(err) { Logger.log('TG 評價通知失敗: ' + err); }
         }
         // status='' 時清除 AC 欄（已評價）
         const statusParam = e.parameter.status !== undefined ? String(e.parameter.status).trim() : null;
