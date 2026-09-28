@@ -948,8 +948,10 @@ async function refreshArrival(btn){
   if(btn){btn.textContent='⏳';btn.disabled=true;}
   else showLoader('重新整理…');
   try{
+    // Manual refresh: invalidate CF cache first so stale data never returns
+    if(btn) await invalidateCache();
     const d=await post({action:'getAdminItems',password:pw});
-    if(d.items)processItems(d);
+    if(d.items){localStorage.setItem('adminItemsCache',JSON.stringify(d));processItems(d);}
   }catch(e){}
   finally{if(btn){btn.textContent=o;btn.disabled=false;}else hideLoader();}
 }
@@ -2347,7 +2349,7 @@ async function submitNewItem(){
 function post(obj){return fetch(API,{method:'POST',body:new URLSearchParams(obj)}).then(r=>r.json());}
 function postGas2(obj){return fetch(API_GAS2,{method:'POST',body:new URLSearchParams(obj)}).then(r=>r.json());}
 function postMain(obj){return fetch(MAIN_API,{method:'POST',body:new URLSearchParams(obj)}).then(r=>r.json());}
-function invalidateCache(){fetch('https://still-art-9869.852hk81jp.workers.dev/api/admin/invalidate',{method:'POST'}).catch(()=>{});}
+function invalidateCache(){return fetch('https://still-art-9869.852hk81jp.workers.dev/api/admin/invalidate',{method:'POST'}).catch(()=>{});}
 function gn(s){const m=String(s||'').match(/\d+/);return m?parseInt(m[0]):-1;}
 async function compUp(file){return new Promise((res,rej)=>{const img=new Image(),rd=new FileReader();rd.onload=e=>img.src=e.target.result;img.onload=()=>{const c=document.createElement('canvas'),max=1000;let w=img.width,h=img.height;if(w>h&&w>max){h*=max/w;w=max;}else if(h>max){w*=max/h;h=max;}c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);c.toBlob(blob=>{const fd=new FormData();fd.append('file',blob);fd.append('upload_preset',UPLOAD_PRESET);fd.append('folder',CLOUD_FOLDER);fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,{method:'POST',body:fd}).then(r=>r.json()).then(d=>res(d.secure_url)).catch(rej);},'image/jpeg',0.7);};rd.readAsDataURL(file);});}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
