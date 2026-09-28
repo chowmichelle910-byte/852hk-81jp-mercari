@@ -778,7 +778,7 @@ async function callAdmin(){
   // Try CF KV (fast, <200ms when warm)
   if(!d){
     try{
-      const r=await post({action:'getAdminItems',password:pw},8000);
+      const r=await post({action:'getAdminItems',password:pw},15000);
       const isAuth=r.error&&/Unauthorized|密碼|password/i.test(r.error);
       if(isAuth){ hideLoader(); throw new Error(r.error); }
       if(!r.error && r.items){ localStorage.setItem('adminItemsCache',JSON.stringify(r)); d=r; seedKvCache(r); }
@@ -802,10 +802,10 @@ async function callAdmin(){
 }
 
 async function bgRetryLoad_(){
-  // Try CF Worker first (fast if KV warm), then fall back to direct GAS
+  const gasParams=new URLSearchParams({action:'getAdminItems',password:pw});
   const sources=[
     ()=>post({action:'getAdminItems',password:pw},25000),
-    ()=>fetch(API_GAS2,{method:'POST',redirect:'follow',body:new URLSearchParams({action:'getAdminItems',password:pw})}).then(r=>r.json())
+    ()=>{const c=new AbortController();setTimeout(()=>c.abort(),25000);return fetch(API_GAS2+'?'+gasParams,{method:'POST',body:gasParams,redirect:'follow',signal:c.signal}).then(r=>r.json());}
   ];
   for(let i=0;i<6;i++){
     await new Promise(r=>setTimeout(r,i===0?1000:5000));
