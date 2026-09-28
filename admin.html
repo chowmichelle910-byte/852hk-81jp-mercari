@@ -665,7 +665,7 @@ async function syncImgsToSheet() {
     // 讀 Supabase arrivals，只要有 image_url 的記錄
     let all = [], offset = 0;
     while (true) {
-      const res = await fetch(`${SB_URL}/rest/v1/arrivals?select=sheet_row,image_url&image_url=neq.&limit=1000&offset=${offset}`, {
+      const res = await fetch(`${SB_URL}/rest/v1/arrivals?select=sheet_row,image_url,arrival_date&image_url=neq.&limit=1000&offset=${offset}`, {
         headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
       });
       if (!res.ok) throw new Error('Supabase 讀取失敗 ' + res.status);
@@ -681,7 +681,9 @@ async function syncImgsToSheet() {
     let ok = 0, fail = 0;
     for (const r of valid) {
       try {
-        const d = await postGas2({ action: 'saveArrivalData', password: pw, row: r.sheet_row, image: r.image_url });
+        const params = { action: 'saveArrivalData', password: pw, row: r.sheet_row, image: r.image_url };
+        if (r.arrival_date) params.arrivalDate = r.arrival_date.replace('T', ' ').substring(0, 10).replace(/-/g, '/');
+        const d = await postGas2(params);
         if (d && d.success) ok++; else fail++;
       } catch { fail++; }
       await new Promise(re => setTimeout(re, 150));
