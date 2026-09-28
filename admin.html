@@ -2393,7 +2393,7 @@ async function submitNewItem(){
 // ════════ UTILS ════════
 function post(obj,ms=10000){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);return fetch(API,{method:'POST',body:new URLSearchParams(obj),signal:c.signal}).then(r=>{clearTimeout(t);return r.json();}).catch(e=>{clearTimeout(t);throw e;});}
 function postGas2(obj){return fetch(API_GAS2,{method:'POST',body:new URLSearchParams(obj)}).then(r=>r.json());}
-function postMain(obj){return fetch(MAIN_API,{method:'POST',body:new URLSearchParams(obj)}).then(r=>r.json());}
+function postMain(obj,ms=20000){const p=new URLSearchParams(obj);const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);return fetch(MAIN_API+'?'+p,{method:'POST',body:p,signal:c.signal}).then(r=>{clearTimeout(t);return r.json();}).catch(e=>{clearTimeout(t);throw e;});}
 function invalidateCache(){return fetch('https://still-art-9869.852hk81jp.workers.dev/api/admin/invalidate',{method:'POST'}).catch(()=>{});}
 function seedKvCache(data){if(!pw||!data)return;fetch('https://still-art-9869.852hk81jp.workers.dev/api/admin/seed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:pw,data})}).catch(()=>{});}
 function gn(s){const m=String(s||'').match(/\d+/);return m?parseInt(m[0]):-1;}
