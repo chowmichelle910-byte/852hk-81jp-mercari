@@ -440,6 +440,33 @@ function getPickListData_() {
   return json({ latestGroup: latestGroup, allGroups: groups });
 }
 
+const CF_INVALIDATE_URL = 'https://still-art-9869.852hk81jp.workers.dev/api/admin/invalidate';
+
+// Called by installable onEdit trigger — invalidates CF KV cache when 訂單 sheet changes
+function onOrderSheetEdit(e) {
+  try {
+    if (e && e.source) {
+      var sheet = e.source.getActiveSheet();
+      if (sheet.getName() !== MAIN_ORDER_SHEET) return;
+    }
+    UrlFetchApp.fetch(CF_INVALIDATE_URL, { method: 'post', muteHttpExceptions: true });
+  } catch(err) { Logger.log('CF invalidate failed: ' + err); }
+}
+
+// Run once to install the trigger (run from GAS editor)
+function installOnEditTrigger() {
+  var ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+  // Remove existing triggers with same name to avoid duplicates
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'onOrderSheetEdit') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('onOrderSheetEdit')
+    .forSpreadsheet(ss)
+    .onEdit()
+    .create();
+  Logger.log('Trigger installed');
+}
+
 function completeEvaluation(row) {
   try {
     const ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
