@@ -738,12 +738,16 @@ async function handleAdminApi(request, env, ctx) {
     const action = params.get('action') || '';
     const clientPw = params.get('password') || '';
 
+    // GAS does 302 redirect; fetch follows and converts POST→GET (HTTP spec), losing body.
+    // Pass params in URL query string so they survive the redirect as GET params.
+    const gasUrlWithParams = GAS_API2 + '?' + body;
+
     if (action === 'getAdminItems' && env.KV) {
       const cached = await env.KV.get(CACHE_KEY);
       if (cached) {
         // Serve cache immediately; refresh GAS in background
         ctx.waitUntil(
-          fetch(GAS_API2, { method: 'POST', body, redirect: 'follow' })
+          fetch(gasUrlWithParams, { method: 'POST', body, redirect: 'follow' })
             .then(r => r.json())
             .then(d => { if (!d.error) return env.KV.put(CACHE_KEY, JSON.stringify(d), { expirationTtl: CACHE_TTL }); })
             .catch(() => {})
@@ -755,7 +759,7 @@ async function handleAdminApi(request, env, ctx) {
     }
 
     // Cache miss or write action — forward to GAS synchronously
-    const res = await fetch(GAS_API2, { method: 'POST', body, redirect: 'follow' });
+    const res = await fetch(gasUrlWithParams, { method: 'POST', body, redirect: 'follow' });
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch { return new Response(text, { headers: corsHeaders() }); }

@@ -21,6 +21,11 @@ const TG_CHAT_ID_SUB = '8392318130';
 
 /******************** GET：分流處理 ********************/
 function doGet(e) {
+  // Forward to doPost so CF Worker's redirect-follow (POST→GET) still works
+  if (e && e.parameter && e.parameter.action && e.parameter.password) {
+    return doPost(e);
+  }
+
   // 🆕 新增：獲取購買人清單 (私密網頁用，不需密碼)
   if (e && e.parameter && e.parameter.action === 'getBuyerList') {
     return getBuyerList_(e.parameter.platform);
