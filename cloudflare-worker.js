@@ -641,6 +641,50 @@ async function handleUpdate(update) {
       reply_markup: { force_reply: true, selective: true }
     });
 
+  } else if (action === 'cp2') {
+    // GAS-style quick fill: cp2:rowNum:pos:id
+    const rowNum = parts[1];
+    const pos    = parts[2];
+    const id     = parts.slice(3).join(':');
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: pos && id ? '✅ 已填入' : '資料不足' });
+    if (pos && id && rowNum) {
+      const result = await gas({ action: 'writePositionId', row: rowNum, pos, id });
+      const origText = cb.message.text || '';
+      const codeM  = origText.match(/_code:(.+?)_/);
+      const urlM   = origText.match(/🔗\s*(https?:\/\/\S+)/);
+      const code   = codeM ? codeM[1] : '';
+      const link   = urlM  ? urlM[1]  : '';
+      const txLink = link.includes('/item/') ? link.replace('/item/', '/transaction/') : link;
+      await tg('editMessageText', {
+        chat_id: chatId, message_id: msgId,
+        text: `✅${code ? ' (' + code + ')' : ''} <b>已填入</b>` +
+              (txLink ? '\n' + txLink : '') +
+              `\nPosition：<b>${pos}</b>\n客人 ID：<b>${id}</b>`,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: '📬 送り状番號', callback_data: `shipped_track:${rowNum}` }]] }
+      });
+    }
+
+  } else if (action === 'show_pos') {
+    // GAS-style: show all positions as buttons
+    const rowNum = parts[1];
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    const data2 = await gas({ action: 'getPendingOrders' });
+    const positions = (data2 && data2.positions) || ['IG', 'WTS', '其他'];
+    const posRows = positions.map(p => [{ text: p, callback_data: `pos:${rowNum}:${p}`.substring(0, 64) }]);
+    posRows.push([{ text: '↩️ 返回', callback_data: `back_order:${rowNum}` }]);
+    await tg('editMessageReplyMarkup', { chat_id: chatId, message_id: msgId, reply_markup: { inline_keyboard: posRows } });
+
+  } else if (action === 'back_order') {
+    // GAS-style: return to original order buttons
+    const rowNum = parts[1];
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    const data3 = await gas({ action: 'getPendingOrders' });
+    const positions = (data3 && data3.positions) || ['IG', 'WTS', '其他'];
+    const kb = positions.map(p => [{ text: p, callback_data: `pos:${rowNum}:${p}`.substring(0, 64) }]);
+    kb.push([{ text: '🗑️ 刪除訂單', callback_data: `del_order:${rowNum}` }]);
+    await tg('editMessageReplyMarkup', { chat_id: chatId, message_id: msgId, reply_markup: { inline_keyboard: kb } });
+
   } else if (action === 'rated' || action === 'rated_all') {
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已記錄！' });
     const body = new URLSearchParams({ password: GAS_PASS, action: 'clearAllUnrated' });
@@ -734,6 +778,18 @@ async function handleAdminApi(request, env, ctx) {
   // POST /api/admin/invalidate  →  clear cache
   if (url.pathname === '/api/admin/invalidate' && request.method === 'POST') {
     if (env.KV) await env.KV.delete(CACHE_KEY);
+    return jsonResp({ ok: true });
+  }
+
+  // POST /api/admin/seed  →  GAS pushes fresh data directly into KV
+  if (url.pathname === '/api/admin/seed' && request.method === 'POST') {
+    const body = await request.json().catch(() => null);
+    if (!body || !env.ADMIN_PASS || body.secret !== env.ADMIN_PASS) {
+      return jsonResp({ error: 'forbidden' }, 403);
+    }
+    if (env.KV && body.data) {
+      await env.KV.put(CACHE_KEY, JSON.stringify(body.data), { expirationTtl: CACHE_TTL });
+    }
     return jsonResp({ ok: true });
   }
 

@@ -441,31 +441,96 @@ function getPickListData_() {
 }
 
 const CF_INVALIDATE_URL = 'https://still-art-9869.852hk81jp.workers.dev/api/admin/invalidate';
+const CF_SEED_URL       = 'https://still-art-9869.852hk81jp.workers.dev/api/admin/seed';
+const CF_SEED_SECRET    = ADMIN_PASSWORD; // reuse same password
 
-// Called by installable onEdit trigger — invalidates CF KV cache when 訂單 sheet changes
+// Push fresh data directly into CF KV (GAS → CF, avoids CF pulling from GAS)
+function seedCfKvCache_() {
+  try {
+    var raw = getAdminItems_();
+    // getAdminItems_ returns ContentService output; re-run the logic to get object
+    var mainSS = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+    var sh     = mainSS.getSheetByName(MAIN_ORDER_SHEET);
+    var currencySh = mainSS.getSheetByName('Currency');
+    if (!sh) return;
+    var lastRow = sh.getLastRow();
+    var values  = (lastRow < 2) ? [] : sh.getRange(2, 1, lastRow - 1, 29).getValues();
+    var items = values
+      .filter(function(r){ return r[1] !== '' || r[6] !== ''; })
+      .map(function(r, i){
+        return {
+          row: i + 2,
+          arrival: r[0] ? String(r[0]) : '',
+          orderedDate: r[1] ? (r[1] instanceof Date ? Utilities.formatDate(r[1],'GMT+8','yyyy-MM-dd') : r[1]) : '',
+          position: r[2] || '',
+          custId: r[3] || '',
+          shop: r[4] || '',
+          link: r[5] || '',
+          item: r[6] || '',
+          track: r[13] || '',
+          code: r[14] || '',
+          arrivalDate: r[15] ? (r[15] instanceof Date ? Utilities.formatDate(r[15],'GMT+8','yyyy-MM-dd') : r[15]) : '',
+          weight: parseFloat(r[16]) || 0,
+          image: r[18] || '',
+          status: r[28] || ''
+        };
+      });
+    var latestShipDateText = '未有寄出資料';
+    try {
+      var cLastRow = currencySh.getLastRow();
+      if (cLastRow >= 9) {
+        var currencyData = currencySh.getRange(9, 1, cLastRow - 8, 3).getValues();
+        for (var j = currencyData.length - 1; j >= 0; j--) {
+          if (currencyData[j][2] instanceof Date) {
+            var nd = new Date(currencyData[j][2].getTime());
+            nd.setDate(nd.getDate() + 1);
+            var wd = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'][nd.getDay()];
+            latestShipDateText = currencyData[j][0]+'寄出日期：'+nd.getFullYear()+'/'+(nd.getMonth()+1)+'/'+nd.getDate()+'('+wd+')';
+            break;
+          }
+        }
+      }
+    } catch(e) {}
+    var data = { items: items, latestShipDate: latestShipDateText };
+    UrlFetchApp.fetch(CF_SEED_URL, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ secret: CF_SEED_SECRET, data: data }),
+      muteHttpExceptions: true
+    });
+    Logger.log('KV seeded: ' + items.length + ' items');
+  } catch(err) { Logger.log('seedCfKvCache_ failed: ' + err); }
+}
+
+// Called by installable onEdit trigger — seeds CF KV with fresh data
 function onOrderSheetEdit(e) {
   try {
     if (e && e.source) {
       var sheet = e.source.getActiveSheet();
       if (sheet.getName() !== MAIN_ORDER_SHEET) return;
     }
-    UrlFetchApp.fetch(CF_INVALIDATE_URL, { method: 'post', muteHttpExceptions: true });
-  } catch(err) { Logger.log('CF invalidate failed: ' + err); }
+    seedCfKvCache_();
+  } catch(err) { Logger.log('CF seed on edit failed: ' + err); }
 }
 
-// Run once to install the trigger (run from GAS editor)
-function installOnEditTrigger() {
+// Run once from GAS editor to install triggers
+function installTriggers() {
   var ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
-  // Remove existing triggers with same name to avoid duplicates
   ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'onOrderSheetEdit') ScriptApp.deleteTrigger(t);
+    var fn = t.getHandlerFunction();
+    if (fn === 'onOrderSheetEdit' || fn === 'seedCfKvCache_') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('onOrderSheetEdit')
-    .forSpreadsheet(ss)
-    .onEdit()
-    .create();
-  Logger.log('Trigger installed');
+  // onEdit: seed KV whenever 訂單 sheet changes
+  ScriptApp.newTrigger('onOrderSheetEdit').forSpreadsheet(ss).onEdit().create();
+  // Time-based: seed KV every 4 minutes (keeps CF warm even without edits)
+  ScriptApp.newTrigger('seedCfKvCache_').timeBased().everyMinutes(4).create();
+  // Seed immediately
+  seedCfKvCache_();
+  Logger.log('Triggers installed + KV seeded');
 }
+
+// Legacy alias
+function installOnEditTrigger() { installTriggers(); }
 
 function completeEvaluation(row) {
   try {
