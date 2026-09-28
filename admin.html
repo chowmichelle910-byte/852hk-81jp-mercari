@@ -649,11 +649,10 @@ async function sbUpsert(record) {
 
 // ── 背景 fire GAS 寫回 Sheet（唔等回應，唔阻塞用戶）──
 function fireGAS(params) {
-  // Write operations bypass CF cache, go directly to GAS
   fetch(API_GAS2, {
-    method : 'POST',
-    mode   : 'no-cors',
-    body   : new URLSearchParams(params)
+    method  : 'POST',
+    redirect: 'follow',
+    body    : new URLSearchParams(params)
   }).catch(() => {});
 }
 
