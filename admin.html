@@ -792,8 +792,8 @@ async function callAdmin(){
 function processItems(d){
   allItems=d.items||[];
 
-  // Ship date from Currency sheet (via MAIN_API)
-  loadShipDate();
+  // Ship date — use what's already in getAdminItems response (cached in CF KV)
+  if(d.latestShipDate) document.getElementById('shipText').textContent=d.latestShipDate;
 
   allGroups=[...new Set(allItems.map(i=>i.arrival).filter(a=>a&&String(a).trim()))].sort((a,b)=>gn(b)-gn(a));
   const grpOpts='<option value="">— 選擇團次 —</option>'+allGroups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
