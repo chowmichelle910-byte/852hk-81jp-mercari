@@ -761,7 +761,7 @@ async function doLogin(){
         sts.textContent='❌ 密碼錯誤';localStorage.removeItem('adminPassword');pw='';return;
       }
       if(attempt<2){sts.textContent='連線中，重試…';await new Promise(r=>setTimeout(r,2000));continue;}
-      sts.textContent='❌ 連線失敗，請重試';localStorage.removeItem('adminPassword');pw='';
+      sts.textContent='❌ 連線失敗，請重試 ('+String(e?.message||e||'').slice(0,60)+')';localStorage.removeItem('adminPassword');pw='';
     }
   }
 }
