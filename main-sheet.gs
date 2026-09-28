@@ -1365,16 +1365,16 @@ function getNextShipDate_() {
 
   let targetGroup = '', targetDate = null;
 
+  // Find the EARLIEST date >= today (handles sheets sorted newest-first)
   for (let i = 0; i < data.length; i++) {
     const groupName = String(data[i][0] || '').trim();
     const dateVal   = data[i][2];
     if (!dateVal || !(dateVal instanceof Date)) continue;
     const d = new Date(dateVal);
     d.setHours(0, 0, 0, 0);
-    if (d >= today) {
+    if (d >= today && (!targetDate || d < targetDate)) {
       targetGroup = groupName;
       targetDate  = d;
-      break;
     }
   }
 
