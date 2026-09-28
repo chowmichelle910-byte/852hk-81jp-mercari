@@ -768,8 +768,8 @@ async function doLogin(){
 
 async function callAdmin(){
   showLoader('載入訂單資料…');
-  // Step 1: fetch/auth — only this step propagates errors to doLogin
-  let d;
+  let d=null;
+  // Try cache first
   const cached=localStorage.getItem('adminItemsCache');
   if(cached){
     try{
@@ -778,21 +778,26 @@ async function callAdmin(){
       post({action:'getAdminItems',password:pw}).then(r=>{
         if(!r.error){localStorage.setItem('adminItemsCache',JSON.stringify(r));processItems(r);}
       }).catch(()=>{});
-    }catch(e){localStorage.removeItem('adminItemsCache');}
+    }catch(e){localStorage.removeItem('adminItemsCache');d=null;}
   }
+  // No cache — fetch from GAS; only explicit auth error blocks login
   if(!d){
-    let r;
-    try{ r=await post({action:'getAdminItems',password:pw}); }
-    catch(e){ hideLoader(); throw e; }
-    if(r.error){ hideLoader(); throw new Error(r.error); }
-    localStorage.setItem('adminItemsCache',JSON.stringify(r));
-    d=r;
+    try{
+      const r=await post({action:'getAdminItems',password:pw});
+      const isAuth=r.error&&(r.error.includes('Unauthorized')||r.error.includes('密碼')||r.error.includes('password'));
+      if(isAuth){hideLoader();throw new Error(r.error);}
+      if(!r.error){localStorage.setItem('adminItemsCache',JSON.stringify(r));d=r;}
+    }catch(e){
+      const isAuth=String(e?.message||'').match(/Unauthorized|密碼|password/i);
+      if(isAuth){hideLoader();throw e;}
+      // Network/timeout — enter UI with empty data; refreshArrival will retry
+      d={items:[],latestShipDate:''};
+    }
   }
   localStorage.setItem('adminPassword',pw);
-  // Step 2: render UI — errors here do NOT propagate (auth already succeeded)
   hideLoader();
   try{
-    processItems(d);
+    processItems(d||{items:[],latestShipDate:''});
     document.getElementById('loginWrap').style.display='none';
     document.getElementById('adminUI').style.display='block';
     igLoadTemplateFromSheet();
