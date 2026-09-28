@@ -95,6 +95,9 @@ function doPost(e){
   // --- 以下功能需要密碼 ---
   if (password !== ADMIN_PASSWORD) return json({ error:'Unauthorized' });
 
+  // V2: 輕量密碼驗證（唔讀資料，只確認密碼正確）
+  if (action === 'checkPassword') return json({ ok: true });
+
   if (action === 'getAdminItems') return getAdminItems_();
 
   if (action === 'addNewItem') {
@@ -507,7 +510,7 @@ function seedCfKvCache() {
   } catch(err) { Logger.log('seedCfKvCache failed: ' + err); }
 }
 
-// Called by installable onEdit trigger — seeds CF KV with fresh data
+// Called by installable onEdit trigger — seeds CF KV + Supabase with fresh data
 function onOrderSheetEdit(e) {
   try {
     if (e && e.source) {
@@ -515,7 +518,81 @@ function onOrderSheetEdit(e) {
       if (sheet.getName() !== MAIN_ORDER_SHEET) return;
     }
     seedCfKvCache();
+    syncToSupabase();  // V2: 同時寫入 Supabase
   } catch(err) { Logger.log('CF seed on edit failed: ' + err); }
+}
+
+// ── V2: 將 adminItems 同步寫入 Supabase admin_items table ──
+// 聽日填入 service_role key 後先生效
+const SB_SERVICE_KEY = 'PASTE_SERVICE_ROLE_KEY_HERE';  // ← 聽日換
+const SB_ADMIN_URL   = 'https://ifrjaxpgrnvjesboelra.supabase.co/rest/v1/admin_items';
+
+function syncToSupabase() {
+  if (SB_SERVICE_KEY === 'PASTE_SERVICE_ROLE_KEY_HERE') {
+    Logger.log('syncToSupabase: service key not set, skipping');
+    return;
+  }
+  try {
+    var mainSS = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
+    var sh     = mainSS.getSheetByName(MAIN_ORDER_SHEET);
+    if (!sh) return;
+    var lastRow = sh.getLastRow();
+    var values  = (lastRow < 2) ? [] : sh.getRange(2, 1, lastRow - 1, 29).getValues();
+    var items = values
+      .filter(function(r){ return r[1] !== '' || r[6] !== ''; })
+      .map(function(r, i){
+        return {
+          row: i + 2,
+          arrival: r[0] ? String(r[0]) : '',
+          orderedDate: r[1] ? (r[1] instanceof Date ? Utilities.formatDate(r[1],'GMT+8','yyyy-MM-dd') : r[1]) : '',
+          position: r[2] || '',
+          custId: r[3] || '',
+          shop: r[4] || '',
+          link: r[5] || '',
+          item: r[6] || '',
+          track: r[13] || '',
+          code: r[14] || '',
+          arrivalDate: r[15] ? (r[15] instanceof Date ? Utilities.formatDate(r[15],'GMT+8','yyyy-MM-dd') : r[15]) : '',
+          weight: parseFloat(r[16]) || 0,
+          image: r[18] || '',
+          status: r[28] || ''
+        };
+      });
+    var payload = { items: items, latestShipDate: '', updated_at: new Date().toISOString() };
+    // upsert: id=1 係固定 row（整個 adminItems 只存一行）
+    UrlFetchApp.fetch(SB_ADMIN_URL + '?id=eq.1', {
+      method: 'patch',
+      contentType: 'application/json',
+      headers: {
+        'apikey': SB_SERVICE_KEY,
+        'Authorization': 'Bearer ' + SB_SERVICE_KEY,
+        'Prefer': 'return=minimal'
+      },
+      payload: JSON.stringify({ payload: JSON.stringify(payload) }),
+      muteHttpExceptions: true
+    });
+    Logger.log('Supabase synced: ' + items.length + ' items');
+  } catch(err) { Logger.log('syncToSupabase failed: ' + err); }
+}
+
+// 手動執行一次：建立 Supabase 初始資料（id=1 row）
+function initSupabaseRow() {
+  if (SB_SERVICE_KEY === 'PASTE_SERVICE_ROLE_KEY_HERE') {
+    Logger.log('請先填入 SB_SERVICE_KEY');
+    return;
+  }
+  UrlFetchApp.fetch(SB_ADMIN_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'apikey': SB_SERVICE_KEY,
+      'Authorization': 'Bearer ' + SB_SERVICE_KEY,
+      'Prefer': 'return=minimal'
+    },
+    payload: JSON.stringify({ id: 1, payload: '{}' }),
+    muteHttpExceptions: true
+  });
+  Logger.log('Supabase row created, now run syncToSupabase()');
 }
 
 // Run once from GAS editor to install triggers
