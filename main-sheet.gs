@@ -1288,6 +1288,8 @@ function doPost(e) {
             } else if (tUrl) {
               tgSend_(caption, markup);
             }
+            // 標記已通知，防止 onEdit trigger 重複發送「待評價」
+            PropertiesService.getScriptProperties().setProperty('tg_unrated_' + rowNum, '1');
           } catch(err) { Logger.log('TG 評價通知失敗: ' + err); }
         }
         // status='' 時清除 AC 欄（已評價）
