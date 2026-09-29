@@ -1329,20 +1329,46 @@ function clearPending(){if(confirm('確定清除？')){pending.clear();editRows.
 
 // ════════ PICK LIST ════════
 const PICK_CACHE_KEY='pickListCache', PICK_CACHE_TTL=10*60*1000;
+function buildPickFromItems(){
+  const allGroups={};
+  let latestGroupNum=-1,latestGroup='';
+  (allItems||[]).forEach(function(r){
+    const arrival=String(r.arrival||'').trim();
+    const position=String(r.position||'').trim();
+    const id=String(r.custId||'').trim();
+    const code=String(r.code||'').trim();
+    const weightKg=parseFloat(r.weight)||0;
+    const image=String(r.image||'').trim();
+    const link=String(r.link||'').trim();
+    const itemName=String(r.item||'').trim();
+    if(!arrival||!position||!id)return;
+    const userName=position+'--'+id;
+    const region=(position==='Taiwan'||position==='TW')?'TW':'HK';
+    if(!allGroups[arrival])allGroups[arrival]={HK:{customers:{},totalWeightKg:0},TW:{customers:{},totalWeightKg:0}};
+    const grp=allGroups[arrival][region];
+    grp.totalWeightKg+=weightKg;
+    if(!grp.customers[userName])grp.customers[userName]=[];
+    if(code)grp.customers[userName].push({code,img:image,link,itemName});
+    const gNum=parseInt((String(arrival).match(/\d+/)||['-1'])[0]);
+    if(gNum>latestGroupNum){latestGroupNum=gNum;latestGroup=arrival;}
+  });
+  return{allGroups,latestGroup};
+}
 function loadPick(){
   pickLoaded=true;
-  // 有 cache 且未過期 → 即刻顯示，背景靜默更新
-  try {
+  if(allItems&&allItems.length){
+    const d=buildPickFromItems();
+    renderPickData(d);
+    fetchPickInBackground();
+    return;
+  }
+  try{
     const raw=localStorage.getItem(PICK_CACHE_KEY);
     if(raw){
-      const {ts,data}=JSON.parse(raw);
-      if(Date.now()-ts<PICK_CACHE_TTL){
-        renderPickData(data);
-        fetchPickInBackground();
-        return;
-      }
+      const{ts,data}=JSON.parse(raw);
+      if(Date.now()-ts<PICK_CACHE_TTL){renderPickData(data);fetchPickInBackground();return;}
     }
-  } catch(e){ localStorage.removeItem(PICK_CACHE_KEY); }
+  }catch(e){localStorage.removeItem(PICK_CACHE_KEY);}
   document.getElementById('pickContent').innerHTML='<div class="empty"><div class="spin"></div>載入中…</div>';
   fetchPickWithRetry(true);
 }
