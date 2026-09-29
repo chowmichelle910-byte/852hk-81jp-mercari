@@ -735,6 +735,7 @@ function hideLoader(){document.getElementById('pageLoader').style.display='none'
 
 let pw='', allItems=[], allGroups=[], curFilter='todo', curArr='未到貨';
 let pending=new Map(), editRows=new Set(), pickLoaded=false;
+let curIdFilter='';
 let imgCache=new Map();
 try{const c=localStorage.getItem('img_cache');if(c)imgCache=new Map(JSON.parse(c));}catch(e){}
 
@@ -1056,12 +1057,20 @@ function buildArrTabs(){
 
 async function render(){
   const el=document.getElementById('itemList');el.innerHTML='';
+  // 隔離篩選提示 banner
+  if(curIdFilter){
+    const banner=document.createElement('div');
+    banner.style.cssText='background:var(--navy);color:white;padding:8px 12px;border-radius:var(--r-sm);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;';
+    banner.innerHTML=`<span>🔍 ${esc(curIdFilter)}</span><button onclick="curIdFilter='';render()" style="background:rgba(255,255,255,.2);border:none;color:white;padding:3px 10px;border-radius:20px;cursor:pointer;font-size:12px;">✕ 清除</button>`;
+    el.appendChild(banner);
+  }
   let items=allItems.filter(i=>{
     if(curFilter==='unrated')return String(i.status).trim()==='未評價';
     if(curFilter==='done')return!!i.image&&!i.status;
     if(curFilter==='todo')return!i.image;
     return true;
-  }).filter(i=>{const a=String(i.arrival||'').trim();return curArr==='未到貨'?!a:a===curArr;});
+  }).filter(i=>{const a=String(i.arrival||'').trim();return curArr==='未到貨'?!a:a===curArr;})
+    .filter(i=>{if(!curIdFilter)return true;const pos=String(i.position||'').trim();const id=String(i.custId||'').trim();return (pos+'--'+id)===curIdFilter;});
 
   if(curFilter==='unrated'&&items.length){
     const b=document.createElement('button');
@@ -1088,15 +1097,17 @@ async function render(){
     if(dI)imgH=`<img src="${escAttr(dI)}" style="width:100%;height:100%;object-fit:cover;">`;
     else if(fL.startsWith('http')){const cc=imgCache.get(fL);if(cc)imgH=`<img src="${escAttr(cc)}" style="width:100%;height:100%;object-fit:cover;"><div class="pvlbl">預覽</div>`;else{imgH=`<div id="il-${it.row}" style="line-height:86px;color:#3b82f6;font-size:10px;text-align:center;">抓取中…</div>`;fetchPrev(fL,it.row);}}
 
+    const idKey=dPos+'--'+dId;
+    const isIsolated=curIdFilter===idKey&&idKey!=='--';
     const posH=locked
-      ?`<div class="locked"><div class="locked-p">📍 ${esc(dPos)}</div><div class="locked-i">ID: ${esc(dId)}</div><button class="edit-lk" onclick="editRows.add(${it.row});render()">✏️</button></div>`
+      ?`<div class="locked"><div class="locked-p" onclick="curIdFilter=curIdFilter==='${idKey}'?'':'${idKey}';render()" style="cursor:pointer;${isIsolated?'color:var(--warn);':''}" title="點擊隔離此客人">📍 ${esc(dPos)}</div><div class="locked-i" onclick="curIdFilter=curIdFilter==='${idKey}'?'':'${idKey}';render()" style="cursor:pointer;" title="點擊隔離此客人">ID: ${esc(dId)}</div><button class="edit-lk" onclick="editRows.add(${it.row});render()">✏️</button></div>`
       :`<div class="plbl">Position:</div><div class="pgrp">${Object.keys(POS_MAP).map(k=>`<button class="pbtn${dPos===POS_MAP[k]?' sel':''}" onclick="upd(${it.row},'position','${POS_MAP[k]}')">${k}</button>`).join('')}</div><input type="text" list="idList" class="id-inp" placeholder="Customer ID" value="${esc(dId)}" oninput="upd(${it.row},'custId',this.value,true)">`;
 
     card.innerHTML=`
       <div class="ic-l">
         <div class="code-tag">${esc(it.code||'無編號')}</div>
         <a href="${escAttr(fL)}" target="_blank" class="item-a">🔗 ${esc(dN)}</a>
-        <div class="ard-lbl">📅 到貨：<span class="ard-val">${esc(it.arrivalDate||'未填')}</span></div>
+        <div class="ard-lbl">📅 到貨：<span class="ard-val" onclick="editArrDate(${it.row},this)" style="cursor:pointer;text-decoration:underline dotted;" title="點擊修改">${esc(it.arrivalDate||'未填')}</span></div>
         ${posH}
         <div class="wrow"><input type="number" inputmode="decimal" step="0.001" class="w-inp" value="${dW}" oninput="upd(${it.row},'weight',this.value,true)"><span class="wu">kg</span></div>
         <div style="margin-top:6px;">${dT?`<span class="gtag" onclick="ep(${it.row},'track','${esc(dT)}')">${esc(dT)}</span>`:`<span class="atrack" onclick="ep(${it.row},'track','')">＋ 運單</span>`}</div>
@@ -1110,6 +1121,34 @@ async function render(){
       </div>`;
     el.appendChild(card);
   }
+}
+
+// ── 到貨日期直接編輯 ──
+function editArrDate(row,span){
+  const cur=span.textContent.trim();
+  const inp=document.createElement('input');
+  inp.type='date';
+  // 將 yyyy/M/d 或 yyyy-MM-dd 轉換成 input[date] 需要的 yyyy-MM-dd
+  const parts=(cur&&cur!=='未填')?cur.replace(/\//g,'-').split('-'):[];
+  if(parts.length===3)inp.value=`${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`;
+  inp.style.cssText='font-size:12px;border:1px solid var(--border);border-radius:4px;padding:2px 4px;';
+  span.replaceWith(inp);
+  inp.focus();
+  const save=async()=>{
+    const v=inp.value;
+    if(!v){inp.replaceWith(span);return;}
+    const display=v.replace(/-/g,'/');
+    span.textContent=display;
+    inp.replaceWith(span);
+    // 直接儲存（唔需要磅重儲存流程）
+    const it=allItems.find(i=>i.row===row);
+    try{
+      await postGas2({action:'saveArrivalData',password:pw,row,arrivalDate:display});
+      if(it)it.arrivalDate=display;
+    }catch(e){alert('儲存失敗，請重試');}
+  };
+  inp.onblur=save;
+  inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.replaceWith(span);}};
 }
 
 // ── 運單號碼查詢 + 條碼掃描 ──
