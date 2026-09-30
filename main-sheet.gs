@@ -502,6 +502,39 @@ function handleTelegramUpdate_(update) {
       }
 
       if (!count) tgSend_('✅ 沒有待填 Position/ID 的訂單', null, fromChatId);
+
+    } else if (text === '/sent' || text.startsWith('/sent@')) {
+      // 已發送但未填 tracking number 的訂單
+      const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+      const lastRow = sheet.getLastRow();
+      if (lastRow < 2) { tgSend_('✅ 沒有已發送待填 tracking 的訂單', null, fromChatId); return; }
+      const header   = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const trackCol = header.indexOf('Photo/送り状番号'); // 0-based
+      const linkCol  = header.indexOf('Link');            // 0-based
+      if (trackCol === -1) { tgSend_('❌ 找不到 Photo/送り状番号 欄', null, fromChatId); return; }
+      const data = sheet.getRange(2, 1, lastRow - 1, header.length).getValues();
+      let count = 0;
+      for (let i = 0; i < data.length; i++) {
+        const nVal = String(data[i][trackCol] || '').trim();
+        if (nVal !== '已發送') continue;
+        count++;
+        const rowNum  = i + 2;
+        const code    = String(data[i][14] || '').trim();
+        const itemUrl = linkCol !== -1 ? String(data[i][linkCol] || '').trim() : '';
+        const txUrl   = itemUrl.includes('mercari.com/item/') ? itemUrl.replace('/item/', '/transaction/') : itemUrl;
+        const itemName = String(data[i][6] || '').trim();
+        tgSend_(
+          `📦 <b>已發送 — 待入 Tracking</b>${code ? '  ' + code : ''}` +
+          (itemName ? '\n' + tgEscape_(itemName) : '') +
+          (txUrl ? '\n' + txUrl : ''),
+          { inline_keyboard: [[
+            { text: '📮 普通郵便',   callback_data: 'shipped_futsuu:' + rowNum },
+            { text: '📬 送り状番号', callback_data: 'shipped_track:'  + rowNum }
+          ]] },
+          fromChatId
+        );
+      }
+      if (!count) tgSend_('✅ 沒有已發送待填 tracking 的訂單', null, fromChatId);
       return;
     }
   }
