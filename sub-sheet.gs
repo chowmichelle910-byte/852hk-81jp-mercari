@@ -414,6 +414,35 @@ function addNewItem_(date, shop, link, item, jpy, pos, id) {
     if (isNaN(lastNum) || lastNum < 0) lastNum = 0;
     sh.getRange(targetRow, 15).setValue((lastNum >= 1000) ? 1 : lastNum + 1);
     sh.getRange(targetRow, 29).setValue("未評價");
+    // 自動填入 AA 欄（購入時團號）
+    try {
+      const mainSS = SpreadsheetApp.getActiveSpreadsheet();
+      const dataSh = mainSS.getSheetByName('Data');
+      const dataLastRow = dataSh.getLastRow();
+      if (dataLastRow >= 2) {
+        const allDataRows = dataSh.getRange(2, 8, dataLastRow - 1, 3).getValues();
+        const toYMD = function(v) {
+          if (!v) return null;
+          const d = v instanceof Date ? v : new Date(String(v).replace(/\//g, '-'));
+          if (isNaN(d)) return null;
+          const ms = d.getTime() + 8 * 3600000;
+          const dd = new Date(ms);
+          return dd.getUTCFullYear() + '-' + String(dd.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dd.getUTCDate()).padStart(2, '0');
+        };
+        const orderYMD = toYMD(date ? new Date(String(date).replace(/\//g, '-')) : null);
+        if (orderYMD) {
+          for (let i = 0; i < allDataRows.length; i++) {
+            const r = allDataRows[i];
+            const gid = String(r[0] || '').trim();
+            if (!gid || !r[1] || !r[2]) continue;
+            if (orderYMD >= toYMD(r[1]) && orderYMD <= toYMD(r[2])) {
+              sh.getRange(targetRow, 27).setValue(gid);
+              break;
+            }
+          }
+        }
+      }
+    } catch(e) { Logger.log('assignGroup on addNewItem failed: ' + e); }
     return json({ success: true });
   } catch (err) { return json({ error: err.toString() }); }
 }
