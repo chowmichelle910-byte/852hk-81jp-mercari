@@ -1279,6 +1279,28 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'getSentItems': {
+      try {
+        const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        if (lastRow < 2) return jsonResponse_({ items: [] });
+        const data  = sheet.getRange(2, 1, lastRow - 1, 15).getValues();
+        const items = [];
+        for (let i = 0; i < data.length; i++) {
+          if (String(data[i][13] || '').trim() !== '已發送') continue;
+          const link = String(data[i][5] || '').trim();
+          const tUrl = link.includes('mercari.com/item/') ? link.replace('/item/', '/transaction/') : link;
+          items.push({
+            rowNum : i + 2,
+            tUrl,
+            code   : String(data[i][14] || '').trim(),
+            name   : String(data[i][6]  || '').trim()
+          });
+        }
+        return jsonResponse_({ items });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     case 'clearAllUnrated': {
       try {
         const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');

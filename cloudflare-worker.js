@@ -344,6 +344,44 @@ async function handleUpdate(update) {
       return;
     }
 
+    if (text === '/help' || text.startsWith('/help@') || text === '/start' || text.startsWith('/start@')) {
+      await tg('sendMessage', {
+        chat_id: chatId,
+        text: '📋 <b>可用指令</b>\n\n' +
+              '/pending — 列出未填 Position/ID 的訂單\n' +
+              '/sent — 列出已發送但未入 tracking 的訂單\n' +
+              '/unrated — 列出待評價商品\n' +
+              '/check [code] — 查詢訂單\n' +
+              '/charge — 新增充值記錄\n' +
+              '/lawson — 查詢 Lawson 到店包裹',
+        parse_mode: 'HTML'
+      });
+      return;
+    }
+
+    if (text === '/sent' || text.startsWith('/sent@')) {
+      const result = await gas({ action: 'getSentItems' });
+      const items  = result.items || [];
+      if (!items.length) {
+        await tg('sendMessage', { chat_id: chatId, text: '✅ 沒有已發送待填 tracking 的訂單' });
+        return;
+      }
+      for (const item of items) {
+        await tg('sendMessage', {
+          chat_id: chatId,
+          text: `📦 <b>已發送 — 待入 Tracking</b>${item.code ? '  ' + item.code : ''}` +
+                (item.name ? '\n' + item.name : '') +
+                (item.tUrl ? '\n' + item.tUrl : ''),
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [[
+            { text: '📮 普通郵便',   callback_data: 'shipped_futsuu:' + item.rowNum },
+            { text: '📬 送り状番号', callback_data: 'shipped_track:'  + item.rowNum }
+          ]] }
+        });
+      }
+      return;
+    }
+
     if (text === '/pending' || text.startsWith('/pending@')) {
       const data = await gas({ action: 'getPendingOrders' });
       if (!data.orders || !data.orders.length) {
