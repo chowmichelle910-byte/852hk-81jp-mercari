@@ -376,6 +376,8 @@ async function handleUpdate(update) {
           reply_markup: { inline_keyboard: [[
             { text: '📮 普通郵便',   callback_data: 'shipped_futsuu:' + item.rowNum },
             { text: '📬 送り状番号', callback_data: 'shipped_track:'  + item.rowNum }
+          ], [
+            { text: '🗑️ 清除已發送', callback_data: 'clear_sent:' + item.rowNum }
           ]] }
         });
       }
@@ -554,6 +556,16 @@ async function handleUpdate(update) {
       chat_id: chatId,
       text: '請輸入充值日圓金額（JPY）：\n_charge:jpy_',
       reply_markup: { force_reply: true, selective: true }
+    });
+
+  } else if (action === 'clear_sent') {
+    const rowNum = parts[1];
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    await gas({ action: 'clearSentStatus', row: rowNum });
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: '✅ 已清除「已發送」',
+      reply_markup: { inline_keyboard: [] }
     });
 
   } else if (action === 'shipped_futsuu') {

@@ -1220,6 +1220,15 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'clearSentStatus': {
+      try {
+        const row = parseInt(e.parameter.row);
+        if (isNaN(row) || row < 2) return jsonResponse_({ error: 'invalid row' });
+        SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單').getRange(row, 14).setValue('');
+        return jsonResponse_({ success: true });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     case 'getSentItems': {
       try {
         const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
