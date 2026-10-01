@@ -451,6 +451,11 @@ function handleTelegramUpdate_(update) {
       }
     }
 
+    // DEBUG — remove after diagnosis
+    if (text.startsWith('/')) {
+      tgSend_('🔍 cmd=' + JSON.stringify(text) + ' len=' + text.length, null, fromChatId);
+    }
+
     // /check CODE — 查詢訂單詳情
     const checkMatch = text.match(/^\/check\s+(.+)$/i);
     if (checkMatch) {
