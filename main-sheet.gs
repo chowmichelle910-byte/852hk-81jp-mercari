@@ -490,45 +490,52 @@ function handleTelegramUpdate_(update) {
     }
 
     if (text === '/help' || text.startsWith('/help@') || text === '/start' || text.startsWith('/start@')) {
-      tgSend_(
-        '📋 <b>可用指令</b>\n\n' +
-        '/pending — 列出未填 Position/ID 的訂單\n' +
-        '/sent — 列出已發送但未入 tracking 的訂單\n' +
-        '/check [code] — 查詢訂單（例如：/check ABC123）\n' +
-        '/charge — 新增充值記錄',
-        null, fromChatId
-      );
+      try {
+        tgSend_(
+          '📋 <b>可用指令</b>\n\n' +
+          '/pending — 列出未填 Position/ID 的訂單\n' +
+          '/sent — 列出已發送但未入 tracking 的訂單\n' +
+          '/check [code] — 查詢訂單（例如：/check ABC123）\n' +
+          '/charge — 新增充值記錄',
+          null, fromChatId
+        );
+      } catch(e) {
+        tgSend_('❌ /help 錯誤：' + e.message, null, fromChatId);
+      }
       return;
     }
 
     if (text === '/sent' || text.startsWith('/sent@')) {
-      // 已發送但未填 tracking number 的訂單
-      const sheet2  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
-      const lastRow2 = sheet2.getLastRow();
-      if (lastRow2 < 2) { tgSend_('✅ 沒有已發送待填 tracking 的訂單', null, fromChatId); return; }
-      const data2 = sheet2.getRange(2, 1, lastRow2 - 1, 15).getValues();
-      let sentCount = 0;
-      for (let i = 0; i < data2.length; i++) {
-        const nVal = String(data2[i][13] || '').trim();
-        if (nVal !== '已發送') continue;
-        sentCount++;
-        const rowNum2  = i + 2;
-        const code2    = String(data2[i][14] || '').trim();
-        const itemUrl2 = String(data2[i][5]  || '').trim();
-        const txUrl2   = itemUrl2.includes('mercari.com/item/') ? itemUrl2.replace('/item/', '/transaction/') : itemUrl2;
-        const name2    = String(data2[i][6]  || '').trim();
-        tgSend_(
-          `📦 <b>已發送 — 待入 Tracking</b>${code2 ? '  ' + code2 : ''}` +
-          (name2 ? '\n' + tgEscape_(name2) : '') +
-          (txUrl2 ? '\n' + txUrl2 : ''),
-          { inline_keyboard: [[
-            { text: '📮 普通郵便',   callback_data: 'shipped_futsuu:' + rowNum2 },
-            { text: '📬 送り状番号', callback_data: 'shipped_track:'  + rowNum2 }
-          ]] },
-          fromChatId
-        );
+      try {
+        const sheet2  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow2 = sheet2.getLastRow();
+        if (lastRow2 < 2) { tgSend_('✅ 沒有已發送待填 tracking 的訂單', null, fromChatId); return; }
+        const data2 = sheet2.getRange(2, 1, lastRow2 - 1, 15).getValues();
+        let sentCount = 0;
+        for (let i = 0; i < data2.length; i++) {
+          const nVal = String(data2[i][13] || '').trim();
+          if (nVal !== '已發送') continue;
+          sentCount++;
+          const rowNum2  = i + 2;
+          const code2    = String(data2[i][14] || '').trim();
+          const itemUrl2 = String(data2[i][5]  || '').trim();
+          const txUrl2   = itemUrl2.includes('mercari.com/item/') ? itemUrl2.replace('/item/', '/transaction/') : itemUrl2;
+          const name2    = String(data2[i][6]  || '').trim();
+          tgSend_(
+            `📦 <b>已發送 — 待入 Tracking</b>${code2 ? '  ' + code2 : ''}` +
+            (name2 ? '\n' + tgEscape_(name2) : '') +
+            (txUrl2 ? '\n' + txUrl2 : ''),
+            { inline_keyboard: [[
+              { text: '📮 普通郵便',   callback_data: 'shipped_futsuu:' + rowNum2 },
+              { text: '📬 送り状番号', callback_data: 'shipped_track:'  + rowNum2 }
+            ]] },
+            fromChatId
+          );
+        }
+        if (!sentCount) tgSend_('✅ 沒有已發送待填 tracking 的訂單', null, fromChatId);
+      } catch(e) {
+        tgSend_('❌ /sent 錯誤：' + e.message, null, fromChatId);
       }
-      if (!sentCount) tgSend_('✅ 沒有已發送待填 tracking 的訂單', null, fromChatId);
       return;
     }
 
