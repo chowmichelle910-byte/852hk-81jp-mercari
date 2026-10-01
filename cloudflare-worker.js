@@ -353,7 +353,8 @@ async function handleUpdate(update) {
               '/unrated — 列出待評價商品\n' +
               '/check [code] — 查詢訂單\n' +
               '/charge — 新增充值記錄\n' +
-              '/lawson — 查詢 Lawson 到店包裹',
+              '/lawson — 查詢 Lawson 到店包裹\n' +
+              '/neworder [連結] — 新增訂單',
         parse_mode: 'HTML'
       });
       return;
