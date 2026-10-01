@@ -563,7 +563,7 @@ function handleTelegramUpdate_(update) {
           const code    = String(data[i][14] || '').trim(); // O: Code
           const itemUrl = String(data[i][5]  || '').trim(); // F: Link
           tgSend_(
-            `📋 <b>待填訂單</b>${code ? '  ' + code : ''}\n` +
+            `📋 <b>待填訂單</b> [v135]${code ? '  ' + code : ''}\n` +
             (itemUrl ? `🔗 ${itemUrl}\n` : '') +
             `\n係哪個 <b>Position</b>？` +
             (code ? `\n<tg-spoiler>_code:${code}_</tg-spoiler>` : ''),
