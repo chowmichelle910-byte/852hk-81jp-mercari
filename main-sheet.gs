@@ -573,7 +573,7 @@ function handleTelegramUpdate_(update) {
         }
       }
 
-      if (!count) tgSend_('✅ 沒有待填 Position/ID 的訂單', null, fromChatId);
+      if (!count) tgSend_('✅ 沒有待填 Position/ID 的訂單 [v135]', null, fromChatId);
     }
   }
 
