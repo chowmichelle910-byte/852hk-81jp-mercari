@@ -504,6 +504,7 @@ function handleTelegramUpdate_(update) {
       if (!count) tgSend_('✅ 沒有待填 Position/ID 的訂單', null, fromChatId);
 
     } else if (text === '/sent' || text.startsWith('/sent@')) {
+      tgSend_('🔍 /sent 收到，掃描中…', null, fromChatId);
       // 已發送但未填 tracking number 的訂單
       // col N (1-indexed=14, 0-indexed=13) = Photo/送り状番号
       // col F (0-indexed=5) = Link, col G (0-indexed=6) = name, col O (0-indexed=14) = Code
