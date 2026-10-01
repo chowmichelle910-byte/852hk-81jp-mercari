@@ -26,6 +26,23 @@ function deleteWebhookAndUsePoll() {
 }
 
 
+// 執行一次：向 Telegram 註冊指令選單（打 / 會出清單）
+function setMyCommands_() {
+  const commands = [
+    { command: 'help',    description: '列出所有可用指令' },
+    { command: 'pending', description: '列出未填 Position/ID 的訂單' },
+    { command: 'sent',    description: '列出已發送但未入 tracking 的訂單' },
+    { command: 'check',   description: '查詢訂單（例如：/check ABC123）' },
+    { command: 'charge',  description: '新增充值記錄' }
+  ];
+  const res = UrlFetchApp.fetch(TG_API_URL + '/setMyCommands', {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ commands })
+  });
+  Logger.log(res.getContentText());
+}
+
 function tgEscape_(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -469,6 +486,18 @@ function handleTelegramUpdate_(update) {
         });
         tgSend_(lines.join('\n\n'), null, fromChatId);
       }
+      return;
+    }
+
+    if (text === '/help' || text.startsWith('/help@') || text === '/start' || text.startsWith('/start@')) {
+      tgSend_(
+        '📋 <b>可用指令</b>\n\n' +
+        '/pending — 列出未填 Position/ID 的訂單\n' +
+        '/sent — 列出已發送但未入 tracking 的訂單\n' +
+        '/check [code] — 查詢訂單（例如：/check ABC123）\n' +
+        '/charge — 新增充值記錄',
+        null, fromChatId
+      );
       return;
     }
 
