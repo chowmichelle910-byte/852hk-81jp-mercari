@@ -931,6 +931,10 @@ const ADMIN_PASSWORD               = '4916';
 // ─────────────────────────────────────────────
 //  doPost — 完整 Web App 入口
 // ─────────────────────────────────────────────
+function doGet(e) {
+  return ContentService.createTextOutput('GAS VERSION: v135-debug');
+}
+
 function doPost(e) {
   // Telegram webhook callback（JSON body）
   if (e.postData && e.postData.type === 'application/json') {
