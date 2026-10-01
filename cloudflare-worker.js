@@ -344,6 +344,36 @@ async function handleUpdate(update) {
       return;
     }
 
+    const checkMatch = text.match(/^\/check(?:@\S+)?\s+(.+)$/i);
+    if (checkMatch) {
+      const queryCode = checkMatch[1].trim();
+      const result = await gas({ action: 'getOrderByCode', code: queryCode });
+      if (result.error || !result.orders || !result.orders.length) {
+        await tg('sendMessage', { chat_id: chatId, text: `❌ 找不到 code <b>${queryCode}</b> 的訂單`, parse_mode: 'HTML' });
+      } else {
+        const lines = result.orders.map((o, idx) => {
+          const parts = [];
+          parts.push(`🔢 Code：<b>${o.code}</b>`);
+          if (o.date) parts.push(`📅 購買日期：${o.date}`);
+          if (o.name)  parts.push(`📦 商品名：${o.name}`);
+          if (o.price != null) parts.push(`💴 價錢：¥${Number(o.price).toLocaleString()}`);
+          if (o.link)  parts.push(`🔗 ${o.link}`);
+          return (result.orders.length > 1 ? `<b>${idx+1}.</b>\n` : '') + parts.join('\n');
+        });
+        await tg('sendMessage', { chat_id: chatId, text: lines.join('\n\n'), parse_mode: 'HTML' });
+      }
+      return;
+    }
+
+    if (text === '/charge' || text.startsWith('/charge@')) {
+      await tg('sendMessage', {
+        chat_id: chatId,
+        text: '請輸入充值日圓金額（JPY）：\n_charge:jpy_',
+        reply_markup: { force_reply: true, selective: true }
+      });
+      return;
+    }
+
     if (text === '/help' || text.startsWith('/help@') || text === '/start' || text.startsWith('/start@')) {
       await tg('sendMessage', {
         chat_id: chatId,

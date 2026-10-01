@@ -1229,6 +1229,29 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'getOrderByCode': {
+      try {
+        const code    = String(e.parameter.code || '').trim();
+        const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        if (lastRow < 2 || !code) return jsonResponse_({ orders: [] });
+        const data   = sheet.getRange(2, 1, lastRow - 1, 15).getValues();
+        const orders = [];
+        for (let i = 0; i < data.length; i++) {
+          if (String(data[i][14] || '').trim() !== code) continue;
+          const rawDate = data[i][1];
+          orders.push({
+            code  : code,
+            date  : rawDate ? Utilities.formatDate(new Date(rawDate), 'Asia/Tokyo', 'yyyy/M/d') : '',
+            link  : String(data[i][5]  || '').trim(),
+            name  : String(data[i][6]  || '').trim(),
+            price : data[i][7] !== '' ? Number(data[i][7]) : null
+          });
+        }
+        return jsonResponse_({ orders });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     case 'getSentItems': {
       try {
         const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
