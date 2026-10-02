@@ -2982,13 +2982,19 @@ function processMercariShopsEmails() {
                              message.getSubject().includes('ご注文ありがとうございます');
       if (!isOrderConfirm) continue;
 
-      // 1. 訂單 link
-      const orderMatch = plainBody.match(/https?:\/\/mercari-shops\.com\/orders\/([A-Za-z0-9]+)/);
+      // 1. 訂單 link（用於重複偵測）及商品 link（用於記錄）
+      const orderMatch = plainBody.match(/https?:\/\/mercari-shops\.com\/orders\/([A-Za-z0-9_\-]+)/);
       if (!orderMatch) continue;
       const orderUrl = `https://mercari-shops.com/orders/${orderMatch[1]}`;
 
-      // 重複檢查
+      // 重複檢查（用 order URL）
       if (existingUrls.includes(orderUrl)) continue;
+
+      // 優先抽取 jp.mercari.com/shops/product URL；找不到則 fallback 用 order URL
+      const productMatch = plainBody.match(/https?:\/\/jp\.mercari\.com\/shops\/product\/([A-Za-z0-9_\-]+)/);
+      const recordUrl = productMatch
+        ? `https://jp.mercari.com/shops/product/${productMatch[1]}`
+        : orderUrl;
 
       // 2. 商品名（支援全形冒號）
       const itemNameMatch = plainBody.match(/商品名\s*[：:]\s*(.+)/);
@@ -3012,7 +3018,7 @@ function processMercariShopsEmails() {
       const nextRow = getNextOrderRow_(sheet);
       sheet.getRange(nextRow, 2).setValue(dateReceived);
       sheet.getRange(nextRow, 5).setValue("Mercari");
-      sheet.getRange(nextRow, 6).setValue(orderUrl);
+      sheet.getRange(nextRow, 6).setValue(recordUrl);
       sheet.getRange(nextRow, 7).setValue(itemName);
       if (price) sheet.getRange(nextRow, 8).setValue(price);
 
@@ -3141,11 +3147,16 @@ function updateOrdersFromGmail() {
         const emailNameMatch = plainBody.match(/商品名\s*[：: ]\s*(.+)/);
         const emailItemName  = emailNameMatch ? emailNameMatch[1].trim() : '';
         const idMatch    = plainBody.match(/商品ID\s*[：: ]\s*(m\d+)/);
-        const shopsMatch = plainBody.match(/mercari-shops\.com\/orders\/([A-Za-z0-9]+)/);
+        const shopsMatch        = plainBody.match(/mercari-shops\.com\/orders\/([A-Za-z0-9_\-]+)/);
+        const shopsProductMatch = plainBody.match(/jp\.mercari\.com\/shops\/product\/([A-Za-z0-9_\-]+)/);
         let linkToFind = '';
         if (idMatch) {
           linkToFind = 'https://jp.mercari.com/item/' + idMatch[1];
+        } else if (shopsProductMatch) {
+          // 優先用 product URL（與訂單記錄一致）
+          linkToFind = 'https://jp.mercari.com/shops/product/' + shopsProductMatch[1];
         } else if (shopsMatch) {
+          // fallback：舊記錄可能仍用 order URL
           linkToFind = 'https://mercari-shops.com/orders/' + shopsMatch[1];
         }
         Logger.log('[TypeE] subj=' + subj + ' linkToFind=' + linkToFind + ' linkCol=' + linkCol + ' trackCol=' + trackCol);
@@ -3202,11 +3213,16 @@ function updateOrdersFromGmail() {
         subj.includes('ご購入ありがとうございます') ||
         msg.getFrom().includes('mercari-shops.com')
       ) {
-        const orderMatch = plainBody.match(/https?:\/\/mercari-shops\.com\/orders\/([A-Za-z0-9]+)/);
+        const orderMatch = plainBody.match(/https?:\/\/mercari-shops\.com\/orders\/([A-Za-z0-9_\-]+)/);
         const nameMatch  = plainBody.match(/商品名\s*[：:]\s*(.+)/);
         if (orderMatch && nameMatch) {
           const orderUrl = 'https://mercari-shops.com/orders/' + orderMatch[1];
           if (!existingUrls.includes(orderUrl) && !isUrlBlacklisted_(orderUrl)) {
+            // 優先用 product URL；找不到則 fallback 用 order URL
+            const productMatch2 = plainBody.match(/https?:\/\/jp\.mercari\.com\/shops\/product\/([A-Za-z0-9_\-]+)/);
+            const recordUrl2 = productMatch2
+              ? 'https://jp.mercari.com/shops/product/' + productMatch2[1]
+              : orderUrl;
             const pm = plainBody.match(/商品価格\s*[：:]\s*[¥￥]([\d,]+)/) ||
                        plainBody.match(/商品代金\s*[：:]\s*[¥￥]([\d,]+)/) ||
                        plainBody.match(/注文金額合計\s*[：:]\s*[¥￥]([\d,]+)/);
@@ -3214,7 +3230,7 @@ function updateOrdersFromGmail() {
             const nextRow = getNextOrderRow_(orderSheet);
             orderSheet.getRange(nextRow, 2).setValue(dateStr);
             orderSheet.getRange(nextRow, 5).setValue('Mercari');
-            orderSheet.getRange(nextRow, 6).setValue(orderUrl);
+            orderSheet.getRange(nextRow, 6).setValue(recordUrl2);
             orderSheet.getRange(nextRow, 7).setValue(nameMatch[1].trim());
             if (price) orderSheet.getRange(nextRow, 8).setValue(price);
             existingUrls.push(orderUrl);
