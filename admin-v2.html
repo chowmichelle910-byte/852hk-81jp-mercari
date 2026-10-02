@@ -310,8 +310,8 @@ button{font-family:var(--font);}
   <div class="lc">
     <div class="em">🇯🇵</div>
     <h3>852hk81jp 後台</h3>
-    <p>請輸入管理員密碼</p>
-    <input id="pw" type="password" class="pw-inp" placeholder="管理員密碼">
+    <p>請輸入密碼</p>
+    <input id="sbPw" type="password" class="pw-inp" placeholder="密碼">
     <button class="login-btn" onclick="doLogin()">進入後台</button>
     <div id="loginStatus"></div>
   </div>
@@ -645,6 +645,7 @@ button{font-family:var(--font);}
 
 
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 // ── Config ──
 const API      = 'https://still-art-9869.852hk81jp.workers.dev/api/admin';
@@ -652,6 +653,9 @@ const API_GAS2 = 'https://script.google.com/macros/s/AKfycby2I6Q2M67npEFW-Vqi14J
 const MAIN_API = 'https://script.google.com/macros/s/AKfycbwT9_K4m0UvBUrZRveZJ3clzfuUCLtR1TrEok7gYDdamRtqHjk1HkZrTmLPpHuLXTRckA/exec';
 const SB_URL   = 'https://ifrjaxpgrnvjesboelra.supabase.co';
 const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmpheHBncm52amVzYm9lbHJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDU2OTAsImV4cCI6MjA5Nzk4MTY5MH0.3Qw4z9JGapt_B90v_ulja7pM2bSDhbhp439auyvwi_M';
+const SB_AUTH_EMAIL = '852hk886tw@gmail.com';
+const GAS_PW = '4916'; // GAS API password (separate from Supabase auth)
+const supabase = window.supabase.createClient(SB_URL, SB_KEY);
 // ── V2: Supabase 讀取 adminItems ──
 // GAS sync 需要 service_role key（聽日填入）
 const SB_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmpheHBncm52amVzYm9lbHJhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjQwNTY5MCwiZXhwIjoyMDk3OTgxNjkwfQ.4CdxnLRiYIxg-ag1e9wSOVk_HLVxS6JoHtLMRpGQWho';
@@ -723,15 +727,16 @@ async function syncImgsToSheet() {
   }
 }
 
-function doLogout(){
-  if(pending.size&&!confirm('有未儲存的資料，確定登出？'))return;
-  localStorage.removeItem('adminPassword');
+function doLogout(msg){
+  if(!msg&&pending.size&&!confirm('有未儲存的資料，確定登出？'))return;
+  supabase.auth.signOut().catch(()=>{});
+  localStorage.removeItem('adminLogicalDay');
   localStorage.removeItem('adminItemsCache');
   pw='';
   document.getElementById('adminUI').style.display='none';
   document.getElementById('loginWrap').style.display='flex';
-  document.getElementById('loginStatus').textContent='';
-  document.getElementById('pw').value='';
+  document.getElementById('loginStatus').textContent=msg||'';
+  document.getElementById('sbPw').value='';
 }
 function showLoader(msg){const el=document.getElementById('pageLoader');el.style.display='flex';document.getElementById('pageLoaderMsg').textContent=msg||'載入中…';}
 function hideLoader(){document.getElementById('pageLoader').style.display='none';}
@@ -741,31 +746,62 @@ let pending=new Map(), editRows=new Set(), pickLoaded=false;
 let imgCache=new Map();
 try{const c=localStorage.getItem('img_cache');if(c)imgCache=new Map(JSON.parse(c));}catch(e){}
 
+// ── 邏輯日（每日 JST 06:00 換日）──
+function logicalDayKey(){
+  const now=new Date();
+  const jst=new Date(now.getTime()+9*3600000);
+  const h=jst.getUTCHours(), m=jst.getUTCMinutes();
+  const d=new Date(jst);
+  if(h>6||(h===6&&m>=0))d.setUTCDate(d.getUTCDate()+1); // past 06:00 JST → next logical day
+  return d.toISOString().slice(0,10);
+}
+
+function checkLogicalDay(){
+  const stored=localStorage.getItem('adminLogicalDay');
+  if(stored&&stored!==logicalDayKey()){
+    doLogout('已自動登出（每日 JST 06:00）');
+    return false;
+  }
+  return true;
+}
+
 // ── Boot ──
-window.onload=()=>{
-  const s=localStorage.getItem('adminPassword');
-  if(s){pw=s;callAdmin();}
-  document.getElementById('pw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+window.onload=async()=>{
+  document.getElementById('sbPw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
   document.getElementById('arrDateInp').value=new Date().toISOString().split('T')[0];
   document.getElementById('chargeDate').value=new Date().toISOString().split('T')[0];
+
+  // Check existing Supabase session
+  const{data:{session}}=await supabase.auth.getSession();
+  if(session){
+    if(!checkLogicalDay())return;
+    pw=GAS_PW;
+    callAdmin();
+  }
+
+  // Check every minute for logical day change
+  setInterval(()=>{
+    if(pw)checkLogicalDay();
+  },60000);
 };
 
 async function doLogin(){
-  pw=document.getElementById('pw').value.trim();if(!pw)return;
+  const enteredPw=document.getElementById('sbPw').value.trim();
+  if(!enteredPw)return;
   const sts=document.getElementById('loginStatus');
   sts.textContent='驗證中…';
-  for(let attempt=1;attempt<=2;attempt++){
-    try{
-      await callAdmin();
-      return;
-    }catch(e){
-      const msg=String(e?.message||e||'');
-      if(msg.includes('密碼')||msg.includes('password')){
-        sts.textContent='❌ 密碼錯誤';localStorage.removeItem('adminPassword');pw='';return;
-      }
-      if(attempt<2){sts.textContent='連線中，重試…';await new Promise(r=>setTimeout(r,2000));continue;}
-      sts.textContent='❌ 連線失敗，請重試 ('+String(e?.message||e||'').slice(0,60)+')';localStorage.removeItem('adminPassword');pw='';
-    }
+  const{error}=await supabase.auth.signInWithPassword({email:SB_AUTH_EMAIL,password:enteredPw});
+  if(error){
+    sts.textContent='❌ 密碼錯誤';
+    return;
+  }
+  localStorage.setItem('adminLogicalDay',logicalDayKey());
+  pw=GAS_PW;
+  try{
+    await callAdmin();
+  }catch(e){
+    sts.textContent='❌ 連線失敗，請重試 ('+String(e?.message||e||'').slice(0,60)+')';
+    pw='';
   }
 }
 
@@ -794,16 +830,7 @@ async function callAdmin(){
     catch(e){ localStorage.removeItem('adminItemsCache'); }
   }
 
-  // 2. 先用 GAS 驗證密碼（只驗證，唔讀資料）
-  if(!d){
-    try{
-      const auth=await post({action:'checkPassword',password:pw},10000);
-      if(auth.error&&/Unauthorized|密碼|password/i.test(auth.error)){ hideLoader(); throw new Error(auth.error); }
-    }catch(e){
-      if(/Unauthorized|密碼|password/i.test(String(e?.message||''))){ hideLoader(); throw e; }
-      // GAS 驗證失敗（網絡問題）→ 繼續嘗試 Supabase
-    }
-  }
+  // 2. 密碼驗證已由 Supabase Auth 處理，毋需再 checkPassword
 
   // 3. 讀資料：Supabase（快）→ fallback CF KV
   if(!d){
@@ -819,7 +846,7 @@ async function callAdmin(){
     }catch(e){}
   }
 
-  localStorage.setItem('adminPassword',pw);
+  // pw is now managed by Supabase auth, not localStorage
   hideLoader();
   try{
     processItems(d||{items:[],latestShipDate:''});
@@ -901,19 +928,14 @@ function switchNav(n){
 }
 
 // 切回瀏覽器 tab 時自動靜默更新
-// Auto-logout at JST 06:00 daily
+// Auto-logout at JST 06:00 daily (setTimeout approach — fires even if page stays open overnight)
 function scheduleJstLogout(){
   const now=new Date();
   const jstNow=new Date(now.getTime()+9*3600000);
   const next=new Date(Date.UTC(jstNow.getUTCFullYear(),jstNow.getUTCMonth(),jstNow.getUTCDate(),21,0,0,0)); // UTC 21:00 = JST 06:00
   if(next<=now)next.setUTCDate(next.getUTCDate()+1);
   setTimeout(()=>{
-    localStorage.removeItem('adminPassword');
-    localStorage.removeItem('adminItemsCache');
-    pw='';
-    document.getElementById('adminUI').style.display='none';
-    document.getElementById('loginWrap').style.display='flex';
-    document.getElementById('loginStatus').textContent='已自動登出（每日 JST 06:00）';
+    doLogout('已自動登出（每日 JST 06:00）');
     scheduleJstLogout();
   },next-now);
 }
