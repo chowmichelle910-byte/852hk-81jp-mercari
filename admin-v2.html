@@ -1520,7 +1520,7 @@ async function previewShippingNotification(){
   if(!group){document.getElementById('shipSummary').innerHTML='';return;}
   setSts('shipToolSts','⏳ 載入中…','ld');
   try{
-    const d=await postMain({action:'getShippingNotificationPreview',password:pw,group});
+    const d=await postMain({action:'getShippingNotificationPreview',password:pw,group},45000);
     if(d.error)throw new Error(d.error);
     // 若 GAS 未更新仍返回舊 {html} 格式，提示用戶
     if(d.html!==undefined && d.easy===undefined){
@@ -1646,18 +1646,22 @@ async function generateShipPage(){
   setSts('shipToolSts','⏳ 生成寄件清單頁面…','ld');
   document.getElementById('shipUrlRow').style.display='none';
   try{
-    const d=await postMain({action:'getShippingNotificationPreview',password:pw,group});
+    const d=await postMain({action:'getShippingNotificationPreview',password:pw,group},45000);
     if(d.error)throw new Error(d.error);
     if(d.html!==undefined&&d.easy===undefined){setSts('shipToolSts','⚠️ GAS 需更新並重新部署','err');return;}
     const html=buildShipPageHtml(d);
     const safeGroup=group.replace(/[^a-zA-Z0-9_\-]/g,'_');
     const filename=`shiplist_${safeGroup}_${Date.now()}.html`;
     const bytes=new TextEncoder().encode(html);
+    const sbCtrl=new AbortController();
+    const sbTimer=setTimeout(()=>sbCtrl.abort(),30000);
     const res=await fetch(`${SB_URL}/storage/v1/object/receipts/${filename}`,{
       method:'POST',
       headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'text/html; charset=utf-8','x-upsert':'true','Content-Length':String(bytes.length)},
-      body:new Blob([bytes],{type:'text/html; charset=utf-8'})
+      body:new Blob([bytes],{type:'text/html; charset=utf-8'}),
+      signal:sbCtrl.signal
     });
+    clearTimeout(sbTimer);
     if(!res.ok)throw new Error('上傳失敗 '+res.status+': '+await res.text());
     const publicUrl=`${SB_URL}/storage/v1/object/public/receipts/${filename}`;
     const proxyUrl=`https://852hk-81jp-mercari.vercel.app/api/proxy?src=${encodeURIComponent(publicUrl)}`;
