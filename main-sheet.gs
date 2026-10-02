@@ -1637,6 +1637,7 @@ function getShippingNotificationPreview_(groupTitle) {
     const tracking        = String(row[12]||'').trim();
     const postageCollected = !!row[13];
     if (!user || !method) return;
+    if (method.toLowerCase().includes('taiwan')) return; // Taiwan 訂單不包括在寄件清單
     const currMark = String(overallId || productId || '').trim();
     const prevMark = prevHeldMarkByUser.get(user) || '';
     const mark = prevMark ? `${prevMark}(上一團貨品)+${currMark}` : currMark;
@@ -1658,8 +1659,10 @@ function getShippingNotificationPreview_(groupTitle) {
     }
   });
 
+  const taiwanCount = filtered.filter(r => String(r[8]||'').toLowerCase().includes('taiwan')).length;
   return {
-    total: filtered.length,
+    total: filtered.length - taiwanCount,
+    taiwanCount,
     currTag,
     easy, sf, plain, home, held,
     sfWeight: Math.round(sfWeight),
