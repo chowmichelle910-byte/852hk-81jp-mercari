@@ -304,6 +304,7 @@ button{font-family:var(--font);}
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg);}}</style>
 <datalist id="idList"></datalist>
+<datalist id="shipMethodList"></datalist>
 
 <!-- LOGIN -->
 <div id="loginWrap">
@@ -900,6 +901,8 @@ function processItems(d){
   document.getElementById('addShop').innerHTML='<option value="">選擇商店…</option>'+(shops.length?shops:['Mercari','Amazon','Rakuten']).map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
   const pos=[...new Set(allItems.map(i=>(i.position||'').trim()))].filter(Boolean).sort();
   document.getElementById('addPos').innerHTML='<option value="">選擇來源…</option>'+(pos.length?pos:Object.values(POS_MAP)).map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  const methods=[...new Set(allItems.map(i=>(i.method||'').trim()))].filter(Boolean).sort();
+  document.getElementById('shipMethodList').innerHTML=methods.map(m=>`<option value="${esc(m)}">`).join('');
 
   post({action:'getCustomerIds',password:pw}).then(r=>{document.getElementById('idList').innerHTML=(r.ids||[]).map(id=>`<option value="${esc(id)}">`).join('');});
   document.getElementById('addDate').value=new Date().toISOString().split('T')[0];
@@ -1783,7 +1786,7 @@ function renderRecordCard(r, group){
       </div>
     </div>
     <div class="rec-grid">
-      <div class="rec-field"><label>郵寄方式</label><input class="rv-inp" id="rmt-${r.rowNum}" value="${esc(r.method||'')}" placeholder="郵寄方式"></div>
+      <div class="rec-field"><label>郵寄方式</label><input class="rv-inp" id="rmt-${r.rowNum}" list="shipMethodList" value="${esc(r.method||'')}" placeholder="郵寄方式"></div>
       <div class="rec-field"><label>國際運費</label><div class="rv">HK$${r.postage!=null?Number(r.postage).toFixed(1):'—'}</div></div>
       <div class="rec-field"><label>重量</label><div class="rv">${r.weightG?r.weightG+'g':'—'}</div></div>
       <div class="rec-field"><label>到貨數量</label><div class="rv">${r.qty||'—'}</div></div>
