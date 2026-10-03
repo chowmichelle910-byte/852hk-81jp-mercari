@@ -629,15 +629,21 @@ function installTriggers() {
   var ss = SpreadsheetApp.openById(MAIN_SPREADSHEET_ID);
   ScriptApp.getProjectTriggers().forEach(function(t) {
     var fn = t.getHandlerFunction();
-    if (fn === 'onOrderSheetEdit' || fn === 'seedCfKvCache') ScriptApp.deleteTrigger(t);
+    if (fn === 'onOrderSheetEdit' || fn === 'seedCfKvCache' || fn === 'seedAndSync') ScriptApp.deleteTrigger(t);
   });
-  // onEdit: seed KV whenever 訂單 sheet changes
+  // onEdit: seed KV + Supabase whenever 訂單 sheet changes
   ScriptApp.newTrigger('onOrderSheetEdit').forSpreadsheet(ss).onEdit().create();
-  // Time-based: seed KV every 4 minutes (keeps CF warm even without edits)
-  ScriptApp.newTrigger('seedCfKvCache').timeBased().everyMinutes(5).create();
+  // Time-based: seed both CF KV and Supabase every 5 minutes
+  ScriptApp.newTrigger('seedAndSync').timeBased().everyMinutes(5).create();
   // Seed immediately
+  seedAndSync();
+  Logger.log('Triggers installed + KV + Supabase seeded');
+}
+
+// Called by time trigger — keeps CF KV and Supabase in sync
+function seedAndSync() {
   seedCfKvCache();
-  Logger.log('Triggers installed + KV seeded');
+  syncToSupabase();
 }
 
 // Legacy alias

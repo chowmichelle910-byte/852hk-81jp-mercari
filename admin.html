@@ -649,8 +649,8 @@ button{font-family:var(--font);}
 <script>
 // ── Config ──
 const API      = 'https://still-art-9869.852hk81jp.workers.dev/api/admin';
-const API_GAS2 = 'https://script.google.com/macros/s/AKfycby2I6Q2M67npEFW-Vqi14JS3L7rtuQ9DLD35KwhwCaGpyt3xBnRfNyeLcOGXfslA9sx/exec';
 const MAIN_API = 'https://script.google.com/macros/s/AKfycbwT9_K4m0UvBUrZRveZJ3clzfuUCLtR1TrEok7gYDdamRtqHjk1HkZrTmLPpHuLXTRckA/exec';
+const SB_ADMIN_ITEMS_URL = 'https://ifrjaxpgrnvjesboelra.supabase.co/rest/v1/admin_items?select=*&order=updated_at.desc&limit=1';
 const SB_URL   = 'https://ifrjaxpgrnvjesboelra.supabase.co';
 const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmpheHBncm52amVzYm9lbHJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDU2OTAsImV4cCI6MjA5Nzk4MTY5MH0.3Qw4z9JGapt_B90v_ulja7pM2bSDhbhp439auyvwi_M';
 const CLOUD_NAME='disr3dmsj', UPLOAD_PRESET='mercariup', CLOUD_FOLDER='mercari';
@@ -674,9 +674,7 @@ async function sbUpsert(record) {
 
 // ── 背景 fire GAS 寫回 Sheet（唔等回應，唔阻塞用戶）──
 function fireGAS(params) {
-  // Arrival saves go to MAIN_API so TG "新到貨" notification fires
-  const url = params.arrivalDate ? MAIN_API : API_GAS2;
-  fetch(url, {
+  fetch(MAIN_API, {
     method  : 'POST',
     redirect: 'follow',
     body    : new URLSearchParams(params)
@@ -707,7 +705,7 @@ async function syncImgsToSheet() {
       image: r.image_url,
       arrivalDate: r.arrival_date ? r.arrival_date.substring(0, 10).replace(/-/g, '/') : ''
     }));
-    const d = await postGas2({ action: 'syncImagesBatch', password: pw, records: JSON.stringify(records) });
+    const d = await postMain({ action: 'syncImagesBatch', password: pw, records: JSON.stringify(records) });
     if (d && d.success) {
       alert(`同步完成！共 ${d.count} 條`);
       invalidateCache();
@@ -768,53 +766,64 @@ async function doLogin(){
   }
 }
 
+async function sbGetAdminItems(){
+  const res=await fetch(SB_ADMIN_ITEMS_URL,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+  if(!res.ok) throw new Error('Supabase '+res.status);
+  const rows=await res.json();
+  if(!rows||!rows.length) return null;
+  const payload=rows[0].payload;
+  return typeof payload==='string'?JSON.parse(payload):payload;
+}
+
 async function callAdmin(){
   showLoader('載入訂單資料…');
   let d=null;
-  // Try localStorage cache first (instant)
+  // 1. localStorage cache（即時）
   const cached=localStorage.getItem('adminItemsCache');
-  if(cached){
-    try{ d=JSON.parse(cached); }
-    catch(e){ localStorage.removeItem('adminItemsCache'); }
+  if(cached){ try{ d=JSON.parse(cached); }catch(e){ localStorage.removeItem('adminItemsCache'); } }
+  // 2. Supabase（快，GAS onEdit 同步）
+  if(!d){
+    try{
+      const sb=await sbGetAdminItems();
+      if(sb&&sb.items&&sb.items.length){ d=sb; localStorage.setItem('adminItemsCache',JSON.stringify(sb)); }
+    }catch(e){}
   }
-  // Try CF KV (fast, <200ms when warm)
+  // 3. GAS fallback（冷啟動較慢）
   if(!d){
     try{
       const r=await post({action:'getAdminItems',password:pw},15000);
       const isAuth=r.error&&/Unauthorized|密碼|password/i.test(r.error);
       if(isAuth){ hideLoader(); throw new Error(r.error); }
-      if(!r.error && r.items){ localStorage.setItem('adminItemsCache',JSON.stringify(r)); d=r; seedKvCache(r); }
+      if(!r.error&&r.items){ d=r; localStorage.setItem('adminItemsCache',JSON.stringify(r)); seedKvCache(r); }
     }catch(e){
       if(/Unauthorized|密碼|password/i.test(String(e?.message||''))){ hideLoader(); throw e; }
-      // timeout/network — proceed with empty, retry below
     }
   }
   localStorage.setItem('adminPassword',pw);
   hideLoader();
-  // Show UI regardless (auth passed)
   try{
     processItems(d||{items:[],latestShipDate:''});
     document.getElementById('loginWrap').style.display='none';
     document.getElementById('adminUI').style.display='block';
     igLoadTemplateFromSheet();
   }catch(e){ console.error('UI init error:',e); }
-  // Background: keep retrying until data loads
   if(!d||!d.items||!d.items.length) bgRetryLoad_();
-  else{ post({action:'getAdminItems',password:pw}).then(r=>{if(!r.error&&r.items){localStorage.setItem('adminItemsCache',JSON.stringify(r));processItems(r);seedKvCache(r);}}).catch(()=>{}); }
+  else{
+    // 背景靜默刷新 Supabase
+    sbGetAdminItems().then(sb=>{if(sb&&sb.items){localStorage.setItem('adminItemsCache',JSON.stringify(sb));processItems(sb);}}).catch(()=>{});
+  }
 }
 
 async function bgRetryLoad_(){
-  const gasParams=new URLSearchParams({action:'getAdminItems',password:pw});
   const sources=[
-    ()=>post({action:'getAdminItems',password:pw},25000),
-    ()=>{const c=new AbortController();setTimeout(()=>c.abort(),25000);return fetch(API_GAS2+'?'+gasParams,{method:'POST',body:gasParams,redirect:'follow',signal:c.signal}).then(r=>r.json());}
+    ()=>sbGetAdminItems(),
+    ()=>post({action:'getAdminItems',password:pw},25000)
   ];
   for(let i=0;i<6;i++){
     await new Promise(r=>setTimeout(r,i===0?1000:5000));
-    const src=sources[i%2];
     try{
-      const r=await src();
-      if(!r.error&&r.items&&r.items.length){
+      const r=await sources[i%2]();
+      if(r&&!r.error&&r.items&&r.items.length){
         localStorage.setItem('adminItemsCache',JSON.stringify(r));
         seedKvCache(r);
         processItems(r);
@@ -1193,7 +1202,7 @@ function editArrDate(row,span){
     // 直接儲存（唔需要磅重儲存流程）
     const it=allItems.find(i=>i.row===row);
     try{
-      await postGas2({action:'saveArrivalData',password:pw,row,arrivalDate:display});
+      await postMain({action:'saveArrivalData',password:pw,row,arrivalDate:display});
       if(it)it.arrivalDate=display;
     }catch(e){alert('儲存失敗，請重試');}
   };
@@ -1276,7 +1285,7 @@ function stopScan(){
 }
 
 async function allEval(){if(!confirm('確定一鍵完成所有評價？'))return;const b=event.target;b.disabled=true;b.textContent='處理中…';try{const d=await post({action:'clearAllUnrated',password:pw});if(d.success){alert(`成功 ${d.count||0} 項`);allItems.forEach(i=>{if(i.status==='未評價')i.status='';});render();}else alert('失敗：'+d.error);}catch{alert('連線失敗');}finally{b.disabled=false;}}
-async function oneEval(row){const b=event.target;b.disabled=true;b.textContent='處理中…';try{const d=await postGas2({action:'saveArrivalData',password:pw,row,status:''});if(d.success){const it=allItems.find(i=>i.row===row);if(it)it.status='';render();}}catch{b.disabled=false;b.textContent='✅ 已完成評價';}}
+async function oneEval(row){const b=event.target;b.disabled=true;b.textContent='處理中…';try{const d=await postMain({action:'saveArrivalData',password:pw,row,status:''});if(d.success){const it=allItems.find(i=>i.row===row);if(it)it.status='';render();}}catch{b.disabled=false;b.textContent='✅ 已完成評價';}}
 async function fetchPrev(url,row){
   if(imgCache.has(url)){upIW(row,imgCache.get(url));return;}
   // Mercari 一般商品：用 static CDN 直接取圖
@@ -2521,7 +2530,6 @@ async function submitNewItem(){
 
 // ════════ UTILS ════════
 function post(obj,ms=10000){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);return fetch(API,{method:'POST',body:new URLSearchParams(obj),signal:c.signal}).then(r=>{clearTimeout(t);return r.json();}).catch(e=>{clearTimeout(t);throw e;});}
-function postGas2(obj){return fetch(API_GAS2,{method:'POST',body:new URLSearchParams(obj)}).then(r=>r.json());}
 function postMain(obj,ms=20000){const p=new URLSearchParams(obj);const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);return fetch(MAIN_API+'?'+p,{method:'POST',body:p,signal:c.signal}).then(r=>{clearTimeout(t);return r.json();}).catch(e=>{clearTimeout(t);throw e;});}
 function invalidateCache(){return fetch('https://still-art-9869.852hk81jp.workers.dev/api/admin/invalidate',{method:'POST'}).catch(()=>{});}
 function seedKvCache(data){if(!pw||!data)return;fetch('https://still-art-9869.852hk81jp.workers.dev/api/admin/seed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:pw,data})}).catch(()=>{});}

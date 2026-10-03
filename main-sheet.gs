@@ -1346,6 +1346,8 @@ function doPost(e) {
           // 只有到貨日期存在時才寫「未評價」到 AC 欄（col 29）
           sheet.getRange(rowNum, 29).setValue('未評價');
           try { assignGroupByArrivalDate(); } catch(err) {}
+          // 同步最新資料（含到貨團次 col A）到 Supabase admin_items
+          try { syncToSupabase(); } catch(err) {}
           const url    = String(sheet.getRange(rowNum, 6).getValue() || '').trim();
           const code   = String(sheet.getRange(rowNum, 15).getValue() || '').trim();
           const imgUrl = image || String(sheet.getRange(rowNum, 19).getValue() || '').trim();
