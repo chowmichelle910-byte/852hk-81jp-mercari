@@ -812,7 +812,7 @@ function jsonResp(data, status = 200) {
 
 // ─── Admin API via KV cache ───────────────────────
 const CACHE_KEY = 'adminItems';
-const CACHE_TTL = 300; // 5 minutes
+const CACHE_TTL = 3600; // 1 hour
 
 async function handleAdminApi(request, env, ctx) {
   const url = new URL(request.url);
@@ -849,8 +849,18 @@ async function handleAdminApi(request, env, ctx) {
       }
     }
 
-    // Cache miss or write action — forward to GAS synchronously
-    const res = await fetch(gasUrlWithParams, { method: 'POST', body, redirect: 'follow' });
+    // Cache miss or write action — forward to GAS synchronously (28s timeout)
+    const gasCtrl = new AbortController();
+    const gasTimer = setTimeout(() => gasCtrl.abort(), 28000);
+    let res;
+    try {
+      res = await fetch(gasUrlWithParams, { method: 'POST', body, redirect: 'follow', signal: gasCtrl.signal });
+    } catch(e) {
+      clearTimeout(gasTimer);
+      if (e.name === 'AbortError') return jsonResp({ error: 'GAS 逾時，請稍後重試' }, 504);
+      throw e;
+    }
+    clearTimeout(gasTimer);
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch { return new Response(text, { headers: corsHeaders() }); }
