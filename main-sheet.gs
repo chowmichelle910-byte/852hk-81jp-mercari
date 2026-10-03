@@ -3216,7 +3216,13 @@ function updateOrdersFromGmail() {
         msg.getFrom().includes('mercari-shops.com')
       ) {
         const orderMatch = plainBody.match(/https?:\/\/mercari-shops\.com\/orders\/([A-Za-z0-9_\-]+)/);
-        const nameMatch  = plainBody.match(/商品名\s*[：:]\s*(.+)/);
+        // 同時支援「商品名」和「商品タイトル」
+        const nameMatch  = plainBody.match(/商品(?:名|タイトル)\s*[：:]\s*(.+)/);
+        if (!orderMatch) {
+          console.log('[TypeB] ⚠️ 找不到 mercari-shops.com/orders URL，subj=' + subj + ' body_snippet=' + plainBody.substring(0, 300));
+        } else if (!nameMatch) {
+          console.log('[TypeB] ⚠️ 找不到商品名，subj=' + subj + ' order=' + orderMatch[1] + ' body_snippet=' + plainBody.substring(0, 300));
+        }
         if (orderMatch && nameMatch) {
           const orderUrl = 'https://mercari-shops.com/orders/' + orderMatch[1];
           if (!existingUrls.includes(orderUrl) && !isUrlBlacklisted_(orderUrl)) {
@@ -3239,6 +3245,29 @@ function updateOrdersFromGmail() {
             blacklistUrl_(orderUrl);
             anyNewOrder = true;
             console.log('Mercari Shops 新增：' + nameMatch[1].trim());
+          }
+        } else if (orderMatch && !nameMatch) {
+          // Has order URL but no product name — record with blank name rather than skip entirely
+          const orderUrl = 'https://mercari-shops.com/orders/' + orderMatch[1];
+          if (!existingUrls.includes(orderUrl) && !isUrlBlacklisted_(orderUrl)) {
+            const productMatch2 = plainBody.match(/https?:\/\/jp\.mercari\.com\/shops\/product\/([A-Za-z0-9_\-]+)/);
+            const recordUrl2 = productMatch2
+              ? 'https://jp.mercari.com/shops/product/' + productMatch2[1]
+              : orderUrl;
+            const pm = plainBody.match(/商品価格\s*[：:]\s*[¥￥]([\d,]+)/) ||
+                       plainBody.match(/商品代金\s*[：:]\s*[¥￥]([\d,]+)/) ||
+                       plainBody.match(/注文金額合計\s*[：:]\s*[¥￥]([\d,]+)/);
+            const price = pm ? pm[1].replace(/,/g, '') : '';
+            const nextRow = getNextOrderRow_(orderSheet);
+            orderSheet.getRange(nextRow, 2).setValue(dateStr);
+            orderSheet.getRange(nextRow, 5).setValue('Mercari');
+            orderSheet.getRange(nextRow, 6).setValue(recordUrl2);
+            // G欄留空，待人手補充
+            if (price) orderSheet.getRange(nextRow, 8).setValue(price);
+            existingUrls.push(orderUrl);
+            blacklistUrl_(orderUrl);
+            anyNewOrder = true;
+            console.log('[TypeB] 新增（無商品名）：' + recordUrl2);
           }
         }
         labeledShops = true;
