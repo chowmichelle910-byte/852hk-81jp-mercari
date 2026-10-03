@@ -778,38 +778,34 @@ async function sbGetAdminItems(){
 async function callAdmin(){
   showLoader('載入訂單資料…');
   let d=null;
-
-  // 1. localStorage cache — 即時顯示（只用作佔位，之後必定刷新）
+  // 1. localStorage cache（即時）
   const cached=localStorage.getItem('adminItemsCache');
-  if(cached){
+  if(cached){ try{ d=JSON.parse(cached); }catch(e){ localStorage.removeItem('adminItemsCache'); } }
+  // 2. Supabase（快，GAS onEdit 同步）
+  if(!d){
     try{
-      const tmp=JSON.parse(cached);
-      if(tmp&&tmp.items&&tmp.items.length){ d=tmp; }
-    }catch(e){ localStorage.removeItem('adminItemsCache'); }
+      const sb=await sbGetAdminItems();
+      if(sb&&sb.items&&sb.items.length){
+        d=sb;
+        try{ localStorage.setItem('adminItemsCache',JSON.stringify(sb)); }catch(e){}
+      }
+    }catch(e){}
   }
-
-  // 2. 始終拉 Supabase（唔被 localStorage 擋住）
-  let sbData=null;
-  try{
-    sbData=await sbGetAdminItems();
-    if(sbData&&sbData.items&&sbData.items.length){
-      d=sbData; // 先 set d，唔受 localStorage 影響
-      try{ localStorage.setItem('adminItemsCache',JSON.stringify(sbData)); }catch(e){}
-    }
-  }catch(e){}
-
-  // 3. Supabase 冇資料才 fallback GAS
-  if(!d||!d.items||!d.items.length){
+  // 3. GAS fallback（冷啟動較慢）
+  if(!d){
     try{
-      const r=await post({action:'getAdminItems',password:pw},20000);
+      const r=await post({action:'getAdminItems',password:pw},15000);
       const isAuth=r.error&&/Unauthorized|密碼|password/i.test(r.error);
       if(isAuth){ hideLoader(); throw new Error(r.error); }
-      if(!r.error&&r.items){ d=r; localStorage.setItem('adminItemsCache',JSON.stringify(r)); seedKvCache(r); }
+      if(!r.error&&r.items){
+        d=r;
+        try{ localStorage.setItem('adminItemsCache',JSON.stringify(r)); }catch(e){}
+        seedKvCache(r);
+      }
     }catch(e){
       if(/Unauthorized|密碼|password/i.test(String(e?.message||''))){ hideLoader(); throw e; }
     }
   }
-
   localStorage.setItem('adminPassword',pw);
   hideLoader();
   try{
@@ -818,9 +814,16 @@ async function callAdmin(){
     document.getElementById('adminUI').style.display='block';
     igLoadTemplateFromSheet();
   }catch(e){ console.error('UI init error:',e); }
-
-  // 如果仍然冇資料，後台繼續重試
   if(!d||!d.items||!d.items.length) bgRetryLoad_();
+  else{
+    // 背景靜默刷新 Supabase
+    sbGetAdminItems().then(sb=>{
+      if(sb&&sb.items&&sb.items.length){
+        try{ localStorage.setItem('adminItemsCache',JSON.stringify(sb)); }catch(e){}
+        processItems(sb);
+      }
+    }).catch(()=>{});
+  }
 }
 
 async function bgRetryLoad_(){
