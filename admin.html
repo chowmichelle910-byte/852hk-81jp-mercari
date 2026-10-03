@@ -1323,6 +1323,8 @@ async function doSaveBatch(){
       if(hw){it.arrivalDate=dv;it.status='未評價';}
     });
     pending.clear();editRows.clear();render();updUI();
+    // 即時更新 localStorage 快取（fireGAS 係背景，唔等 GAS 寫完）
+    try{localStorage.setItem('adminItemsCache',JSON.stringify({items:allItems,latestShipDate:document.getElementById('shipText').textContent}));}catch(e){}
     invalidateCache();
     alert('儲存成功！');
   }

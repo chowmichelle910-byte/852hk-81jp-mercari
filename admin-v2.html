@@ -1341,6 +1341,7 @@ async function doSaveBatch(){
       if(hw){it.arrivalDate=dv;it.status='未評價';}
     });
     pending.clear();editRows.clear();render();updUI();
+    try{localStorage.setItem('adminItemsCache',JSON.stringify({items:allItems,latestShipDate:document.getElementById('shipText').textContent}));}catch(e){}
     invalidateCache();
     alert('儲存成功！');
   }
