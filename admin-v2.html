@@ -666,13 +666,13 @@ const POS_MAP={'Wts':'Whatsapp','IG':'IG','FB':'FB','Line':'Line','TW':'Taiwan'}
 
 // ── Supabase upsert（以 sheet_row 作唯一識別）──
 async function sbUpsert(record) {
-  const res = await fetch(`${SB_URL}/rest/v1/arrivals`, {
+  const res = await fetch(`${SB_URL}/rest/v1/arrivals?on_conflict=sheet_row`, {
     method : 'POST',
     headers: {
       'apikey'        : SB_KEY,
       'Authorization' : 'Bearer ' + SB_KEY,
       'Content-Type'  : 'application/json',
-      'Prefer'        : 'resolution=merge-duplicates'
+      'Prefer'        : 'resolution=merge-duplicates,return=minimal'
     },
     body: JSON.stringify(record)
   });
