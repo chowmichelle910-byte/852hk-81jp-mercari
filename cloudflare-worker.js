@@ -144,9 +144,19 @@ async function sendNewOrderPreview(chatId, url, name, price) {
 }
 
 // ─── GAS API ─────────────────────────────────────
-async function gas(params) {
+async function gas(params, timeoutMs = 25000) {
   const body = new URLSearchParams({ password: GAS_PASS, ...params });
-  const res  = await fetch(GAS_URL, { method: 'POST', body, redirect: 'follow' });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetch(GAS_URL, { method: 'POST', body, redirect: 'follow', signal: ctrl.signal });
+  } catch(e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') throw new Error('GAS 逾時（' + timeoutMs / 1000 + 's）');
+    throw e;
+  }
+  clearTimeout(timer);
   const text = await res.text();
   try {
     return JSON.parse(text);

@@ -1349,7 +1349,7 @@ async function doSaveBatch(){
       fireGAS(gasParams);
     } else {
       // 非到貨類（改 position/custId/track）→ 直接 GAS，等回應
-      gasTasks.push(postGas2(gasParams));
+      gasTasks.push(postMain(gasParams));
     }
   });
 
@@ -2526,7 +2526,7 @@ function postMain(obj,ms=20000){const p=new URLSearchParams(obj);const c=new Abo
 function invalidateCache(){return fetch('https://still-art-9869.852hk81jp.workers.dev/api/admin/invalidate',{method:'POST'}).catch(()=>{});}
 function seedKvCache(data){if(!pw||!data)return;fetch('https://still-art-9869.852hk81jp.workers.dev/api/admin/seed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:pw,data})}).catch(()=>{});}
 function gn(s){const m=String(s||'').match(/\d+/);return m?parseInt(m[0]):-1;}
-async function compUp(file){return new Promise((res,rej)=>{const img=new Image(),rd=new FileReader();rd.onload=e=>img.src=e.target.result;img.onload=()=>{const c=document.createElement('canvas'),max=1000;let w=img.width,h=img.height;if(w>h&&w>max){h*=max/w;w=max;}else if(h>max){w*=max/h;h=max;}c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);c.toBlob(blob=>{const fd=new FormData();fd.append('file',blob);fd.append('upload_preset',UPLOAD_PRESET);fd.append('folder',CLOUD_FOLDER);fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,{method:'POST',body:fd}).then(r=>r.json()).then(d=>res(d.secure_url)).catch(rej);},'image/jpeg',0.7);};rd.readAsDataURL(file);});}
+async function compUp(file){return new Promise((res,rej)=>{const img=new Image(),rd=new FileReader();rd.onload=e=>img.src=e.target.result;img.onload=()=>{const c=document.createElement('canvas'),max=1000;let w=img.width,h=img.height;if(w>h&&w>max){h*=max/w;w=max;}else if(h>max){w*=max/h;h=max;}c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);c.toBlob(blob=>{const fd=new FormData();fd.append('file',blob);fd.append('upload_preset',UPLOAD_PRESET);fd.append('folder',CLOUD_FOLDER);const ctrl=new AbortController();setTimeout(()=>ctrl.abort(),30000);fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,{method:'POST',body:fd,signal:ctrl.signal}).then(r=>r.json()).then(d=>{if(!d.secure_url)throw new Error(d.error?.message||'上傳失敗');res(d.secure_url);}).catch(e=>rej(e.name==='AbortError'?new Error('圖片上傳逾時，請重試'):e));},'image/jpeg',0.7);};rd.readAsDataURL(file);});}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 function escAttr(s){return esc(s).replace(/\n/g,' ');}
 
