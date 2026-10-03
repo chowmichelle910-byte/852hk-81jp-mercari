@@ -846,6 +846,38 @@ function processItems(d){
   post({action:'getCustomerIds',password:pw}).then(r=>{document.getElementById('idList').innerHTML=(r.ids||[]).map(id=>`<option value="${esc(id)}">`).join('');});
   document.getElementById('addDate').value=new Date().toISOString().split('T')[0];
   setFilter('todo');buildArrTabs();
+  // 背景從 Supabase 補齊圖片/重量/到貨日期（防止 fireGAS 失敗導致 Sheet 冇資料）
+  mergeSbArrivals();
+}
+
+async function mergeSbArrivals(){
+  try{
+    let all=[],offset=0;
+    while(true){
+      const res=await fetch(`${SB_URL}/rest/v1/arrivals?select=sheet_row,image_url,weight_kg,arrival_date&limit=1000&offset=${offset}`,{
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+      });
+      if(!res.ok)return;
+      const rows=await res.json();
+      all=all.concat(rows);
+      if(rows.length<1000)break;
+      offset+=1000;
+    }
+    if(!all.length)return;
+    const byRow=new Map(all.map(r=>[r.sheet_row,r]));
+    let changed=false;
+    allItems.forEach(it=>{
+      const sb=byRow.get(it.row);
+      if(!sb)return;
+      if(!it.image&&sb.image_url){it.image=sb.image_url;changed=true;}
+      if((!it.weight||it.weight===0)&&sb.weight_kg){it.weight=sb.weight_kg;changed=true;}
+      if(!it.arrivalDate&&sb.arrival_date){it.arrivalDate=sb.arrival_date;changed=true;}
+    });
+    if(changed){
+      try{localStorage.setItem('adminItemsCache',JSON.stringify({items:allItems,latestShipDate:document.getElementById('shipText').textContent}));}catch(e){}
+      render();
+    }
+  }catch(e){}
 }
 
 // ── Ship Date from Currency C col ──
