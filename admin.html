@@ -778,20 +778,30 @@ async function sbGetAdminItems(){
 async function callAdmin(){
   showLoader('載入訂單資料…');
   let d=null;
-  // 1. localStorage cache（即時）
+
+  // 1. localStorage cache — 即時顯示（只用作佔位，之後必定刷新）
   const cached=localStorage.getItem('adminItemsCache');
-  if(cached){ try{ d=JSON.parse(cached); }catch(e){ localStorage.removeItem('adminItemsCache'); } }
-  // 2. Supabase（快，GAS onEdit 同步）
-  if(!d){
+  if(cached){
     try{
-      const sb=await sbGetAdminItems();
-      if(sb&&sb.items&&sb.items.length){ d=sb; localStorage.setItem('adminItemsCache',JSON.stringify(sb)); }
-    }catch(e){}
+      const tmp=JSON.parse(cached);
+      if(tmp&&tmp.items&&tmp.items.length){ d=tmp; }
+    }catch(e){ localStorage.removeItem('adminItemsCache'); }
   }
-  // 3. GAS fallback（冷啟動較慢）
-  if(!d){
+
+  // 2. 始終拉 Supabase（唔被 localStorage 擋住）
+  let sbData=null;
+  try{
+    sbData=await sbGetAdminItems();
+    if(sbData&&sbData.items&&sbData.items.length){
+      localStorage.setItem('adminItemsCache',JSON.stringify(sbData));
+      d=sbData; // Supabase 成功 → 覆蓋 localStorage
+    }
+  }catch(e){}
+
+  // 3. Supabase 冇資料才 fallback GAS
+  if(!d||!d.items||!d.items.length){
     try{
-      const r=await post({action:'getAdminItems',password:pw},15000);
+      const r=await post({action:'getAdminItems',password:pw},20000);
       const isAuth=r.error&&/Unauthorized|密碼|password/i.test(r.error);
       if(isAuth){ hideLoader(); throw new Error(r.error); }
       if(!r.error&&r.items){ d=r; localStorage.setItem('adminItemsCache',JSON.stringify(r)); seedKvCache(r); }
@@ -799,6 +809,7 @@ async function callAdmin(){
       if(/Unauthorized|密碼|password/i.test(String(e?.message||''))){ hideLoader(); throw e; }
     }
   }
+
   localStorage.setItem('adminPassword',pw);
   hideLoader();
   try{
@@ -807,11 +818,9 @@ async function callAdmin(){
     document.getElementById('adminUI').style.display='block';
     igLoadTemplateFromSheet();
   }catch(e){ console.error('UI init error:',e); }
+
+  // 如果仍然冇資料，後台繼續重試
   if(!d||!d.items||!d.items.length) bgRetryLoad_();
-  else{
-    // 背景靜默刷新 Supabase
-    sbGetAdminItems().then(sb=>{if(sb&&sb.items){localStorage.setItem('adminItemsCache',JSON.stringify(sb));processItems(sb);}}).catch(()=>{});
-  }
 }
 
 async function bgRetryLoad_(){

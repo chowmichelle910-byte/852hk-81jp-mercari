@@ -3505,6 +3505,54 @@ function updateChineseNamesByKeyword() {
 }
 
 // ─────────────────────────────────────────────
+//  Supabase admin_items 同步
+// ─────────────────────────────────────────────
+var SB_SERVICE_KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmpheHBncm52amVzYm9lbHJhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjQwNTY5MCwiZXhwIjoyMDk3OTgxNjkwfQ.4CdxnLRiYIxg-ag1e9wSOVk_HLVxS6JoHtLMRpGQWho';
+var SB_ADMIN_URL_   = 'https://ifrjaxpgrnvjesboelra.supabase.co/rest/v1/admin_items';
+
+function syncToSupabase() {
+  try {
+    var sh      = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+    if (!sh) return;
+    var lastRow = sh.getLastRow();
+    var values  = (lastRow < 2) ? [] : sh.getRange(2, 1, lastRow - 1, 29).getValues();
+    var items = values
+      .filter(function(r){ return r[1] !== '' || r[6] !== ''; })
+      .map(function(r, i){
+        return {
+          row: i + 2,
+          arrival: r[0] ? String(r[0]) : '',
+          orderedDate: r[1] ? (r[1] instanceof Date ? Utilities.formatDate(r[1],'GMT+8','yyyy-MM-dd') : String(r[1])) : '',
+          position: r[2] || '',
+          custId: r[3] || '',
+          shop: r[4] || '',
+          link: r[5] || '',
+          item: r[6] || '',
+          track: r[13] || '',
+          code: r[14] || '',
+          arrivalDate: r[15] ? (r[15] instanceof Date ? Utilities.formatDate(r[15],'GMT+8','yyyy-MM-dd') : String(r[15])) : '',
+          weight: parseFloat(r[16]) || 0,
+          image: r[18] || '',
+          status: r[28] || ''
+        };
+      });
+    var payload = { items: items, latestShipDate: '', updated_at: new Date().toISOString() };
+    var resp = UrlFetchApp.fetch(SB_ADMIN_URL_ + '?id=eq.1', {
+      method: 'patch',
+      contentType: 'application/json',
+      headers: {
+        'apikey': SB_SERVICE_KEY_,
+        'Authorization': 'Bearer ' + SB_SERVICE_KEY_,
+        'Prefer': 'return=minimal'
+      },
+      payload: JSON.stringify({ payload: JSON.stringify(payload) }),
+      muteHttpExceptions: true
+    });
+    Logger.log('syncToSupabase: ' + items.length + ' items, status=' + resp.getResponseCode());
+  } catch(err) { Logger.log('syncToSupabase failed: ' + err); }
+}
+
+// ─────────────────────────────────────────────
 //  Public Sheet 同步（每 10 分鐘）
 // ─────────────────────────────────────────────
 function syncMainDataAndUsers() {
