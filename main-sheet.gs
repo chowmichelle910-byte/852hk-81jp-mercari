@@ -2847,6 +2847,7 @@ function assignGroupByArrivalDate() {
     results.push([groupId]);
   }
   orderSheet.getRange(2,1,results.length,1).setValues(results);
+  try { syncToSupabase(); } catch(e) { console.error('assignGroupByArrivalDate syncToSupabase:', e); }
 }
 
 function assignGroupByOrderDate() {
