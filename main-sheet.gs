@@ -3517,8 +3517,10 @@ function syncToSupabase() {
     var lastRow = sh.getLastRow();
     var values  = (lastRow < 2) ? [] : sh.getRange(2, 1, lastRow - 1, 29).getValues();
     var items = values
-      .filter(function(r){ return r[1] !== '' || r[6] !== ''; })
-      .map(function(r, i){
+      .map(function(r, i){ return { _i: i, _r: r }; })
+      .filter(function(x){ var r=x._r; return r[1] !== '' || r[6] !== '' || r[3] !== '' || r[4] !== ''; })
+      .map(function(x){
+        var r=x._r, i=x._i;
         return {
           row: i + 2,
           arrival: r[0] ? String(r[0]) : '',
