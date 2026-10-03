@@ -653,6 +653,8 @@ const MAIN_API = 'https://script.google.com/macros/s/AKfycbwT9_K4m0UvBUrZRveZJ3c
 const SB_ADMIN_ITEMS_URL = 'https://ifrjaxpgrnvjesboelra.supabase.co/rest/v1/admin_items?select=*&order=updated_at.desc&limit=1';
 const SB_URL   = 'https://ifrjaxpgrnvjesboelra.supabase.co';
 const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmpheHBncm52amVzYm9lbHJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDU2OTAsImV4cCI6MjA5Nzk4MTY5MH0.3Qw4z9JGapt_B90v_ulja7pM2bSDhbhp439auyvwi_M';
+// service key — for admin_items reads (bypasses RLS; page is password-protected)
+const SB_SVC   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmpheHBncm52amVzYm9lbHJhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjQwNTY5MCwiZXhwIjoyMDk3OTgxNjkwfQ.4CdxnLRiYIxg-ag1e9wSOVk_HLVxS6JoHtLMRpGQWho';
 const CLOUD_NAME='disr3dmsj', UPLOAD_PRESET='mercariup', CLOUD_FOLDER='mercari';
 const LPK='03b25d4673fab76cc420aba868dff16b';
 const POS_MAP={'Wts':'Whatsapp','IG':'IG','FB':'FB','Line':'Line','TW':'Taiwan'};
@@ -767,7 +769,7 @@ async function doLogin(){
 }
 
 async function sbGetAdminItems(){
-  const res=await fetch(SB_ADMIN_ITEMS_URL,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+  const res=await fetch(SB_ADMIN_ITEMS_URL,{headers:{'apikey':SB_SVC,'Authorization':'Bearer '+SB_SVC}});
   if(!res.ok) throw new Error('Supabase '+res.status);
   const rows=await res.json();
   if(!rows||!rows.length) return null;
