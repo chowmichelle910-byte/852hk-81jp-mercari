@@ -1344,6 +1344,14 @@ async function doSaveBatch(){
     try{localStorage.setItem('adminItemsCache',JSON.stringify({items:allItems,latestShipDate:document.getElementById('shipText').textContent}));}catch(e){}
     invalidateCache();
     alert('儲存成功！');
+    setTimeout(()=>{
+      postMain({action:'getAdminItems',password:pw}).then(r=>{
+        if(!r.error&&r.items){
+          try{localStorage.setItem('adminItemsCache',JSON.stringify(r));}catch(e){}
+          processItems(r);
+        }
+      }).catch(()=>{});
+    },4000);
   }
   catch(err){alert('儲存失敗：'+err.message);}
   finally{if(sb){sb.disabled=false;sb.textContent='💾 儲存全部';}if(fb)fb.disabled=false;}

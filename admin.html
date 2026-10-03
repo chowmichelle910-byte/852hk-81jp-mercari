@@ -1323,10 +1323,19 @@ async function doSaveBatch(){
       if(hw){it.arrivalDate=dv;it.status='未評價';}
     });
     pending.clear();editRows.clear();render();updUI();
-    // 即時更新 localStorage 快取（fireGAS 係背景，唔等 GAS 寫完）
+    // 即時更新 localStorage 快取
     try{localStorage.setItem('adminItemsCache',JSON.stringify({items:allItems,latestShipDate:document.getElementById('shipText').textContent}));}catch(e){}
     invalidateCache();
     alert('儲存成功！');
+    // 背景重新讀 GAS（等 fireGAS 寫完後取得最新 arrival 團次）
+    setTimeout(()=>{
+      post({action:'getAdminItems',password:pw}).then(r=>{
+        if(!r.error&&r.items){
+          try{localStorage.setItem('adminItemsCache',JSON.stringify(r));}catch(e){}
+          processItems(r);
+        }
+      }).catch(()=>{});
+    },4000);
   }
   catch(err){alert('儲存失敗：'+err.message);}
   finally{if(sb){sb.disabled=false;sb.textContent='💾 儲存全部';}if(fb)fb.disabled=false;}
