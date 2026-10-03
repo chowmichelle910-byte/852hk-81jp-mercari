@@ -1316,8 +1316,8 @@ async function doSaveBatch(){
       sbRecord.updated_at=new Date().toISOString();
       sbTasks.push(sbUpsert(sbRecord));
 
-      // 2. 背景 fire GAS（唔等，慢慢寫回 Sheet）
-      fireGAS(gasParams);
+      // 2. 等 GAS 寫回 Sheet（確保到貨日期/重量/圖片/團次都有寫入）
+      gasTasks.push(postMain(gasParams, 45000).catch(()=>fireGAS(gasParams)));
     } else {
       // 非到貨類（改 position/custId/track）→ 直接 GAS，等回應
       gasTasks.push(postGas2(gasParams));
