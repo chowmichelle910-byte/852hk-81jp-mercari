@@ -1108,7 +1108,10 @@ async function render(){
 
     card.innerHTML=`
       <div class="ic-l">
-        <div class="code-tag">${esc(it.code||'無編號')}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div class="code-tag" style="margin-bottom:0;">${esc(it.code||'無編號')}</div>
+          <button onclick="deleteOrder(${it.row},'${esc(it.item||it.code||'此商品')}')" style="background:none;border:none;color:#9CA3AF;font-size:16px;cursor:pointer;padding:0 2px;line-height:1;" title="刪除">✕</button>
+        </div>
         <a href="${escAttr(fL)}" target="_blank" class="item-a">🔗 ${esc(dN)}</a>
         <div class="ard-lbl">📅 到貨：<span class="ard-val" onclick="editArrDate(${it.row},this)" style="cursor:pointer;text-decoration:underline dotted;" title="點擊修改">${esc(it.arrivalDate||'未填')}</span></div>
         ${posH}
@@ -1124,6 +1127,18 @@ async function render(){
       </div>`;
     el.appendChild(card);
   }
+}
+
+async function deleteOrder(row, name){
+  if(!confirm(`確定刪除「${name}」？此操作不可撤銷。`))return;
+  try{
+    const r=await post({action:'deleteOrder',password:pw,row});
+    if(r.error)throw new Error(r.error);
+    allItems=allItems.filter(i=>i.row!==row);
+    try{localStorage.setItem('adminItemsCache',JSON.stringify({items:allItems,latestShipDate:document.getElementById('shipText').textContent}));}catch(e){}
+    render();
+    invalidateCache();
+  }catch(e){alert('刪除失敗：'+e.message);}
 }
 
 // ── 到貨日期直接編輯 ──
