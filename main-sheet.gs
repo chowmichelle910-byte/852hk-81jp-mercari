@@ -3537,18 +3537,18 @@ function syncToSupabase() {
         };
       });
     var payload = { items: items, latestShipDate: '', updated_at: new Date().toISOString() };
-    var resp = UrlFetchApp.fetch(SB_ADMIN_URL_ + '?id=eq.1', {
-      method: 'patch',
+    var resp = UrlFetchApp.fetch(SB_ADMIN_URL_, {
+      method: 'post',
       contentType: 'application/json',
       headers: {
         'apikey': SB_SERVICE_KEY_,
         'Authorization': 'Bearer ' + SB_SERVICE_KEY_,
-        'Prefer': 'return=minimal'
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
       },
-      payload: JSON.stringify({ payload: JSON.stringify(payload) }),
+      payload: JSON.stringify({ id: 1, payload: JSON.stringify(payload) }),
       muteHttpExceptions: true
     });
-    Logger.log('syncToSupabase: ' + items.length + ' items, status=' + resp.getResponseCode());
+    Logger.log('syncToSupabase: ' + items.length + ' items, status=' + resp.getResponseCode() + ' body=' + resp.getContentText().substring(0,200));
   } catch(err) { Logger.log('syncToSupabase failed: ' + err); }
 }
 
