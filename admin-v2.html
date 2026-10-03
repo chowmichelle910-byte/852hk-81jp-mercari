@@ -902,6 +902,49 @@ function processItems(d){
   post({action:'getCustomerIds',password:pw}).then(r=>{document.getElementById('idList').innerHTML=(r.ids||[]).map(id=>`<option value="${esc(id)}">`).join('');});
   document.getElementById('addDate').value=new Date().toISOString().split('T')[0];
   setFilter('todo');buildArrTabs();
+  mergeSbArrivals();
+}
+
+async function mergeSbArrivals(){
+  try{
+    let all=[],offset=0;
+    while(true){
+      const res=await fetch(`${SB_URL}/rest/v1/arrivals?select=sheet_row,image_url,weight_kg,arrival_date&limit=1000&offset=${offset}`,{
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+      });
+      if(!res.ok)return;
+      const rows=await res.json();
+      all=all.concat(rows);
+      if(rows.length<1000)break;
+      offset+=1000;
+    }
+    if(!all.length)return;
+    const byRow=new Map(all.map(r=>[r.sheet_row,r]));
+    let changed=false;
+    allItems.forEach(it=>{
+      const sb=byRow.get(it.row);
+      if(!sb)return;
+      if(!it.image&&sb.image_url){it.image=sb.image_url;changed=true;}
+      if((!it.weight||it.weight===0)&&sb.weight_kg){it.weight=sb.weight_kg;changed=true;}
+      if(!it.arrivalDate&&sb.arrival_date){it.arrivalDate=sb.arrival_date;changed=true;}
+    });
+    if(changed){
+      try{localStorage.setItem('adminItemsCache',JSON.stringify({items:allItems,latestShipDate:document.getElementById('shipText').textContent}));}catch(e){}
+      render();
+    }
+  }catch(e){}
+}
+
+async function deleteOrder(row, name){
+  if(!confirm(`確定刪除「${name}」？此操作不可撤銷。`))return;
+  try{
+    const r=await postMain({action:'deleteOrder',password:pw,row});
+    if(r.error)throw new Error(r.error);
+    allItems=allItems.filter(i=>i.row!==row);
+    try{localStorage.setItem('adminItemsCache',JSON.stringify({items:allItems,latestShipDate:document.getElementById('shipText').textContent}));}catch(e){}
+    render();
+    invalidateCache();
+  }catch(e){alert('刪除失敗：'+e.message);}
 }
 
 // ── Ship Date from Currency C col ──
@@ -1149,7 +1192,10 @@ async function render(){
 
     card.innerHTML=`
       <div class="ic-l">
-        <div class="code-tag">${esc(it.code||'無編號')}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div class="code-tag" style="margin-bottom:0;">${esc(it.code||'無編號')}</div>
+          <button onclick="deleteOrder(${it.row},'${esc(it.item||it.code||'此商品')}')" style="background:none;border:none;color:#9CA3AF;font-size:16px;cursor:pointer;padding:0 2px;line-height:1;" title="刪除">✕</button>
+        </div>
         <a href="${escAttr(fL)}" target="_blank" class="item-a">🔗 ${esc(dN)}</a>
         <div class="ard-lbl">📅 到貨：<span class="ard-val">${esc(it.arrivalDate||'未填')}</span></div>
         ${posH}
