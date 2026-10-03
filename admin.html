@@ -1345,8 +1345,8 @@ async function doSaveBatch(){
       sbRecord.updated_at=new Date().toISOString();
       sbTasks.push(sbUpsert(sbRecord));
 
-      // 2. 等 GAS 寫回 Sheet（確保到貨日期/重量/圖片/團次都有寫入）
-      gasTasks.push(postMain(gasParams, 45000).catch(()=>fireGAS(gasParams)));
+      // 2. 背景 fire GAS（唔等，4秒後 background reload 會拎到最新團次）
+      fireGAS(gasParams);
     } else {
       // 非到貨類（改 position/custId/track）→ 直接 GAS，等回應
       gasTasks.push(postGas2(gasParams));
@@ -1382,7 +1382,7 @@ async function doSaveBatch(){
           processItems(r);
         }
       }).catch(()=>{});
-    },4000);
+    },8000);
   }
   catch(err){alert('儲存失敗：'+err.message);}
   finally{if(sb){sb.disabled=false;sb.textContent='💾 儲存全部';}if(fb)fb.disabled=false;}
