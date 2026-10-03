@@ -1287,7 +1287,7 @@ function doPost(e) {
             cleared++;
           }
         }
-        return jsonResponse_({ cleared });
+        return jsonResponse_({ success: true, count: cleared });
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
