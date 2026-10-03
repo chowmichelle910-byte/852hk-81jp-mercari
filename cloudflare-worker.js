@@ -821,7 +821,7 @@ async function handleAdminApi(request, env, ctx) {
 
     // GAS does 302 redirect; fetch follows and converts POST→GET (HTTP spec), losing body.
     // Pass params in URL query string so they survive the redirect as GET params.
-    const gasUrlWithParams = GAS_API2 + '?' + body;
+    const gasUrlWithParams = GAS_URL + '?' + body;
 
     if (action === 'getAdminItems' && env.KV) {
       const cached = await env.KV.get(CACHE_KEY);
