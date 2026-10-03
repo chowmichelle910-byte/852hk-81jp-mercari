@@ -793,8 +793,8 @@ async function callAdmin(){
   try{
     sbData=await sbGetAdminItems();
     if(sbData&&sbData.items&&sbData.items.length){
-      localStorage.setItem('adminItemsCache',JSON.stringify(sbData));
-      d=sbData; // Supabase 成功 → 覆蓋 localStorage
+      d=sbData; // 先 set d，唔受 localStorage 影響
+      try{ localStorage.setItem('adminItemsCache',JSON.stringify(sbData)); }catch(e){}
     }
   }catch(e){}
 
@@ -833,7 +833,7 @@ async function bgRetryLoad_(){
     try{
       const r=await sources[i%2]();
       if(r&&!r.error&&r.items&&r.items.length){
-        localStorage.setItem('adminItemsCache',JSON.stringify(r));
+        try{ localStorage.setItem('adminItemsCache',JSON.stringify(r)); }catch(e){}
         seedKvCache(r);
         processItems(r);
         refreshArrival(null);
