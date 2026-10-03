@@ -1164,7 +1164,7 @@ async function render(){
 async function deleteOrder(row, name){
   if(!confirm(`確定刪除「${name}」？此操作不可撤銷。`))return;
   try{
-    const r=await postGas2({action:'deleteOrder',password:pw,row});
+    const r=await postMain({action:'deleteOrder',password:pw,row});
     if(r.error)throw new Error(r.error);
     allItems=allItems.filter(i=>i.row!==row);
     try{localStorage.setItem('adminItemsCache',JSON.stringify({items:allItems,latestShipDate:document.getElementById('shipText').textContent}));}catch(e){}
