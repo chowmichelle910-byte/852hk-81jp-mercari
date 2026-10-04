@@ -3091,6 +3091,8 @@ function logMercariOrders() {
   try{assignGroupByOrderDate();}catch(e){console.error(e);}
   try{updateSerialNumberInColO();}catch(e){console.error(e);}
   try{updateOrdersCurrencyAndChargeWeighted();}catch(e){console.error(e);}
+  try{syncToSupabase();}catch(e){console.error(e);}
+  try{checkNewOrdersAndNotify();}catch(e){console.error(e);}
 }
 
 /**
