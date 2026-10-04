@@ -402,21 +402,19 @@ async function handleUpdate(update) {
     }
 
     if (text.startsWith('/cg') && (text === '/cg' || text[3] === ' ' || text[3] === '@')) {
-      const rawArgs = text.replace(/^\/cg(@\S+)?\s*/, '').trim();
-      if (!rawArgs || rawArgs.split(/\s+/).length < 3) {
-        await tg('sendMessage', { chat_id: chatId, text: '用法：/cg &lt;position&gt; &lt;ID&gt; &lt;團號&gt;\n例如：/cg IG abc 55', parse_mode: 'HTML' });
+      const result = await gas({ action: 'getCgPositions' });
+      const positions = result.positions || [];
+      if (!positions.length) {
+        await tg('sendMessage', { chat_id: chatId, text: '❌ 找不到任何訂單' });
         return;
       }
-      const args  = rawArgs.split(/\s+/);
-      const qPos  = args[0];
-      const qId   = args[1];
-      const qGroup = args.slice(2).join(' ');
-      const result = await gas({ action: 'getCustomerGroupStatus', pos: qPos, id: qId, group: qGroup });
-      if (result.error) {
-        await tg('sendMessage', { chat_id: chatId, text: '❌ ' + result.error, parse_mode: 'HTML' });
-        return;
-      }
-      await tg('sendMessage', { chat_id: chatId, text: result.text, parse_mode: 'HTML', disable_web_page_preview: true });
+      const posButtons = positions.map(p => [{ text: p, callback_data: `cg_pos:${p}`.substring(0, 64) }]);
+      await tg('sendMessage', {
+        chat_id: chatId,
+        text: '📦 <b>查詢到貨狀態</b>\n\n請選擇 Position：',
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: posButtons }
+      });
       return;
     }
 
@@ -795,6 +793,73 @@ async function handleUpdate(update) {
     const kb = positions.map(p => [{ text: p, callback_data: `pos:${rowNum}:${p}`.substring(0, 64) }]);
     kb.push([{ text: '🗑️ 刪除訂單', callback_data: `del_order:${rowNum}` }]);
     await tg('editMessageReplyMarkup', { chat_id: chatId, message_id: msgId, reply_markup: { inline_keyboard: kb } });
+
+  } else if (action === 'cg_pos') {
+    const pos = parts.slice(1).join(':');
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    const result = await gas({ action: 'getCgCustomers', pos });
+    const ids = result.ids || [];
+    if (!ids.length) {
+      await tg('editMessageText', { chat_id: chatId, message_id: msgId, text: `❌ ${pos} 下找不到客人`, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } });
+      return;
+    }
+    const idButtons = ids.map(id => [{ text: id, callback_data: `cg_id:${pos}:${id}`.substring(0, 64) }]);
+    idButtons.push([{ text: '↩️ 返回', callback_data: 'cg_back' }]);
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: `📦 <b>查詢到貨狀態</b>\n\nPosition：<b>${pos}</b>\n請選擇客人 ID：`,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: idButtons }
+    });
+
+  } else if (action === 'cg_id') {
+    const pos = parts[1];
+    const id  = parts.slice(2).join(':');
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    const result = await gas({ action: 'getCgGroups', pos, id });
+    const groups = result.groups || [];
+    if (!groups.length) {
+      await tg('editMessageText', { chat_id: chatId, message_id: msgId, text: `❌ 找不到 ${pos} ${id} 的團號`, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } });
+      return;
+    }
+    const grpButtons = groups.map(g => [{ text: `第${g}團`, callback_data: `cg_grp:${pos}:${id}:${g}`.substring(0, 64) }]);
+    grpButtons.push([{ text: '↩️ 返回', callback_data: `cg_pos:${pos}` }]);
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: `📦 <b>查詢到貨狀態</b>\n\nPosition：<b>${pos}</b>\n客人 ID：<b>${id}</b>\n請選擇團號：`,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: grpButtons }
+    });
+
+  } else if (action === 'cg_grp') {
+    const pos   = parts[1];
+    const id    = parts[2];
+    const group = parts.slice(3).join(':');
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    const result = await gas({ action: 'getCustomerGroupStatus', pos, id, group });
+    if (result.error) {
+      await tg('editMessageText', { chat_id: chatId, message_id: msgId, text: '❌ ' + result.error, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } });
+      return;
+    }
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: result.text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      reply_markup: { inline_keyboard: [[{ text: '↩️ 再查', callback_data: `cg_id:${pos}:${id}` }]] }
+    });
+
+  } else if (action === 'cg_back') {
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    const result2 = await gas({ action: 'getCgPositions' });
+    const positions2 = result2.positions || [];
+    const posButtons2 = positions2.map(p => [{ text: p, callback_data: `cg_pos:${p}`.substring(0, 64) }]);
+    await tg('editMessageText', {
+      chat_id: chatId, message_id: msgId,
+      text: '📦 <b>查詢到貨狀態</b>\n\n請選擇 Position：',
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: posButtons2 }
+    });
 
   } else if (action === 'rated' || action === 'rated_all') {
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ 已記錄！' });

@@ -1445,6 +1445,64 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'getCgPositions': {
+      try {
+        const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        if (lastRow < 2) return jsonResponse_({ positions: [] });
+        const data = sheet.getRange(2, 3, lastRow - 1, 1).getValues(); // col C
+        const seen = new Set();
+        const positions = [];
+        for (let i = data.length - 1; i >= 0; i--) {
+          const p = String(data[i][0] || '').trim();
+          if (p && !seen.has(p)) { seen.add(p); positions.unshift(p); }
+        }
+        return jsonResponse_({ positions });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
+    case 'getCgCustomers': {
+      try {
+        const qPos  = String(e.parameter.pos || '').trim();
+        const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        if (lastRow < 2) return jsonResponse_({ ids: [] });
+        const data = sheet.getRange(2, 3, lastRow - 1, 2).getValues(); // col C, D
+        const seen = new Set();
+        const ids  = [];
+        for (let i = data.length - 1; i >= 0; i--) {
+          const p  = String(data[i][0] || '').trim();
+          const id = String(data[i][1] || '').trim();
+          if (p.toLowerCase() === qPos.toLowerCase() && id && !seen.has(id)) {
+            seen.add(id); ids.unshift(id);
+          }
+        }
+        return jsonResponse_({ ids });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
+    case 'getCgGroups': {
+      try {
+        const qPos = String(e.parameter.pos || '').trim();
+        const qId  = String(e.parameter.id  || '').trim();
+        const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        if (lastRow < 2) return jsonResponse_({ groups: [] });
+        const data = sheet.getRange(2, 1, lastRow - 1, 27).getValues();
+        const seen = new Set();
+        const groups = [];
+        for (let i = data.length - 1; i >= 0; i--) {
+          const p  = String(data[i][2]  || '').trim();
+          const id = String(data[i][3]  || '').trim();
+          const g  = String(data[i][26] || '').trim();
+          if (p.toLowerCase() === qPos.toLowerCase() && id.toLowerCase() === qId.toLowerCase() && g && !seen.has(g)) {
+            seen.add(g); groups.unshift(g);
+          }
+        }
+        return jsonResponse_({ groups });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     case 'getCustomerGroupStatus': {
       try {
         const qPos   = String(e.parameter.pos   || '').trim();
