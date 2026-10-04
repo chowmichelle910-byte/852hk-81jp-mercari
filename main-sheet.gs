@@ -545,6 +545,13 @@ function handleTelegramUpdate_(update) {
     if (prevPos && prevId && !isNaN(rowNum) && rowNum >= 2) {
       sheet.getRange(rowNum, 3).setValue(prevPos);
       sheet.getRange(rowNum, 4).setValue(prevId);
+      SpreadsheetApp.flush();
+      try { assignGroupByOrderDate(); }               catch(e) {}
+      try { updateSerialNumberInColO(); }              catch(e) {}
+      try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) {}
+      try { updateChineseNamesByKeyword(); }           catch(e) {}
+      try { syncToSupabase(); }                        catch(e) {}
+      try { checkNewOrdersAndNotify(); }               catch(e) {}
       const rowData = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
       const code    = String(rowData[14] || '').trim();
       const link    = String(rowData[5]  || '').trim();
@@ -568,6 +575,13 @@ function handleTelegramUpdate_(update) {
       const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
       sheet.getRange(rowNum, 3).setValue(pos);
       sheet.getRange(rowNum, 4).setValue(id);
+      SpreadsheetApp.flush();
+      try { assignGroupByOrderDate(); }               catch(e) {}
+      try { updateSerialNumberInColO(); }              catch(e) {}
+      try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) {}
+      try { updateChineseNamesByKeyword(); }           catch(e) {}
+      try { syncToSupabase(); }                        catch(e) {}
+      try { checkNewOrdersAndNotify(); }               catch(e) {}
       const rowData = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
       const code    = String(rowData[14] || '').trim();
       const link    = String(rowData[5]  || '').trim();
@@ -674,6 +688,13 @@ function handleTelegramUpdate_(update) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
     sheet.getRange(rowNum, 3).setValue(pos);
     sheet.getRange(rowNum, 4).setValue(selId);
+    SpreadsheetApp.flush();
+    try { assignGroupByOrderDate(); }               catch(e) {}
+    try { updateSerialNumberInColO(); }              catch(e) {}
+    try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) {}
+    try { updateChineseNamesByKeyword(); }           catch(e) {}
+    try { syncToSupabase(); }                        catch(e) {}
+    try { checkNewOrdersAndNotify(); }               catch(e) {}
 
     const rowData = sheet.getRange(rowNum, 1, 1, 15).getValues()[0];
     const code    = String(rowData[14] || '').trim(); // O
