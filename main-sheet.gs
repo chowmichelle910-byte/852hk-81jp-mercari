@@ -13,6 +13,7 @@ const TG_API_URL = 'https://api.telegram.org/bot' + TG_TOKEN;
 
 
 // 執行一次：向 Telegram 註冊指令選單（打 / 會出清單）
+function setMyCommands() { setMyCommands_(); }
 function setMyCommands_() {
   const commands = [
     { command: 'help',    description: '列出所有可用指令' },
