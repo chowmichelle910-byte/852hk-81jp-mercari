@@ -655,7 +655,8 @@ const MAIN_API = 'https://script.google.com/macros/s/AKfycbwT9_K4m0UvBUrZRveZJ3c
 const SB_URL   = 'https://ifrjaxpgrnvjesboelra.supabase.co';
 const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmpheHBncm52amVzYm9lbHJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDU2OTAsImV4cCI6MjA5Nzk4MTY5MH0.3Qw4z9JGapt_B90v_ulja7pM2bSDhbhp439auyvwi_M';
 const SB_AUTH_EMAIL = '852hk886tw@gmail.com';
-const GAS_PW = '4916'; // GAS API password (separate from Supabase auth)
+const GAS_PW = '4916';
+if(!window.supabase){document.body.innerHTML='<p style="color:red;padding:20px">Supabase 庫載入失敗，請重新整理頁面</p>';throw new Error('supabase not loaded');}
 const supabase = window.supabase.createClient(SB_URL, SB_KEY);
 // ── V2: Supabase 讀取 adminItems ──
 // GAS sync 需要 service_role key（聽日填入）
