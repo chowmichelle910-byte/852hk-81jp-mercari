@@ -166,6 +166,22 @@ async function gas(params, timeoutMs = 25000) {
   }
 }
 
+// ─── Supabase 讀取（比 GAS 快，直接查快取資料）────────
+const SB_URL  = 'https://ifrjaxpgrnvjesboelra.supabase.co';
+const SB_SVC  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmpheHBncm52amVzYm9lbHJhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjQwNTY5MCwiZXhwIjoyMDk3OTgxNjkwfQ.4CdxnLRiYIxg-ag1e9wSOVk_HLVxS6JoHtLMRpGQWho';
+
+let _sbItemsCache = null;
+async function sbItems() {
+  if (_sbItemsCache) return _sbItemsCache;
+  const res = await fetch(`${SB_URL}/rest/v1/admin_items?id=eq.1&select=payload`, {
+    headers: { apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC }
+  });
+  const rows = await res.json();
+  const payload = rows[0] && rows[0].payload ? JSON.parse(rows[0].payload) : { items: [] };
+  _sbItemsCache = payload.items || [];
+  return _sbItemsCache;
+}
+
 // ─── 顯示客人分頁 ─────────────────────────────────
 function custKeyboard(ids, rowNum, pos, offset) {
   const page = ids.slice(offset, offset + PAGE);
@@ -335,15 +351,16 @@ async function handleUpdate(update) {
     }
 
     if (text === '/unrated' || text.startsWith('/unrated@')) {
-      const result = await gas({ action: 'getUnratedItems' });
-      const items  = result.items || [];
+      const all   = await sbItems();
+      const items = all.filter(it => it.status === '未評價');
       if (!items.length) {
         await tg('sendMessage', { chat_id: chatId, text: '✅ 沒有待評價的商品' });
         return;
       }
-      const lines = items.map((u, i) => {
-        const label = [u.code, u.name].filter(Boolean).join('  ');
-        return `${i + 1}. ${label ? label + '\n' : ''}<a href="${u.tUrl}">${u.tUrl}</a>`;
+      const lines = items.map((it, i) => {
+        const label = [it.code, it.item].filter(Boolean).join('  ');
+        const tUrl  = (it.link || '').includes('mercari.com/item/') ? it.link.replace('/item/', '/transaction/') : (it.link || '');
+        return `${i + 1}. ${label ? label + '\n' : ''}${tUrl ? `<a href="${tUrl}">${tUrl}</a>` : ''}`;
       }).join('\n\n');
       await tg('sendMessage', {
         chat_id: chatId,
@@ -356,19 +373,19 @@ async function handleUpdate(update) {
 
     const checkMatch = text.match(/^\/check(?:@\S+)?\s+(.+)$/i);
     if (checkMatch) {
-      const queryCode = checkMatch[1].trim();
-      const result = await gas({ action: 'getOrderByCode', code: queryCode });
-      if (result.error || !result.orders || !result.orders.length) {
+      const queryCode = checkMatch[1].trim().toUpperCase();
+      const all    = await sbItems();
+      const orders = all.filter(it => String(it.code || '').toUpperCase() === queryCode);
+      if (!orders.length) {
         await tg('sendMessage', { chat_id: chatId, text: `❌ 找不到 code <b>${queryCode}</b> 的訂單`, parse_mode: 'HTML' });
       } else {
-        const lines = result.orders.map((o, idx) => {
-          const parts = [];
-          parts.push(`🔢 Code：<b>${o.code}</b>`);
-          if (o.date) parts.push(`📅 購買日期：${o.date}`);
-          if (o.name)  parts.push(`📦 商品名：${o.name}`);
-          if (o.price != null) parts.push(`💴 價錢：¥${Number(o.price).toLocaleString()}`);
-          if (o.link)  parts.push(`🔗 ${o.link}`);
-          return (result.orders.length > 1 ? `<b>${idx+1}.</b>\n` : '') + parts.join('\n');
+        const lines = orders.map((o, idx) => {
+          const parts2 = [];
+          parts2.push(`🔢 Code：<b>${o.code}</b>`);
+          if (o.orderedDate) parts2.push(`📅 購買日期：${o.orderedDate}`);
+          if (o.item)  parts2.push(`📦 商品名：${o.item}`);
+          if (o.link)  parts2.push(`🔗 ${o.link}`);
+          return (orders.length > 1 ? `<b>${idx+1}.</b>\n` : '') + parts2.join('\n');
         });
         await tg('sendMessage', { chat_id: chatId, text: lines.join('\n\n'), parse_mode: 'HTML' });
       }
@@ -402,8 +419,8 @@ async function handleUpdate(update) {
     }
 
     if (text.startsWith('/cg') && (text === '/cg' || text[3] === ' ' || text[3] === '@')) {
-      const result = await gas({ action: 'getCgPositions' });
-      const positions = result.positions || [];
+      const all       = await sbItems();
+      const positions = [...new Set(all.map(it => String(it.position || '').trim()).filter(Boolean))].sort();
       if (!positions.length) {
         await tg('sendMessage', { chat_id: chatId, text: '❌ 找不到任何訂單' });
         return;
@@ -419,24 +436,25 @@ async function handleUpdate(update) {
     }
 
     if (text === '/sent' || text.startsWith('/sent@')) {
-      const result = await gas({ action: 'getSentItems' });
-      const items  = result.items || [];
+      const all   = await sbItems();
+      const items = all.filter(it => String(it.track || '').trim() === '已發送');
       if (!items.length) {
         await tg('sendMessage', { chat_id: chatId, text: '✅ 沒有已發送待填 tracking 的訂單' });
         return;
       }
-      for (const item of items) {
+      for (const it of items) {
+        const tUrl = (it.link || '').includes('mercari.com/item/') ? it.link.replace('/item/', '/transaction/') : (it.link || '');
         await tg('sendMessage', {
           chat_id: chatId,
-          text: `📦 <b>已發送 — 待入 Tracking</b>${item.code ? '  ' + item.code : ''}` +
-                (item.name ? '\n' + item.name : '') +
-                (item.tUrl ? '\n' + item.tUrl : ''),
+          text: `📦 <b>已發送 — 待入 Tracking</b>${it.code ? '  ' + it.code : ''}` +
+                (it.item ? '\n' + it.item : '') +
+                (tUrl ? '\n' + tUrl : ''),
           parse_mode: 'HTML',
           reply_markup: { inline_keyboard: [[
-            { text: '📮 普通郵便',   callback_data: 'shipped_futsuu:' + item.rowNum },
-            { text: '📬 送り状番号', callback_data: 'shipped_track:'  + item.rowNum }
+            { text: '📮 普通郵便',   callback_data: 'shipped_futsuu:' + it.row },
+            { text: '📬 送り状番号', callback_data: 'shipped_track:'  + it.row }
           ], [
-            { text: '🗑️ 清除已發送', callback_data: 'clear_sent:' + item.rowNum }
+            { text: '🗑️ 清除已發送', callback_data: 'clear_sent:' + it.row }
           ]] }
         });
       }
@@ -444,38 +462,38 @@ async function handleUpdate(update) {
     }
 
     if (text === '/pending' || text.startsWith('/pending@')) {
-      const data = await gas({ action: 'getPendingOrders' });
-      if (!data.orders || !data.orders.length) {
+      const all      = await sbItems();
+      const orders   = all.filter(it => !it.position && !it.custId && (it.item || it.shop || it.link || it.code));
+      const posSet   = [...new Set(all.map(it => String(it.position || '').trim()).filter(Boolean))].sort();
+      // find most recent pos+id combo
+      let prevPos = '', prevId = '';
+      for (let i = all.length - 1; i >= 0; i--) {
+        if (all[i].position && all[i].custId) { prevPos = all[i].position; prevId = all[i].custId; break; }
+      }
+      if (!orders.length) {
         await tg('sendMessage', { chat_id: chatId, text: '✅ 沒有待填 Position/ID 的訂單' });
         return;
       }
-      const positions = data.positions || [];
-      const posButtons = positions.length
-        ? positions.map(p => [{ text: p, callback_data: `pos:${p}`.substring(0, 64) }])
-        : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: `pos:${p}` }))];
-
-      const prevPos = data.prevPos || '';
-      const prevId  = data.prevId  || '';
-      for (const order of data.orders) {
-        const kb = positions.length
-          ? positions.map(p => [{ text: p, callback_data: `pos:${order.rowNum}:${p}`.substring(0, 64) }])
-          : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: `pos:${order.rowNum}:${p}` }))];
+      for (const order of orders) {
+        const kb = posSet.length
+          ? posSet.map(p => [{ text: p, callback_data: `pos:${order.row}:${p}`.substring(0, 64) }])
+          : [['IG', 'WTS', '其他'].map(p => ({ text: p, callback_data: `pos:${order.row}:${p}` }))];
         if (prevPos && prevId) {
-          kb.unshift([{ text: `📋 同上 (${prevPos} ${prevId})`, callback_data: `copy_prev:${order.rowNum}`.substring(0, 64) }]);
+          kb.unshift([{ text: `📋 同上 (${prevPos} ${prevId})`, callback_data: `copy_prev:${order.row}`.substring(0, 64) }]);
         }
-        kb.push([{ text: '🗑️ 刪除訂單', callback_data: `del_order:${order.rowNum}` }]);
+        kb.push([{ text: '🗑️ 刪除訂單', callback_data: `del_order:${order.row}` }]);
         await tg('sendMessage', {
           chat_id: chatId,
           text: `📋 <b>待填訂單</b>${order.code ? '  ' + order.code : ''}\n` +
-                (order.itemUrl ? `🔗 ${order.itemUrl}\n` : '') +
+                (order.link ? `🔗 ${order.link}\n` : '') +
                 `\n係哪個 <b>Position</b>？` +
                 (order.code ? `\n_code:${order.code}_` : ''),
           parse_mode: 'HTML',
           reply_markup: { inline_keyboard: kb }
         });
       }
+      return;
     }
-    return;
   }
 
   // ── Callback Query ──
@@ -513,10 +531,13 @@ async function handleUpdate(update) {
     const rowNum = parts[1];
     const pos    = parts.slice(2).join(':');
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
-    const result = await gas({ action: 'getCustomersByPosition', pos });
-    const ids    = result.ids || [];
-
-    // 取訂單資料顯示（從原訊息解析）
+    const all  = await sbItems();
+    const seen = new Set(); const ids = [];
+    for (let i = all.length - 1; i >= 0; i--) {
+      const p = String(all[i].position || '').trim();
+      const d = String(all[i].custId   || '').trim();
+      if (p === pos && d && !seen.has(d)) { seen.add(d); ids.unshift(d); }
+    }
     const origText = cb.message.text || '';
     const codeM    = origText.match(/_code:(.+?)_/);
     const posCode  = codeM ? codeM[1] : '';
@@ -537,12 +558,16 @@ async function handleUpdate(update) {
     const offset = parseInt(parts[2]);
     const pos    = parts.slice(3).join(':');
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
-    const result = await gas({ action: 'getCustomersByPosition', pos });
-    const ids    = result.ids || [];
-    const origText = cb.message.text || '';
+    const all2  = await sbItems();
+    const seen2 = new Set(); const ids2 = [];
+    for (let i = all2.length - 1; i >= 0; i--) {
+      const p = String(all2[i].position || '').trim();
+      const d = String(all2[i].custId   || '').trim();
+      if (p === pos && d && !seen2.has(d)) { seen2.add(d); ids2.unshift(d); }
+    }
     await tg('editMessageReplyMarkup', {
       chat_id: chatId, message_id: msgId,
-      reply_markup: custKeyboard(ids, rowNum, pos, offset)
+      reply_markup: custKeyboard(ids2, rowNum, pos, offset)
     });
 
   } else if (action === 'id') {
@@ -797,13 +822,18 @@ async function handleUpdate(update) {
   } else if (action === 'cg_pos') {
     const pos = parts.slice(1).join(':');
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
-    const result = await gas({ action: 'getCgCustomers', pos });
-    const ids = result.ids || [];
-    if (!ids.length) {
+    const all3 = await sbItems();
+    const seen3 = new Set(); const ids3 = [];
+    for (let i = all3.length - 1; i >= 0; i--) {
+      const p = String(all3[i].position || '').trim();
+      const d = String(all3[i].custId   || '').trim();
+      if (p.toLowerCase() === pos.toLowerCase() && d && !seen3.has(d)) { seen3.add(d); ids3.unshift(d); }
+    }
+    if (!ids3.length) {
       await tg('editMessageText', { chat_id: chatId, message_id: msgId, text: `❌ ${pos} 下找不到客人`, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } });
       return;
     }
-    const idButtons = ids.map(id => [{ text: id, callback_data: `cg_id:${pos}:${id}`.substring(0, 64) }]);
+    const idButtons = ids3.map(id => [{ text: id, callback_data: `cg_id:${pos}:${id}`.substring(0, 64) }]);
     idButtons.push([{ text: '↩️ 返回', callback_data: 'cg_back' }]);
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
@@ -816,17 +846,25 @@ async function handleUpdate(update) {
     const pos = parts[1];
     const id  = parts.slice(2).join(':');
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
-    const result = await gas({ action: 'getCgGroups', pos, id });
-    const groups = result.groups || [];
+    const all4   = await sbItems();
+    const seen4  = new Set(); const groups = [];
+    for (let i = 0; i < all4.length; i++) {
+      const p = String(all4[i].position || '').trim();
+      const d = String(all4[i].custId   || '').trim();
+      const g = String(all4[i].arrival  || '').trim(); // col A = 到貨團號
+      if (p.toLowerCase() === pos.toLowerCase() && d.toLowerCase() === id.toLowerCase() && g && !seen4.has(g)) {
+        seen4.add(g); groups.push(g);
+      }
+    }
     if (!groups.length) {
-      await tg('editMessageText', { chat_id: chatId, message_id: msgId, text: `❌ 找不到 ${pos} ${id} 的團號`, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } });
+      await tg('editMessageText', { chat_id: chatId, message_id: msgId, text: `❌ 找不到 ${pos} ${id} 的到貨團號`, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } });
       return;
     }
     const grpButtons = groups.map(g => [{ text: `第${g}團`, callback_data: `cg_grp:${pos}:${id}:${g}`.substring(0, 64) }]);
     grpButtons.push([{ text: '↩️ 返回', callback_data: `cg_pos:${pos}` }]);
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
-      text: `📦 <b>查詢到貨狀態</b>\n\nPosition：<b>${pos}</b>\n客人 ID：<b>${id}</b>\n請選擇團號：`,
+      text: `📦 <b>查詢到貨狀態</b>\n\nPosition：<b>${pos}</b>\n客人 ID：<b>${id}</b>\n請選擇到貨團號：`,
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: grpButtons }
     });
@@ -836,29 +874,42 @@ async function handleUpdate(update) {
     const id    = parts[2];
     const group = parts.slice(3).join(':');
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
-    const result = await gas({ action: 'getCustomerGroupStatus', pos, id, group });
-    if (result.error) {
-      await tg('editMessageText', { chat_id: chatId, message_id: msgId, text: '❌ ' + result.error, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } });
+    const all5   = await sbItems();
+    const matched = all5.filter(it =>
+      String(it.position || '').toLowerCase() === pos.toLowerCase() &&
+      String(it.custId   || '').toLowerCase() === id.toLowerCase()  &&
+      String(it.arrival  || '')               === group
+    );
+    if (!matched.length) {
+      await tg('editMessageText', { chat_id: chatId, message_id: msgId, text: `❌ 找不到 ${pos} ${id} 第${group}團的訂單`, parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } });
       return;
+    }
+    const arrived = matched.filter(it => it.arrivalDate).length;
+    let msg = `📦 <b>${pos} ${id}</b>　第${group}團\n共 ${matched.length} 件｜已到 ${arrived}　未到 ${matched.length - arrived}\n──────────────\n`;
+    for (const it of matched) {
+      const statusIcon = it.arrivalDate ? '✅' : '⏳';
+      const statusText = it.arrivalDate ? `已到貨 (${it.arrivalDate})` : '未到貨';
+      const codePart   = it.code ? `<b>${it.code}</b>` : '—';
+      const itemPart   = it.item ? ` ${it.item.length > 20 ? it.item.slice(0,20)+'…' : it.item}` : '';
+      const linkPart   = it.link ? `\n   🔗 ${it.link}` : '';
+      msg += `${statusIcon} ${codePart}${itemPart}　${statusText}${linkPart}\n`;
     }
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
-      text: result.text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
+      text: msg, parse_mode: 'HTML', disable_web_page_preview: true,
       reply_markup: { inline_keyboard: [[{ text: '↩️ 再查', callback_data: `cg_id:${pos}:${id}` }]] }
     });
 
   } else if (action === 'cg_back') {
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
-    const result2 = await gas({ action: 'getCgPositions' });
-    const positions2 = result2.positions || [];
-    const posButtons2 = positions2.map(p => [{ text: p, callback_data: `cg_pos:${p}`.substring(0, 64) }]);
+    const all6 = await sbItems();
+    const positions6 = [...new Set(all6.map(it => String(it.position || '').trim()).filter(Boolean))].sort();
+    const posButtons6 = positions6.map(p => [{ text: p, callback_data: `cg_pos:${p}`.substring(0, 64) }]);
     await tg('editMessageText', {
       chat_id: chatId, message_id: msgId,
       text: '📦 <b>查詢到貨狀態</b>\n\n請選擇 Position：',
       parse_mode: 'HTML',
-      reply_markup: { inline_keyboard: posButtons2 }
+      reply_markup: { inline_keyboard: posButtons6 }
     });
 
   } else if (action === 'rated' || action === 'rated_all') {
