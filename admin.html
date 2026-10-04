@@ -1189,11 +1189,38 @@ async function deleteOrder(row, name){
   try{
     const r=await postMain({action:'deleteOrder',password:pw,row});
     if(r.error)throw new Error(r.error);
+    // Delete arrivals record for deleted row, then shift all rows above it down by 1
+    await sbDeleteAndShiftArrivals(row);
     allItems=allItems.filter(i=>i.row!==row);
+    allItems.forEach(it=>{ if(it.row>row) it.row--; });
     try{localStorage.setItem('adminItemsCache',JSON.stringify({items:allItems,latestShipDate:document.getElementById('shipText').textContent}));}catch(e){}
     render();
     invalidateCache();
   }catch(e){alert('刪除失敗：'+e.message);}
+}
+
+async function sbDeleteAndShiftArrivals(deletedRow){
+  try{
+    // 1. Delete the arrivals record for the deleted row
+    await fetch(`${SB_URL}/rest/v1/arrivals?sheet_row=eq.${deletedRow}`,{
+      method:'DELETE',
+      headers:{'apikey':SB_SVC,'Authorization':'Bearer '+SB_SVC}
+    });
+    // 2. Fetch all arrivals with sheet_row > deletedRow
+    const res=await fetch(`${SB_URL}/rest/v1/arrivals?sheet_row=gt.${deletedRow}&select=sheet_row`,{
+      headers:{'apikey':SB_SVC,'Authorization':'Bearer '+SB_SVC}
+    });
+    if(!res.ok)return;
+    const rows=await res.json();
+    // 3. Update each one: sheet_row -= 1
+    await Promise.all(rows.map(r=>
+      fetch(`${SB_URL}/rest/v1/arrivals?sheet_row=eq.${r.sheet_row}`,{
+        method:'PATCH',
+        headers:{'apikey':SB_SVC,'Authorization':'Bearer '+SB_SVC,'Content-Type':'application/json'},
+        body:JSON.stringify({sheet_row:r.sheet_row-1})
+      })
+    ));
+  }catch(e){ console.warn('sbDeleteAndShiftArrivals failed:',e); }
 }
 
 // ── 到貨日期直接編輯 ──
