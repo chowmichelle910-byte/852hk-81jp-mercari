@@ -31,6 +31,7 @@ function setMyCommands_() {
   const commands = [
     { command: 'help',    description: '列出所有可用指令' },
     { command: 'pending', description: '列出未填 Position/ID 的訂單' },
+    { command: 'cg',      description: '查詢客人指定團號到貨狀態（例：/cg IG abc 55）' },
     { command: 'sent',    description: '列出已發送但未入 tracking 的訂單' },
     { command: 'check',   description: '查詢訂單（例如：/check ABC123）' },
     { command: 'charge',  description: '新增充值記錄' }
@@ -519,6 +520,70 @@ function handleTelegramUpdate_(update) {
       }
 
       if (!count) tgSend_('✅ 沒有待填 Position/ID 的訂單', null, fromChatId);
+    }
+
+    // /cg <pos> <id> <group>  — 查詢客人指定團號到貨狀態
+    if (text.startsWith('/cg') && (text === '/cg' || text[3] === ' ' || text[3] === '@')) {
+      const rawArgs = text.replace(/^\/cg(@\S+)?\s*/, '').trim();
+      if (!rawArgs) {
+        tgSend_('用法：/cg &lt;position&gt; &lt;ID&gt; &lt;團號&gt;\n例如：/cg IG abc 55', null, fromChatId);
+        return;
+      }
+      const args = rawArgs.split(/\s+/);
+      if (args.length < 3) {
+        tgSend_('❌ 請輸入 position、ID 及團號\n例如：/cg IG abc 55', null, fromChatId);
+        return;
+      }
+      const qPos   = args[0].trim();
+      const qId    = args[1].trim();
+      const qGroup = args.slice(2).join(' ').trim();
+
+      const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+      const lastRow = sheet.getLastRow();
+      if (lastRow < 2) { tgSend_('找不到訂單', null, fromChatId); return; }
+      const data = sheet.getRange(2, 1, lastRow - 1, 27).getValues();
+
+      const matched = [];
+      for (let i = 0; i < data.length; i++) {
+        const rowPos   = String(data[i][2]  || '').trim();
+        const rowId    = String(data[i][3]  || '').trim();
+        const rowGroup = String(data[i][26] || '').trim(); // col AA = 訂單團號
+        if (rowPos.toLowerCase() === qPos.toLowerCase() &&
+            rowId.toLowerCase()  === qId.toLowerCase()  &&
+            rowGroup === qGroup) {
+          matched.push({
+            row:         i + 2,
+            code:        String(data[i][14] || '').trim(), // O
+            item:        String(data[i][6]  || '').trim(), // G
+            link:        String(data[i][5]  || '').trim(), // F
+            arrivalDate: String(data[i][15] || '').trim()  // P
+          });
+        }
+      }
+
+      if (!matched.length) {
+        tgSend_(`❌ 找不到 <b>${tgEscape_(qPos)} ${tgEscape_(qId)}</b> 第${tgEscape_(qGroup)}團的訂單`, null, fromChatId);
+        return;
+      }
+
+      const arrived    = matched.filter(r => r.arrivalDate);
+      const notArrived = matched.filter(r => !r.arrivalDate);
+
+      let msg = `📦 <b>${tgEscape_(qPos)} ${tgEscape_(qId)}</b>　第${tgEscape_(qGroup)}團\n`;
+      msg += `共 ${matched.length} 件｜已到 ${arrived.length}　未到 ${notArrived.length}\n`;
+      msg += '──────────────\n';
+
+      for (const r of matched) {
+        const statusIcon = r.arrivalDate ? '✅' : '⏳';
+        const statusText = r.arrivalDate ? `已到貨 (${r.arrivalDate})` : '未到貨';
+        const codePart   = r.code ? `<b>${tgEscape_(r.code)}</b>` : `第${r.row}行`;
+        const itemPart   = r.item ? ` ${tgEscape_(r.item.length > 20 ? r.item.slice(0,20)+'…' : r.item)}` : '';
+        const linkPart   = r.link ? `\n   🔗 ${r.link}` : '';
+        msg += `${statusIcon} ${codePart}${itemPart}　${statusText}${linkPart}\n`;
+      }
+
+      tgSend_(msg, null, fromChatId);
+      return;
     }
   }
 
