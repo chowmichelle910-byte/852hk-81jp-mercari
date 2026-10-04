@@ -101,6 +101,7 @@ button{font-family:var(--font);}
 /* Item card */
 .ic{background:var(--white);border-radius:var(--r-md);padding:12px;margin-bottom:10px;box-shadow:var(--sh-sm);border:2px solid transparent;display:flex;gap:10px;}
 .ic.pending{border-color:var(--warn)!important;background:#FFFAF5!important;}
+.ic.tw{background:#EFF6FF!important;border-color:#BFDBFE!important;}
 .ic-l{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;}
 .ic-r{width:90px;flex-shrink:0;text-align:center;}
 .code-tag{display:inline-block;background:var(--navy);color:var(--gold);font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:3px;margin-bottom:3px;}
@@ -1191,7 +1192,8 @@ async function render(){
     const isUn=curFilter==='unrated';
     let fL=dL;if(isUn&&fL.includes('mercari.com/item/'))fL=fL.replace('/item/','/transaction/');
     const locked=(it.position||it.custId)&&!editRows.has(it.row)&&!ip;
-    const card=document.createElement('div');card.id='card-'+it.row;card.className='ic'+(ip?' pending':'');
+    const isTW=(dPos==='Taiwan'||dPos==='TW');
+    const card=document.createElement('div');card.id='card-'+it.row;card.className='ic'+(ip?' pending':'')+(isTW?' tw':'');
 
     let imgH='<div style="line-height:86px;color:#ccc;font-size:10px;text-align:center;">無圖</div>';
     if(dI)imgH=`<img src="${escAttr(dI)}" style="width:100%;height:100%;object-fit:cover;">`;
