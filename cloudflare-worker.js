@@ -392,6 +392,7 @@ async function handleUpdate(update) {
               '/sent — 列出已發送但未入 tracking 的訂單\n' +
               '/unrated — 列出待評價商品\n' +
               '/check [code] — 查詢訂單\n' +
+              '/cg [position] [ID] [團號] — 查詢客人指定團號到貨狀態\n' +
               '/charge — 新增充值記錄\n' +
               '/lawson — 查詢 Lawson 到店包裹\n' +
               '/neworder [連結] — 新增訂單',
