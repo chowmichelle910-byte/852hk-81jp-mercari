@@ -311,7 +311,8 @@ button{font-family:var(--font);}
   <div class="lc">
     <div class="em">🇯🇵</div>
     <h3>852hk81jp 後台</h3>
-    <p>請輸入密碼</p>
+    <p>請輸入帳號及密碼</p>
+    <input id="sbEmail" type="email" class="pw-inp" placeholder="電郵" value="852hk886tw@gmail.com" style="margin-bottom:8px;">
     <input id="sbPw" type="password" class="pw-inp" placeholder="密碼">
     <button class="login-btn" onclick="doLogin()">進入後台</button>
     <div id="loginStatus"></div>
@@ -766,6 +767,7 @@ function checkLogicalDay(){
 // ── Boot ──
 window.onload=async()=>{
   document.getElementById('sbPw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+  document.getElementById('sbEmail').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('sbPw').focus();});
   document.getElementById('arrDateInp').value=new Date().toISOString().split('T')[0];
   document.getElementById('chargeDate').value=new Date().toISOString().split('T')[0];
 
@@ -788,7 +790,8 @@ async function doLogin(){
   if(!enteredPw)return;
   const sts=document.getElementById('loginStatus');
   sts.textContent='驗證中…';
-  const{error}=await supabase.auth.signInWithPassword({email:SB_AUTH_EMAIL,password:enteredPw});
+  const enteredEmail=document.getElementById('sbEmail').value.trim()||SB_AUTH_EMAIL;
+  const{error}=await supabase.auth.signInWithPassword({email:enteredEmail,password:enteredPw});
   if(error){
     sts.textContent='❌ 密碼錯誤';
     return;
