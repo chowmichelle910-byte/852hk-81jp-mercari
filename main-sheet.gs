@@ -1905,6 +1905,7 @@ function addChargeRecord_(date, jpy, hkd, place) {
   SpreadsheetApp.flush();
 
   try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) { Logger.log('重算匯率失敗: ' + e); }
+  try { syncChargeToSupabase(); } catch(e) {}
 
   return { success: true };
 }
@@ -2187,6 +2188,7 @@ function saveNewGroup_(params) {
   if (r50k) curSheet.getRange(nextRow, 8).setValue(parseFloat(r50k));
 
   SpreadsheetApp.flush();
+  try { syncGroupsToSupabase(); } catch(e) {}
   return { success: true };
 }
 
@@ -3690,7 +3692,10 @@ function syncToSupabase() {
           arrivalDate: r[15] ? (r[15] instanceof Date ? Utilities.formatDate(r[15],'GMT+8','yyyy-MM-dd') : String(r[15])) : '',
           weight: parseFloat(r[16]) || 0,
           image: r[18] || '',
-          status: r[28] || ''
+          status: r[28] || '',
+          jpy: parseFloat(r[7]) || 0,
+          rate: parseFloat(r[8]) || 0,
+          orderGroup: r[26] ? String(r[26]) : ''
         };
       });
     var payload = { items: items, latestShipDate: '', updated_at: new Date().toISOString() };
@@ -3707,6 +3712,87 @@ function syncToSupabase() {
     });
     Logger.log('syncToSupabase: ' + items.length + ' items, status=' + resp.getResponseCode() + ' body=' + resp.getContentText().substring(0,200));
   } catch(err) { Logger.log('syncToSupabase failed: ' + err); }
+}
+
+// Currency 分頁 → Supabase admin_items id=2
+function syncGroupsToSupabase() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName('Currency');
+    if (!sh) return;
+    var lastRow = sh.getLastRow();
+    var groups = [];
+    if (lastRow >= 10) {
+      var vals = sh.getRange(10, 1, lastRow - 9, 8).getValues();
+      for (var i = 0; i < vals.length; i++) {
+        var r = vals[i];
+        var name = String(r[0] || '').trim();
+        if (!name) continue;
+        groups.push({
+          name: name,
+          start: r[1] ? (r[1] instanceof Date ? Utilities.formatDate(r[1],'GMT+8','yyyy-MM-dd') : String(r[1])) : '',
+          end:   r[2] ? (r[2] instanceof Date ? Utilities.formatDate(r[2],'GMT+8','yyyy-MM-dd') : String(r[2])) : '',
+          r1:   parseFloat(r[4]) || 0,
+          r5k:  parseFloat(r[5]) || 0,
+          r10k: parseFloat(r[6]) || 0,
+          r50k: parseFloat(r[7]) || 0
+        });
+      }
+    }
+    var payload = { groups: groups, updated_at: new Date().toISOString() };
+    UrlFetchApp.fetch(SB_ADMIN_URL_, {
+      method: 'post', contentType: 'application/json',
+      headers: { 'apikey': SB_SERVICE_KEY_, 'Authorization': 'Bearer ' + SB_SERVICE_KEY_, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      payload: JSON.stringify({ id: 2, payload: JSON.stringify(payload) }),
+      muteHttpExceptions: true
+    });
+    Logger.log('syncGroupsToSupabase: ' + groups.length + ' groups');
+  } catch(err) { Logger.log('syncGroupsToSupabase failed: ' + err); }
+}
+
+// チャージ分頁 → Supabase admin_items id=3
+function syncChargeToSupabase() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName('チャージ');
+    if (!sh) return;
+    var lastRow = sh.getLastRow();
+    var records = [];
+    if (lastRow >= 2) {
+      var data = sh.getRange(2, 1, lastRow - 1, 10).getValues();
+      for (var i = 0; i < data.length; i++) {
+        var r = data[i];
+        if (!r[1]) continue; // B=日期必填
+        records.push({
+          row:  i + 2,
+          date: r[1] instanceof Date ? Utilities.formatDate(r[1],'GMT+8','yyyy-MM-dd') : String(r[1]),
+          jpy:  parseFloat(r[2]) || 0,
+          hkd:  parseFloat(r[3]) || 0,
+          place: String(r[5] || '').trim(),
+          balance: parseFloat(r[9]) || 0
+        });
+      }
+    }
+    var lastBalance = 0;
+    for (var j = records.length - 1; j >= 0; j--) {
+      if (records[j].balance) { lastBalance = records[j].balance; break; }
+    }
+    var payload = { records: records, lastBalance: lastBalance, updated_at: new Date().toISOString() };
+    UrlFetchApp.fetch(SB_ADMIN_URL_, {
+      method: 'post', contentType: 'application/json',
+      headers: { 'apikey': SB_SERVICE_KEY_, 'Authorization': 'Bearer ' + SB_SERVICE_KEY_, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      payload: JSON.stringify({ id: 3, payload: JSON.stringify(payload) }),
+      muteHttpExceptions: true
+    });
+    Logger.log('syncChargeToSupabase: ' + records.length + ' records, balance=' + lastBalance);
+  } catch(err) { Logger.log('syncChargeToSupabase failed: ' + err); }
+}
+
+// 一鍵同步所有資料到 Supabase（手動執行用）
+function syncAllToSupabase() {
+  syncToSupabase();
+  syncGroupsToSupabase();
+  syncChargeToSupabase();
 }
 
 // ─────────────────────────────────────────────

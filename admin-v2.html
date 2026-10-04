@@ -829,6 +829,38 @@ async function sbGetAdminItems(){
   return typeof payload==='string'?JSON.parse(payload):payload;
 }
 
+// ── Supabase: 讀取 Currency/Groups 資料（id=2）──
+let _sbGroupsCache=null, _sbGroupsCacheTs=0;
+async function sbGetGroups(){
+  const now=Date.now();
+  if(_sbGroupsCache&&now-_sbGroupsCacheTs<300000) return _sbGroupsCache;
+  const res=await fetch(`${SB_URL}/rest/v1/admin_items?id=eq.2&select=payload`,{
+    headers:{'apikey':SB_SERVICE_KEY,'Authorization':'Bearer '+SB_SERVICE_KEY}
+  });
+  if(!res.ok) throw new Error('Supabase groups '+res.status);
+  const rows=await res.json();
+  if(!rows||!rows.length||!rows[0].payload) return {groups:[]};
+  const p=typeof rows[0].payload==='string'?JSON.parse(rows[0].payload):rows[0].payload;
+  _sbGroupsCache=p; _sbGroupsCacheTs=now;
+  return p;
+}
+
+// ── Supabase: 讀取 チャージ 資料（id=3）──
+let _sbChargeCache=null, _sbChargeCacheTs=0;
+async function sbGetCharge(){
+  const now=Date.now();
+  if(_sbChargeCache&&now-_sbChargeCacheTs<60000) return _sbChargeCache;
+  const res=await fetch(`${SB_URL}/rest/v1/admin_items?id=eq.3&select=payload`,{
+    headers:{'apikey':SB_SERVICE_KEY,'Authorization':'Bearer '+SB_SERVICE_KEY}
+  });
+  if(!res.ok) throw new Error('Supabase charge '+res.status);
+  const rows=await res.json();
+  if(!rows||!rows.length||!rows[0].payload) return {records:[],lastBalance:0};
+  const p=typeof rows[0].payload==='string'?JSON.parse(rows[0].payload):rows[0].payload;
+  _sbChargeCache=p; _sbChargeCacheTs=now;
+  return p;
+}
+
 async function callAdmin(){
   showLoader('載入訂單資料…');
   let d=null;
@@ -911,7 +943,8 @@ function processItems(d){
   const methods=[...new Set(allItems.map(i=>(i.method||'').trim()))].filter(Boolean).sort();
   document.getElementById('shipMethodList').innerHTML=methods.map(m=>`<option value="${esc(m)}">`).join('');
 
-  post({action:'getCustomerIds',password:pw}).then(r=>{document.getElementById('idList').innerHTML=(r.ids||[]).map(id=>`<option value="${esc(id)}">`).join('');});
+  const custIds=[...new Set(allItems.map(i=>(i.custId||'').trim()).filter(Boolean))].sort();
+  document.getElementById('idList').innerHTML=custIds.map(id=>`<option value="${esc(id)}">`).join('');
   document.getElementById('addDate').value=new Date().toISOString().split('T')[0];
   setFilter('todo');buildArrTabs();
   mergeSbArrivals();
@@ -959,12 +992,23 @@ async function deleteOrder(row, name){
   }catch(e){alert('刪除失敗：'+e.message);}
 }
 
-// ── Ship Date from Currency C col ──
+// ── Ship Date from Supabase groups ──
 async function loadShipDate(){
   try{
-    const d=await postMain({action:'getNextShipDate',password:pw});
-    if(d&&d.text) document.getElementById('shipText').textContent=d.text;
-    else document.getElementById('shipText').textContent='未有寄出資料';
+    const p=await sbGetGroups();
+    const groups=p.groups||[];
+    const today=new Date(); today.setHours(0,0,0,0);
+    const yesterday=new Date(today.getTime()-86400000);
+    let targetGroup='', targetDate=null;
+    for(const g of groups){
+      if(!g.end) continue;
+      const d=new Date(g.end); d.setHours(0,0,0,0);
+      if(d>=yesterday&&(!targetDate||d<targetDate)){targetGroup=g.name;targetDate=d;}
+    }
+    if(!targetDate){document.getElementById('shipText').textContent='未有寄出資料';return;}
+    const ship=new Date(targetDate); ship.setDate(ship.getDate()+1);
+    const wk=['日','一','二','三','四','五','六'];
+    document.getElementById('shipText').textContent=`${targetGroup}寄出日期：${ship.getFullYear()}/${ship.getMonth()+1}/${ship.getDate()}（${wk[ship.getDay()]}）`;
   }catch(e){ document.getElementById('shipText').textContent='未有寄出資料'; }
 }
 
@@ -1050,18 +1094,24 @@ function selectToolGrp(g){
   if(activeTab&&activeTab.id==='ts-ship') previewShippingNotification();
 }
 
-// ── 新團設定 ──
+// ── 新團設定（from Supabase groups）──
 async function loadNewGroupDefaults(){
   try{
-    const d=await postMain({action:'getNewGroupDefaults',password:pw});
-    if(d.error)return;
-    document.getElementById('ng-group').value=d.group||'';
-    document.getElementById('ng-start').value=d.start||'';
-    document.getElementById('ng-end').value=d.end||'';
-    document.getElementById('ng-r1').value=d.r1||'';
-    document.getElementById('ng-r5k').value=d.r5k||'';
-    document.getElementById('ng-r10k').value=d.r10k||'';
-    document.getElementById('ng-r50k').value=d.r50k||'';
+    const p=await sbGetGroups();
+    const groups=(p.groups||[]).filter(g=>g.name);
+    if(!groups.length) return;
+    // last group
+    groups.sort((a,b)=>(parseInt(a.name.replace(/\D/g,''))||0)-(parseInt(b.name.replace(/\D/g,''))||0));
+    const last=groups[groups.length-1];
+    function addDays(s,n){if(!s)return '';const d=new Date(s);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+    const lastNum=parseInt(last.name.replace(/\D/g,''))||0;
+    document.getElementById('ng-group').value='第'+(lastNum+1)+'團';
+    document.getElementById('ng-start').value=addDays(last.start,14);
+    document.getElementById('ng-end').value=addDays(last.end,14);
+    document.getElementById('ng-r1').value=last.r1||'';
+    document.getElementById('ng-r5k').value=last.r5k||'';
+    document.getElementById('ng-r10k').value=last.r10k||'';
+    document.getElementById('ng-r50k').value=last.r50k||'';
   }catch(e){}
 }
 
@@ -1079,9 +1129,9 @@ async function saveNewGroup(){
     const d=await postMain({action:'saveNewGroup',password:pw,group,start:start.replace(/-/g,'/'),end:end.replace(/-/g,'/'),r1,r5k,r10k,r50k});
     if(d.error)throw new Error(d.error);
     setSts('ngSts','✅ 已儲存！','ok');
-    // Refresh tool group tabs
-    const f=await post({action:'getAdminItems',password:pw});
-    if(f.items) processItems(f);
+    // Refresh groups cache + tool group tabs
+    _sbGroupsCache=null;
+    await loadNewGroupDefaults();
   }catch(e){setSts('ngSts','❌ 失敗：'+e.message,'err');}
 }
 
@@ -2279,22 +2329,25 @@ async function loadFinanceAll(){
 
 async function loadBalance(){
   try{
-    const d=await postMain({action:'getChargeBalance',password:pw});
-    if(d.error)return;
-    document.getElementById('balAmt').textContent=d.balance!=null?`¥${Number(d.balance).toLocaleString()}`:'—';
-    document.getElementById('balSub').textContent=d.note||'チャージ J欄最後有數值';
+    const p=await sbGetCharge();
+    const bal=p.lastBalance;
+    document.getElementById('balAmt').textContent=bal!=null?`¥${Number(Math.round(bal)).toLocaleString()}`:'—';
+    document.getElementById('balSub').textContent='チャージ J欄最後有數值';
   }catch(e){}
 }
 
 async function loadChargePlaces(){
   try{
-    const d=await postMain({action:'getChargePlaces',password:pw});
-    const places=d.places||[];
+    const p=await sbGetCharge();
+    const records=p.records||[];
+    const places=[...new Set(records.map(r=>r.place||'').filter(Boolean))];
     const sel=document.getElementById('chargePlace');
     sel.innerHTML='<option value="">選擇地點…</option>'+places.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
-    // also prefill last jpy/hkd
-    if(d.lastJpy) document.getElementById('chargeJpy').value=d.lastJpy;
-    if(d.lastHkd) document.getElementById('chargeHkd').value=d.lastHkd;
+    // prefill last jpy/hkd
+    let lastJpy='',lastHkd='';
+    for(let i=records.length-1;i>=0;i--){if(records[i].jpy){lastJpy=records[i].jpy;lastHkd=records[i].hkd||'';break;}}
+    if(lastJpy) document.getElementById('chargeJpy').value=lastJpy;
+    if(lastHkd) document.getElementById('chargeHkd').value=lastHkd;
     calcChargeRate();
   }catch(e){}
 }
@@ -2318,7 +2371,8 @@ async function submitCharge(){
     const d=await postMain({action:'addChargeRecord',password:pw,date,jpy,hkd,place});
     if(d.error)throw new Error(d.error);
     setSts('chargeSts','✅ 已新增！','ok');
-    loadBalance();
+    _sbChargeCache=null; // invalidate so loadBalance re-fetches
+    setTimeout(()=>{ loadBalance(); loadChargePlaces(); }, 2000); // wait for GAS→Supabase sync
   }catch(e){setSts('chargeSts','❌ 失敗：'+e.message,'err');}
 }
 
@@ -2370,11 +2424,11 @@ async function switchBuyerGroup(g){
 }
 
 async function loadBuyerTable(){
-  let groups = [];
-  try {
-    const d = await postMain({ action: 'getAllGroups', password: pw });
-    groups = (d.groups && d.groups.length) ? d.groups : allGroups;
-  } catch(e) { groups = allGroups; }
+  // Use orderGroups from allItems (col AA = orderGroup), fallback to allGroups (arrival)
+  const orderGroupSet=new Set(allItems.map(i=>i.orderGroup||'').filter(Boolean));
+  let groups=orderGroupSet.size
+    ? [...orderGroupSet].sort((a,b)=>(parseInt(b.replace(/\D/g,''))||0)-(parseInt(a.replace(/\D/g,''))||0))
+    : allGroups;
   if(!curBuyerGroup && groups.length) curBuyerGroup = groups[0];
   buildBuyerGroupTabs(groups);
   if(curBuyerGroup) await loadBuyerData(curBuyerGroup);
@@ -2384,7 +2438,22 @@ async function loadBuyerData(group){
   document.getElementById('buyerGroupLbl').textContent = group ? ' — '+group : '';
   document.getElementById('buyerTbody').innerHTML = '<tr><td colspan="4" class="empty"><div class="spin"></div></td></tr>';
   try{
-    const d = await postMain({action:'getCustomerGroupSummary', password:pw, group});
+    // Compute from allItems (Supabase) instead of GAS
+    const custMap=new Map();
+    for(const it of allItems){
+      if(String(it.orderGroup||'').trim()!==String(group).trim()) continue;
+      if(!it.position||!it.custId) continue;
+      const key=`${it.position}--${it.custId}`;
+      if(!custMap.has(key)) custMap.set(key,{totalJpy:0,rateSum:0});
+      const d=custMap.get(key);
+      const jpy=parseFloat(it.jpy)||0, rate=parseFloat(it.rate)||0;
+      d.totalJpy+=jpy; d.rateSum+=jpy*rate;
+    }
+    const rows=[...custMap.entries()].map(([name,d])=>({
+      name, totalJpy:Math.round(d.totalJpy),
+      rate:d.totalJpy>0?Number((d.rateSum/d.totalJpy).toFixed(4)):null
+    })).sort((a,b)=>a.name.localeCompare(b.name));
+    const d={rows};
     if(d.error){ document.getElementById('buyerTbody').innerHTML=`<tr><td colspan="4" class="empty">❌ ${esc(d.error)}</td></tr>`; return; }
     const rows = Array.isArray(d.rows) ? d.rows : [];
     if(!rows.length){ document.getElementById('buyerTbody').innerHTML='<tr><td colspan="4" class="empty">此團暫無訂單</td></tr>'; return; }
@@ -2498,7 +2567,8 @@ async function clearIColor(group, analysisRow){
 
 // ════════ ID SEARCH ════════
 function loadIdList(){
-  post({action:'getCustomerIds',password:pw}).then(d=>{document.getElementById('idList').innerHTML=(d.ids||[]).map(id=>`<option value="${esc(id)}">`).join('');}).catch(()=>{});
+  const ids=[...new Set(allItems.map(i=>(i.custId||'').trim()).filter(Boolean))].sort();
+  document.getElementById('idList').innerHTML=ids.map(id=>`<option value="${esc(id)}">`).join('');
 }
 document.addEventListener('DOMContentLoaded',()=>{
   const ci=document.getElementById('cidInp');
