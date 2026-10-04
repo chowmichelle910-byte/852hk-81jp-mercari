@@ -509,69 +509,6 @@ function handleTelegramUpdate_(update) {
       if (!count) tgSend_('✅ 沒有待填 Position/ID 的訂單', null, fromChatId);
     }
 
-    // /cg <pos> <id> <group>  — 查詢客人指定團號到貨狀態
-    if (text.startsWith('/cg') && (text === '/cg' || text[3] === ' ' || text[3] === '@')) {
-      const rawArgs = text.replace(/^\/cg(@\S+)?\s*/, '').trim();
-      if (!rawArgs) {
-        tgSend_('用法：/cg &lt;position&gt; &lt;ID&gt; &lt;團號&gt;\n例如：/cg IG abc 55', null, fromChatId);
-        return;
-      }
-      const args = rawArgs.split(/\s+/);
-      if (args.length < 3) {
-        tgSend_('❌ 請輸入 position、ID 及團號\n例如：/cg IG abc 55', null, fromChatId);
-        return;
-      }
-      const qPos   = args[0].trim();
-      const qId    = args[1].trim();
-      const qGroup = args.slice(2).join(' ').trim();
-
-      const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
-      const lastRow = sheet.getLastRow();
-      if (lastRow < 2) { tgSend_('找不到訂單', null, fromChatId); return; }
-      const data = sheet.getRange(2, 1, lastRow - 1, 27).getValues();
-
-      const matched = [];
-      for (let i = 0; i < data.length; i++) {
-        const rowPos   = String(data[i][2]  || '').trim();
-        const rowId    = String(data[i][3]  || '').trim();
-        const rowGroup = String(data[i][26] || '').trim(); // col AA = 訂單團號
-        if (rowPos.toLowerCase() === qPos.toLowerCase() &&
-            rowId.toLowerCase()  === qId.toLowerCase()  &&
-            rowGroup === qGroup) {
-          matched.push({
-            row:         i + 2,
-            code:        String(data[i][14] || '').trim(), // O
-            item:        String(data[i][6]  || '').trim(), // G
-            link:        String(data[i][5]  || '').trim(), // F
-            arrivalDate: String(data[i][15] || '').trim()  // P
-          });
-        }
-      }
-
-      if (!matched.length) {
-        tgSend_(`❌ 找不到 <b>${tgEscape_(qPos)} ${tgEscape_(qId)}</b> 第${tgEscape_(qGroup)}團的訂單`, null, fromChatId);
-        return;
-      }
-
-      const arrived    = matched.filter(r => r.arrivalDate);
-      const notArrived = matched.filter(r => !r.arrivalDate);
-
-      let msg = `📦 <b>${tgEscape_(qPos)} ${tgEscape_(qId)}</b>　第${tgEscape_(qGroup)}團\n`;
-      msg += `共 ${matched.length} 件｜已到 ${arrived.length}　未到 ${notArrived.length}\n`;
-      msg += '──────────────\n';
-
-      for (const r of matched) {
-        const statusIcon = r.arrivalDate ? '✅' : '⏳';
-        const statusText = r.arrivalDate ? `已到貨 (${r.arrivalDate})` : '未到貨';
-        const codePart   = r.code ? `<b>${tgEscape_(r.code)}</b>` : `第${r.row}行`;
-        const itemPart   = r.item ? ` ${tgEscape_(r.item.length > 20 ? r.item.slice(0,20)+'…' : r.item)}` : '';
-        const linkPart   = r.link ? `\n   🔗 ${r.link}` : '';
-        msg += `${statusIcon} ${codePart}${itemPart}　${statusText}${linkPart}\n`;
-      }
-
-      tgSend_(msg, null, fromChatId);
-      return;
-    }
   }
 
   const cb = update.callback_query;
@@ -1505,6 +1442,50 @@ function doPost(e) {
         try { updateSerialNumberInColO(); } catch(e) {}
         checkNewOrdersAndNotify();
         return jsonResponse_({ success: true, row: newRow });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
+    case 'getCustomerGroupStatus': {
+      try {
+        const qPos   = String(e.parameter.pos   || '').trim();
+        const qId    = String(e.parameter.id    || '').trim();
+        const qGroup = String(e.parameter.group || '').trim();
+        if (!qPos || !qId || !qGroup) return jsonResponse_({ error: '請提供 position、ID 及團號' });
+        const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const lastRow = sheet.getLastRow();
+        if (lastRow < 2) return jsonResponse_({ error: '找不到訂單' });
+        const data = sheet.getRange(2, 1, lastRow - 1, 27).getValues();
+        const matched = [];
+        for (let i = 0; i < data.length; i++) {
+          const rowPos   = String(data[i][2]  || '').trim();
+          const rowId    = String(data[i][3]  || '').trim();
+          const rowGroup = String(data[i][26] || '').trim();
+          if (rowPos.toLowerCase() === qPos.toLowerCase() &&
+              rowId.toLowerCase()  === qId.toLowerCase()  &&
+              rowGroup === qGroup) {
+            matched.push({
+              code:        String(data[i][14] || '').trim(),
+              item:        String(data[i][6]  || '').trim(),
+              link:        String(data[i][5]  || '').trim(),
+              arrivalDate: String(data[i][15] || '').trim()
+            });
+          }
+        }
+        if (!matched.length) return jsonResponse_({ error: `找不到 ${qPos} ${qId} 第${qGroup}團的訂單` });
+        const arrived    = matched.filter(r => r.arrivalDate).length;
+        const notArrived = matched.length - arrived;
+        let msg = `📦 <b>${qPos} ${qId}</b>　第${qGroup}團\n`;
+        msg += `共 ${matched.length} 件｜已到 ${arrived}　未到 ${notArrived}\n`;
+        msg += '──────────────\n';
+        for (const r of matched) {
+          const statusIcon = r.arrivalDate ? '✅' : '⏳';
+          const statusText = r.arrivalDate ? `已到貨 (${r.arrivalDate})` : '未到貨';
+          const codePart   = r.code ? `<b>${r.code}</b>` : '—';
+          const itemPart   = r.item ? ` ${r.item.length > 20 ? r.item.slice(0,20)+'…' : r.item}` : '';
+          const linkPart   = r.link ? `\n   🔗 ${r.link}` : '';
+          msg += `${statusIcon} ${codePart}${itemPart}　${statusText}${linkPart}\n`;
+        }
+        return jsonResponse_({ text: msg });
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 

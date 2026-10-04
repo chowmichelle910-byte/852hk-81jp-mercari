@@ -401,6 +401,25 @@ async function handleUpdate(update) {
       return;
     }
 
+    if (text.startsWith('/cg') && (text === '/cg' || text[3] === ' ' || text[3] === '@')) {
+      const rawArgs = text.replace(/^\/cg(@\S+)?\s*/, '').trim();
+      if (!rawArgs || rawArgs.split(/\s+/).length < 3) {
+        await tg('sendMessage', { chat_id: chatId, text: '用法：/cg &lt;position&gt; &lt;ID&gt; &lt;團號&gt;\n例如：/cg IG abc 55', parse_mode: 'HTML' });
+        return;
+      }
+      const args  = rawArgs.split(/\s+/);
+      const qPos  = args[0];
+      const qId   = args[1];
+      const qGroup = args.slice(2).join(' ');
+      const result = await gas({ action: 'getCustomerGroupStatus', pos: qPos, id: qId, group: qGroup });
+      if (result.error) {
+        await tg('sendMessage', { chat_id: chatId, text: '❌ ' + result.error, parse_mode: 'HTML' });
+        return;
+      }
+      await tg('sendMessage', { chat_id: chatId, text: result.text, parse_mode: 'HTML', disable_web_page_preview: true });
+      return;
+    }
+
     if (text === '/sent' || text.startsWith('/sent@')) {
       const result = await gas({ action: 'getSentItems' });
       const items  = result.items || [];
