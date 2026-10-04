@@ -1191,7 +1191,8 @@ async function render(){
     const dN=it.item||'查看商品';
     const isUn=curFilter==='unrated';
     let fL=dL;if(isUn&&fL.includes('mercari.com/item/'))fL=fL.replace('/item/','/transaction/');
-    const locked=(it.position||it.custId)&&!editRows.has(it.row)&&!ip;
+    const pendingArrivalOnly=ip&&p&&Object.keys(p).every(k=>k==='image'||k==='weight'||k==='arrivalDate');
+    const locked=(it.position||it.custId)&&!editRows.has(it.row)&&(!ip||pendingArrivalOnly);
     const isTW=(dPos==='Taiwan'||dPos==='TW');
     const card=document.createElement('div');card.id='card-'+it.row;card.className='ic'+(ip?' pending':'')+(isTW?' tw':'');
 
