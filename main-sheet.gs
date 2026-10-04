@@ -1371,6 +1371,44 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'addNewItem': {
+      try {
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+        const date  = e.parameter.date  ? String(e.parameter.date).trim()  : '';
+        const shop  = e.parameter.shop  ? String(e.parameter.shop).trim()  : '';
+        const link  = e.parameter.link  ? String(e.parameter.link).trim()  : '';
+        const item  = e.parameter.item  ? String(e.parameter.item).trim()  : '';
+        const jpy   = e.parameter.jpy   ? parseFloat(e.parameter.jpy)      : null;
+        const pos   = e.parameter.pos   ? String(e.parameter.pos).trim()   : '';
+        const id    = e.parameter.id    ? String(e.parameter.id).trim()    : '';
+        // 防重複：相同 link
+        if (link) {
+          const lastRow = sheet.getLastRow();
+          if (lastRow >= 2) {
+            const urls = sheet.getRange(2, 6, lastRow - 1, 1).getValues().flat().map(v => String(v).trim());
+            if (urls.includes(link)) return jsonResponse_({ success: true, duplicate: true });
+          }
+        }
+        const newRow = getNextOrderRow_(sheet);
+        if (date) { sheet.getRange(newRow, 2).setValue(new Date(date.replace(/\//g, '-'))); }
+        else       { sheet.getRange(newRow, 2).setValue(new Date()); }
+        if (pos)  sheet.getRange(newRow, 3).setValue(pos);
+        if (id)   sheet.getRange(newRow, 4).setValue(id);
+        if (shop) sheet.getRange(newRow, 5).setValue(shop);
+        if (link) sheet.getRange(newRow, 6).setValue(link);
+        if (item) sheet.getRange(newRow, 7).setValue(item);
+        if (jpy !== null && !isNaN(jpy)) sheet.getRange(newRow, 8).setValue(jpy);
+        SpreadsheetApp.flush();
+        try { assignGroupByOrderDate(); }               catch(e) {}
+        try { updateSerialNumberInColO(); }              catch(e) {}
+        try { updateOrdersCurrencyAndChargeWeighted(); } catch(e) {}
+        try { updateChineseNamesByKeyword(); }           catch(e) {}
+        try { syncToSupabase(); }                        catch(e) {}
+        try { checkNewOrdersAndNotify(); }               catch(e) {}
+        return jsonResponse_({ success: true, row: newRow });
+      } catch(err) { return jsonResponse_({ error: err.message }); }
+    }
+
     case 'addNewOrder': {
       try {
         const sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
