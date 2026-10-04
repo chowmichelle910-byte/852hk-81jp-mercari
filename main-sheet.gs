@@ -11,20 +11,6 @@ const TG_TOKEN   = '8932041338:AAHRcNR1BNoLHU4sXdVSD2uZyQQ2PQN0ECI';
 const TG_CHAT_ID = '8392318130';
 const TG_API_URL = 'https://api.telegram.org/bot' + TG_TOKEN;
 
-// 執行一次：設定 webhook（令 TG 按鈕即時回應）
-// 步驟：1. 部署 GAS 為 Web App（執行者=我，存取=任何人）
-//       2. 在 GAS 編輯器執行 setWebhook() 一次
-// ⚠️ 已棄用 — 請改用 fixWebhook()
-// 此函數在時間觸發器下會回傳空 URL 並清除 webhook，勿執行
-function setWebhook() {
-  throw new Error('請改用 fixWebhook()，此函數已棄用');
-}
-
-// ⚠️ 已棄用 — 執行此函數會清除 webhook，令 TG 按鈕失效
-function deleteWebhookAndUsePoll() {
-  throw new Error('此函數會清除 webhook，如確認要清除請直接修改代碼');
-}
-
 
 // 執行一次：向 Telegram 註冊指令選單（打 / 會出清單）
 function setMyCommands_() {
