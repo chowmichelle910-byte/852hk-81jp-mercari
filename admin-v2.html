@@ -657,7 +657,7 @@ const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const SB_AUTH_EMAIL = '852hk886tw@gmail.com';
 const GAS_PW = '4916';
 if(!window.supabase){document.body.innerHTML='<p style="color:red;padding:20px">Supabase 庫載入失敗，請重新整理頁面</p>';throw new Error('supabase not loaded');}
-const supabase = window.supabase.createClient(SB_URL, SB_KEY);
+var supabase = window.supabase.createClient(SB_URL, SB_KEY);
 // ── V2: Supabase 讀取 adminItems ──
 // GAS sync 需要 service_role key（聽日填入）
 const SB_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmpheHBncm52amVzYm9lbHJhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjQwNTY5MCwiZXhwIjoyMDk3OTgxNjkwfQ.4CdxnLRiYIxg-ag1e9wSOVk_HLVxS6JoHtLMRpGQWho';
