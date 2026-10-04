@@ -3072,7 +3072,7 @@ function updateOrdersFromGmail() {
   const qShipped = `-label:${LABEL_MERCARI} -label:${LABEL_SHOPS} -label:${LABEL_SHIPPED} newer_than:14d from:no-reply@mercari.jp`;
 
   // ── PayPay フリマ / Yahoo!フリマ：支払い完了 + 発送通知 + キャンセル ──
-  const qPayPay = `-label:${LABEL_PAYPAY} newer_than:30d (subject:PayPayフリマ OR subject:"Yahoo!フリマ")`;
+  const qPayPay = `-label:${LABEL_PAYPAY} -label:${LABEL_SHIPPED} newer_than:30d (subject:PayPayフリマ OR subject:"Yahoo!フリマ")`;
 
   // ── Yahoo! かんたん決済：落札支払い完了通知 ──
   const qYahoo = `-label:${LABEL_YAHOO} newer_than:30d subject:"Yahoo! かんたん決済"`;
@@ -3152,9 +3152,12 @@ function updateOrdersFromGmail() {
         const idMatch    = plainBody.match(/商品ID\s*[：: ]\s*(m\d+)/);
         const shopsMatch        = plainBody.match(/mercari-shops\.com\/orders\/([A-Za-z0-9_\-]+)/);
         const shopsProductMatch = plainBody.match(/jp\.mercari\.com\/shops\/product\/([A-Za-z0-9_\-]+)/);
+        const paypayIdMatch     = plainBody.match(/商品ID\s*[：: ]\s*(z[A-Za-z0-9]+)/);
         let linkToFind = '';
         if (idMatch) {
           linkToFind = 'https://jp.mercari.com/item/' + idMatch[1];
+        } else if (paypayIdMatch) {
+          linkToFind = 'https://paypayfleamarket.yahoo.co.jp/item/' + paypayIdMatch[1];
         } else if (shopsProductMatch) {
           // 優先用 product URL（與訂單記錄一致）
           linkToFind = 'https://jp.mercari.com/shops/product/' + shopsProductMatch[1];
