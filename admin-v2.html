@@ -1316,7 +1316,8 @@ async function fetchPrev(url,row){
 function svCache(u,i){try{imgCache.set(u,i);const a=Array.from(imgCache.entries());localStorage.setItem('img_cache',JSON.stringify(a.length>400?a.slice(-400):a));}catch{localStorage.removeItem('img_cache');imgCache.clear();}}
 function upIW(row,src){const w=document.getElementById(`iw-${row}`);if(w)w.innerHTML=`<img src="${escAttr(src)}" style="width:100%;height:100%;object-fit:cover;"><div class="pvlbl">預覽</div>`;}
 function ep(row,f,old){const v=prompt(`修改${f==='track'?'運單編號':'連結'}:`,old);if(v!==null)upd(row,f,v);}
-function upd(row,f,v,typing=false){let d=pending.get(row)||{};d[f]=v;pending.set(row,d);editRows.add(row);if(typing){updUI();const s=document.getElementById('st-'+row);if(s)s.textContent='⏳ 待儲存';}else{render();updUI();}}
+const ARRIVAL_FIELDS=new Set(['image','weight','arrivalDate']);
+function upd(row,f,v,typing=false){let d=pending.get(row)||{};d[f]=v;pending.set(row,d);if(!ARRIVAL_FIELDS.has(f))editRows.add(row);if(typing){updUI();const s=document.getElementById('st-'+row);if(s)s.textContent='⏳ 待儲存';}else{render();updUI();}}
 
 function saveBatch(){
   if(!pending.size)return;
