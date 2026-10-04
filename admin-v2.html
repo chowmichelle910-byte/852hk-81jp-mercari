@@ -786,15 +786,22 @@ window.onload=async()=>{
 };
 
 async function doLogin(){
-  const enteredPw=document.getElementById('sbPw').value.trim();
-  if(!enteredPw)return;
   const sts=document.getElementById('loginStatus');
-  sts.textContent='驗證中…';
   const enteredEmail=document.getElementById('sbEmail').value.trim();
+  const enteredPw=document.getElementById('sbPw').value.trim();
   if(!enteredEmail){sts.textContent='請輸入電郵';return;}
-  const{error}=await supabase.auth.signInWithPassword({email:enteredEmail,password:enteredPw});
+  if(!enteredPw){sts.textContent='請輸入密碼';return;}
+  sts.textContent='驗證中…';
+  let signInResult;
+  try{
+    signInResult=await supabase.auth.signInWithPassword({email:enteredEmail,password:enteredPw});
+  }catch(e){
+    sts.textContent='❌ 網絡錯誤：'+String(e?.message||e||'').slice(0,80);
+    return;
+  }
+  const{error}=signInResult;
   if(error){
-    sts.textContent='❌ 密碼錯誤';
+    sts.textContent='❌ '+error.message;
     return;
   }
   localStorage.setItem('adminLogicalDay',logicalDayKey());
