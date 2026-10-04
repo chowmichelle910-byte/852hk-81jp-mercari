@@ -3071,8 +3071,8 @@ function updateOrdersFromGmail() {
   // ── 発送 email：不加 label:inbox，因 Gmail filter 可能已 archive；只排 Processed-Shipped ──
   const qShipped = `-label:${LABEL_MERCARI} -label:${LABEL_SHOPS} -label:${LABEL_SHIPPED} newer_than:14d from:no-reply@mercari.jp`;
 
-  // ── PayPay フリマ：支払い完了 + 発送通知 + キャンセル ──
-  const qPayPay = `-label:${LABEL_PAYPAY} newer_than:30d subject:PayPayフリマ`;
+  // ── PayPay フリマ / Yahoo!フリマ：支払い完了 + 発送通知 + キャンセル ──
+  const qPayPay = `-label:${LABEL_PAYPAY} newer_than:30d (subject:PayPayフリマ OR subject:"Yahoo!フリマ")`;
 
   // ── Yahoo! かんたん決済：落札支払い完了通知 ──
   const qYahoo = `-label:${LABEL_YAHOO} newer_than:30d subject:"Yahoo! かんたん決済"`;
@@ -3359,9 +3359,9 @@ function updateOrdersFromGmail() {
         }
       }
 
-      // ── 類型 F：PayPay フリマ 支払い完了（新訂單）──
-      else if (subj.includes('PayPayフリマ') &&
-               (subj.includes('支払い') || plainBody.includes('支払い手続完了') || plainBody.includes('支払い手続き完了'))) {
+      // ── 類型 F：PayPay フリマ / Yahoo!フリマ 支払い完了（新訂單）──
+      else if ((subj.includes('PayPayフリマ') || subj.includes('Yahoo!フリマ')) &&
+               (subj.includes('支払い') || plainBody.includes('支払い手続完了') || plainBody.includes('支払い手続き完了') || plainBody.includes('購入いただいた') || plainBody.includes('ご注文ありがとう'))) {
         labeledPayPay = true;
         // 商品ID（含全形空白及轉寄 > 前綴）：匹配緊跟 z/l 開頭的 ID
         const idMatch    = plainBody.match(/商品ID[\s　]*[：:]\s*(z[A-Za-z0-9]+)/);
@@ -3395,8 +3395,8 @@ function updateOrdersFromGmail() {
         }
       }
 
-      // ── 類型 H：PayPay フリマ 取消交易 ──
-      else if (subj.includes('PayPayフリマ') &&
+      // ── 類型 H：PayPay フリマ / Yahoo!フリマ 取消交易 ──
+      else if ((subj.includes('PayPayフリマ') || subj.includes('Yahoo!フリマ')) &&
                (subj.includes('キャンセル') || plainBody.includes('キャンセル') || plainBody.includes('キャンセルされました'))) {
         labeledPayPay = true;
         const idMatch   = plainBody.match(/商品ID[\s　]*[：:]\s*(z[A-Za-z0-9]+)/) ||
