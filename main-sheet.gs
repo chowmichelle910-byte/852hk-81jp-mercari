@@ -3666,6 +3666,77 @@ function updateChineseNamesByKeyword() {
 // ─────────────────────────────────────────────
 var SB_SERVICE_KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmpheHBncm52amVzYm9lbHJhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjQwNTY5MCwiZXhwIjoyMDk3OTgxNjkwfQ.4CdxnLRiYIxg-ag1e9wSOVk_HLVxS6JoHtLMRpGQWho';
 var SB_ADMIN_URL_   = 'https://ifrjaxpgrnvjesboelra.supabase.co/rest/v1/admin_items';
+var SB_BASE_URL_    = 'https://ifrjaxpgrnvjesboelra.supabase.co';
+
+// ─────────────────────────────────────────────
+//  定時同步：Supabase arrivals → Google Sheet
+//  設定方法：GAS Triggers → 時間驅動 → 分鐘計時器 → 每 10 分鐘 → syncArrivalsFromSupabase
+// ─────────────────────────────────────────────
+function syncArrivalsFromSupabase() {
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('訂單');
+    if (!sh) return;
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) return;
+
+    // 讀取 Sheet 現有資料（P=arrivalDate col16, Q=weight col17, S=image col19）
+    var sheetData = sh.getRange(2, 1, lastRow - 1, 19).getValues();
+
+    // 從 Supabase arrivals 表拉所有有資料嘅記錄
+    var res = UrlFetchApp.fetch(
+      SB_BASE_URL_ + '/rest/v1/arrivals?select=sheet_row,image_url,weight_kg,arrival_date&limit=2000',
+      { headers: { 'apikey': SB_SERVICE_KEY_, 'Authorization': 'Bearer ' + SB_SERVICE_KEY_ }, muteHttpExceptions: true }
+    );
+    if (res.getResponseCode() !== 200) { Logger.log('syncArrivalsFromSupabase: fetch failed ' + res.getResponseCode()); return; }
+    var rows = JSON.parse(res.getContentText());
+    if (!rows || !rows.length) return;
+
+    var updated = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var rowNum = parseInt(r.sheet_row);
+      if (!rowNum || rowNum < 2 || rowNum > lastRow) continue;
+
+      var idx = rowNum - 2; // 0-based index in sheetData
+      var sheetArrDate = String(sheetData[idx][15] || '').trim(); // col P = index 15
+      var sheetWeight  = sheetData[idx][16];                      // col Q = index 16
+      var sheetImage   = String(sheetData[idx][18] || '').trim(); // col S = index 18
+
+      var needUpdate = false;
+
+      // 補 arrival_date（col P）
+      if (r.arrival_date && !sheetArrDate) {
+        sh.getRange(rowNum, 16).setValue(r.arrival_date.substring(0, 10).replace(/-/g, '/'));
+        sh.getRange(rowNum, 16).setNumberFormat('yyyy/m/d');
+        // 同時補 AC 欄（未評價）
+        sh.getRange(rowNum, 29).setValue('未評價');
+        needUpdate = true;
+      }
+
+      // 補 weight（col Q）
+      if (r.weight_kg && (!sheetWeight || sheetWeight === 0)) {
+        sh.getRange(rowNum, 17).setValue(r.weight_kg);
+        needUpdate = true;
+      }
+
+      // 補 image（col S）
+      if (r.image_url && !sheetImage) {
+        sh.getRange(rowNum, 19).setValue(r.image_url);
+        needUpdate = true;
+      }
+
+      if (needUpdate) updated++;
+    }
+
+    Logger.log('syncArrivalsFromSupabase: checked=' + rows.length + ' updated=' + updated);
+
+    if (updated > 0) {
+      SpreadsheetApp.flush();
+      try { assignGroupByArrivalDate(); } catch(e) { Logger.log('assignGroup err: ' + e); }
+      try { syncToSupabase(); }           catch(e) { Logger.log('syncSB err: ' + e); }
+    }
+  } catch(err) { Logger.log('syncArrivalsFromSupabase failed: ' + err); }
+}
 
 function syncToSupabase() {
   try {
