@@ -536,7 +536,7 @@ async function handleUpdate(update) {
     for (let i = all.length - 1; i >= 0; i--) {
       const p = String(all[i].position || '').trim();
       const d = String(all[i].custId   || '').trim();
-      if (p === pos && d && !seen.has(d)) { seen.add(d); ids.unshift(d); }
+      if (p === pos && d && !seen.has(d)) { seen.add(d); ids.push(d); }
     }
     const origText = cb.message.text || '';
     const codeM    = origText.match(/_code:(.+?)_/);
@@ -563,7 +563,7 @@ async function handleUpdate(update) {
     for (let i = all2.length - 1; i >= 0; i--) {
       const p = String(all2[i].position || '').trim();
       const d = String(all2[i].custId   || '').trim();
-      if (p === pos && d && !seen2.has(d)) { seen2.add(d); ids2.unshift(d); }
+      if (p === pos && d && !seen2.has(d)) { seen2.add(d); ids2.push(d); }
     }
     await tg('editMessageReplyMarkup', {
       chat_id: chatId, message_id: msgId,
