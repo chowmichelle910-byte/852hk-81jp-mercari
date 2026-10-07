@@ -818,7 +818,7 @@ async function doLogin(){
 
 // ── V2: 驗證密碼（GAS）+ 讀資料（Supabase）──
 async function sbGetAdminItems(){
-  const res=await fetch(`${SB_URL}/rest/v1/admin_items?select=*&order=updated_at.desc&limit=1`,{
+  const res=await fetch(`${SB_URL}/rest/v1/admin_items?id=eq.1&select=*`,{
     headers:{'apikey':SB_SERVICE_KEY,'Authorization':'Bearer '+SB_SERVICE_KEY}
   });
   if(!res.ok) throw new Error('Supabase '+res.status);
