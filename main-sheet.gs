@@ -1196,6 +1196,23 @@ function doPost(e) {
       } catch(err) { return jsonResponse_({ error: err.message }); }
     }
 
+    case 'chargeCopyPrev': {
+      try {
+        const chargeSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('チャージ');
+        const lastRow     = chargeSheet.getLastRow();
+        if (lastRow < 2) return jsonResponse_({ success: false, error: '搵唔到上一筆紀錄' });
+        const data = chargeSheet.getRange(2, 1, lastRow - 1, 6).getValues();
+        let lastJpy = null, lastHkd = null, lastPlace = null;
+        for (let i = data.length - 1; i >= 0; i--) {
+          if (data[i][2]) { lastJpy = data[i][2]; lastHkd = data[i][3] || 0; lastPlace = data[i][5] || null; break; }
+        }
+        if (!lastJpy) return jsonResponse_({ success: false, error: '搵唔到上一筆紀錄' });
+        const today = Utilities.formatDate(new Date(), 'Asia/Hong_Kong', 'yyyy/M/d');
+        addChargeRecord_(today, lastJpy, lastHkd, lastPlace);
+        return jsonResponse_({ success: true, date: today, jpy: lastJpy, hkd: lastHkd, place: lastPlace });
+      } catch(err) { return jsonResponse_({ success: false, error: err.message }); }
+    }
+
     case 'writePositionId': {
       try {
         const rowNum = parseInt(e.parameter.row);

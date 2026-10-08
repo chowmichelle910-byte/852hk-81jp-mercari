@@ -642,6 +642,25 @@ async function handleUpdate(update) {
       reply_markup: { force_reply: true, selective: true }
     });
 
+  } else if (action === 'charge_copy') {
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    const copyResult = await gas({ action: 'chargeCopyPrev', msgId, chatId });
+    if (copyResult && copyResult.success) {
+      await tg('editMessageText', {
+        chat_id: chatId, message_id: msgId,
+        text: (cb.message.text || '') +
+              `\n\n📋 <b>已複製上一筆</b>\n日期：${copyResult.date}\nJPY：¥${Number(copyResult.jpy).toLocaleString()}\nHKD：HK$${Number(copyResult.hkd).toLocaleString()}` +
+              (copyResult.place ? `\n地點：${copyResult.place}` : ''),
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [] }
+      });
+    } else {
+      await tg('editMessageText', {
+        chat_id: chatId, message_id: msgId,
+        text: (cb.message.text || '') + '\n\n❌ ' + (copyResult && copyResult.error ? copyResult.error : '複製失敗')
+      });
+    }
+
   } else if (action === 'clear_sent') {
     const rowNum = parts[1];
     await tg('answerCallbackQuery', { callback_query_id: cb.id });
