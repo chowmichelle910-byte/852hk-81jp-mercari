@@ -3009,16 +3009,24 @@ function assignGroupByArrivalDate() {
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   const orderSheet=ss.getSheetByName("訂單"),dataSheet=ss.getSheetByName("Data");
   const orderData=orderSheet.getRange(2,1,orderSheet.getLastRow()-1,16).getValues();
-  const dataRows=dataSheet.getRange(2,8,dataSheet.getLastRow()-1,3).getValues();
+  const allDataRows=dataSheet.getRange(2,8,dataSheet.getLastRow()-1,3).getValues();
+  const toYMD=v=>{
+    if(!v) return null;
+    const d=v instanceof Date?v:new Date(String(v).replace(/\//g,'-'));
+    if(isNaN(d)) return null;
+    const ms=d.getTime()+8*3600000;
+    const dd=new Date(ms);
+    return dd.getUTCFullYear()+'-'+String(dd.getUTCMonth()+1).padStart(2,'0')+'-'+String(dd.getUTCDate()).padStart(2,'0');
+  };
+  const dataRows=allDataRows.filter(r=>String(r[0]).trim()&&r[1]&&r[2]);
   const results=[];
   for(const orderRow of orderData){
-    let arrival=orderRow[15],groupId="";
-    if(arrival&&!(arrival instanceof Date)){const parsed=new Date(arrival);if(!isNaN(parsed.getTime()))arrival=parsed;}
-    if(arrival instanceof Date){
-      for(let[group,start,end]of dataRows){
-        if(start&&!(start instanceof Date)){const p=new Date(start);if(!isNaN(p.getTime()))start=p;}
-        if(end&&!(end instanceof Date)){const p=new Date(end);if(!isNaN(p.getTime()))end=p;}
-        if(start instanceof Date&&end instanceof Date&&arrival>=start&&arrival<=end){groupId=group;break;}
+    const arrYMD=toYMD(orderRow[15]);
+    let groupId="";
+    if(arrYMD){
+      for(const[group,start,end]of dataRows){
+        const s=toYMD(start),e=toYMD(end);
+        if(s&&e&&arrYMD>=s&&arrYMD<=e){groupId=String(group).trim();break;}
       }
     }
     results.push([groupId]);
