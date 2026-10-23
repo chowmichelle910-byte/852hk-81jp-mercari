@@ -1889,7 +1889,32 @@ async function loadRecordCards(group){
     const rows=d.rows||[];
     if(!rows.length){el.innerHTML='<div class="empty">Record 暫無此團資料，請先匯出</div>';return;}
     el.innerHTML=rows.map(r=>renderRecordCard(r,group)).join('');
+    // 載入已儲存嘅到貨圖 URL
+    sbLoadReceipts(group).catch(()=>{});
   }catch(e){el.innerHTML='<div class="empty">❌ 載入失敗：'+e.message+'</div>';}
+}
+
+async function sbLoadReceipts(group){
+  const res=await fetch(`${SB_URL}/rest/v1/receipts?group=eq.${encodeURIComponent(group)}&select=user_name,url`,{
+    headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+  });
+  if(!res.ok)return;
+  const rows=await res.json();
+  for(const r of rows){
+    if(r.user_name&&r.url) showReceiptUrl(r.user_name,r.url);
+  }
+}
+
+async function sbSaveReceipt(group,userName,url){
+  await fetch(`${SB_URL}/rest/v1/receipts?on_conflict=group,user_name`,{
+    method:'POST',
+    headers:{
+      'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates,return=minimal'
+    },
+    body:JSON.stringify({group,user_name:userName,url})
+  });
 }
 
 function renderRecordCard(r, group){
@@ -2133,11 +2158,13 @@ async function showReceipt(userName, group){
         throw new Error('上傳失敗：'+uploadRes.status+' — '+errText);
       }
 
-      // 5. 顯示 URL
+      // 5. 顯示 URL 並儲存到 receipts table
       const publicUrl = `${SB_URL}/storage/v1/object/public/receipts/${filename}`;
       const VIEWER_BASE = 'https://852hk-81jp-mercari.vercel.app/viewer.html';
       const proxySrc = `https://852hk-81jp-mercari.vercel.app/api/proxy?src=${encodeURIComponent(publicUrl)}`;
-      showReceiptUrl(userName, `${VIEWER_BASE}?src=${encodeURIComponent(proxySrc)}`);
+      const finalUrl = `${VIEWER_BASE}?src=${encodeURIComponent(proxySrc)}`;
+      showReceiptUrl(userName, finalUrl);
+      sbSaveReceipt(currentRecordGroup, userName, finalUrl).catch(()=>{});
       if(btn){btn.disabled=false;btn.textContent=origText;}
       return; // 成功，退出重試迴圈
 
